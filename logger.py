@@ -72,19 +72,13 @@ class FileChangeHandler(FileSystemEventHandler):
                     if self.wait_for_file(source_file):
                         if not os.path.exists(dest_file):
                             shutil.copy2(source_file, dest_file)
-                            if self.wait_for_file(dest_file):  # Проверяем доступность скопированного файла
-                                print(f'Copied {filename} from directory A to {self.directory}')
-                                copied = True
-                            else:
-                                print(f'File {dest_file} is currently in use after copying.')
+                            print(f'Copied {filename} from directory A to {self.directory}')
+                            copied = True
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
                                 shutil.copy2(source_file, dest_file)
-                                if self.wait_for_file(dest_file):  # Проверяем доступность обновленного файла
-                                    print(f'Updated {filename} in {self.directory}')
-                                    copied = True
-                                else:
-                                    print(f'File {dest_file} is currently in use after updating.')
+                                print(f'Updated {filename} in {self.directory}')
+                                copied = True
                     else:
                         print(f'File {source_file} is currently in use and cannot be copied.')
 
@@ -147,10 +141,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 dest_file = os.path.join(self.directory, filename)
                 if os.path.exists(dest_file) and os.path.getmtime(source_file) > os.path.getmtime(dest_file):
                     shutil.copy2(source_file, dest_file)
-                    if self.wait_for_file(dest_file):  # Проверяем доступность обновленного файла
-                        print(f'Updated {filename} in {self.directory}')
-                    else:
-                        print(f'File {dest_file} is currently in use after updating.')
+                    print(f'Updated {filename} in {self.directory}')
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
