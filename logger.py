@@ -1,6 +1,7 @@
 import os
 import time
 import shutil
+import errno
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -10,7 +11,7 @@ class FileChangeHandler(FileSystemEventHandler):
         self.word = word
         self.file_paths = {}
         self.track_files()
-        self.create_directory_if_not_exists(directory)  # Добавляем проверку и создание директории
+        self.create_directory_if_not_exists(directory)
 
     def track_files(self):
         print("Tracking .log files in directory:", self.directory)
@@ -35,26 +36,66 @@ class FileChangeHandler(FileSystemEventHandler):
             except Exception as e:
                 print(f"Error creating directory {directory}: {e}")
 
+    def is_file_closed(self, file_path):
+        try:
+            with open(file_path, 'rb+', buffering=0) as file:
+                file.seek(0, os.SEEK_END)  # Ensure we can seek to the end of the file
+            return True
+        except OSError as e:
+            if e.errno in (errno.EACCES, errno.EROFS):
+                print(f"File {file_path} is currently in use: {e}")
+                return False
+            else:
+                raise
+
+    def wait_for_file(self, file_path, timeout=30):
+        """Wait for the file to be available for reading."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.is_file_closed(file_path):
+                return True
+            time.sleep(1)
+        print(f"File {file_path} is still in use after {timeout} seconds.")
+        return False
+
     def copy_files_from_A(self):
         directory_A = r'C:\temp\loggerA'  # Путь к директории A
         try:
-            self.create_directory_if_not_exists(self.directory)  # Проверяем и создаем целевую директорию, если нужно
+            self.create_directory_if_not_exists(self.directory)
 
-            copied = False  # Флаг для отслеживания факта копирования файлов
+            copied = False
+
             for filename in os.listdir(directory_A):
                 if filename.endswith('.log'):
                     source_file = os.path.join(directory_A, filename)
                     dest_file = os.path.join(self.directory, filename)
-                    if not os.path.exists(dest_file):  # Проверяем, что файл не существует в целевой директории
-                        shutil.copy2(source_file, dest_file)
-                        print(f'Copied {filename} from directory A to {self.directory}')
-                        copied = True  # Установка флага при успешном копировании
-                    else:
-                        # Проверяем, изменился ли файл в директории A по сравнению с целевой директорией
-                        if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
+                    if self.wait_for_file(source_file):
+                        if not os.path.exists(dest_file):
                             shutil.copy2(source_file, dest_file)
-                            print(f'Updated {filename} in {self.directory}')
-                            copied = True  # Установка флага при успешном обновлении
+                            if self.wait_for_file(dest_file):  # Проверяем доступность скопированного файла
+                                print(f'Copied {filename} from directory A to {self.directory}')
+                                copied = True
+                            else:
+                                print(f'File {dest_file} is currently in use after copying.')
+                        else:
+                            if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
+                                shutil.copy2(source_file, dest_file)
+                                if self.wait_for_file(dest_file):  # Проверяем доступность обновленного файла
+                                    print(f'Updated {filename} in {self.directory}')
+                                    copied = True
+                                else:
+                                    print(f'File {dest_file} is currently in use after updating.')
+                    else:
+                        print(f'File {source_file} is currently in use and cannot be copied.')
+
+            for filename in os.listdir(self.directory):
+                if filename.endswith('.log'):
+                    dest_file = os.path.join(self.directory, filename)
+                    source_file = os.path.join(directory_A, filename)
+                    if not os.path.exists(source_file):
+                        os.remove(dest_file)
+                        print(f'Deleted {filename} from {self.directory} because it does not exist in {directory_A}')
+                        copied = True
 
             if copied:
                 print(f'Copying from {directory_A} to {self.directory} completed.')
@@ -100,14 +141,16 @@ class FileChangeHandler(FileSystemEventHandler):
                     if line.strip().startswith(self.word):
                         print(f"New ERR line: {line.strip()}")
 
-                # Проверяем, изменился ли файл в директории A и обновляем его в целевой директории при необходимости
-                directory_A = r'C:\temp\loggerA'  # Путь к директории A
+                directory_A = r'C:\temp\loggerA'
                 filename = os.path.basename(event.src_path)
                 source_file = os.path.join(directory_A, filename)
                 dest_file = os.path.join(self.directory, filename)
                 if os.path.exists(dest_file) and os.path.getmtime(source_file) > os.path.getmtime(dest_file):
                     shutil.copy2(source_file, dest_file)
-                    print(f'Updated {filename} in {self.directory}')
+                    if self.wait_for_file(dest_file):  # Проверяем доступность обновленного файла
+                        print(f'Updated {filename} in {self.directory}')
+                    else:
+                        print(f'File {dest_file} is currently in use after updating.')
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
@@ -125,14 +168,13 @@ def main(directory, word):
 
     try:
         while True:
-            # Проверяем наличие новых файлов в директории A и копируем их
             event_handler.copy_files_from_A()
-            time.sleep(1)  # Проверяем каждую секунду
+            time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
 
 if __name__ == "__main__":
-    directory = r"C:\temp\logger"  # Или "C:/path/to/directory"
+    directory = r"C:\temp\logger"
     word = "ERR"
     main(directory, word)
