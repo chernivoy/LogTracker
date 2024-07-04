@@ -22,7 +22,6 @@ class FileChangeHandler(FileSystemEventHandler):
         self.word = word
         self.file_paths = {}
         self.last_error_lines = set()  # Для отслеживания уже выведенных строк с ошибками
-        self.last_update_time = {}  # Для отслеживания времени последнего обновления файлов
         self.track_files()
         self.create_directory_if_not_exists(directory)
 
@@ -33,7 +32,6 @@ class FileChangeHandler(FileSystemEventHandler):
                 file_path = os.path.join(self.directory, file_name)
                 if file_name.endswith(".log") and self.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
-                    self.last_update_time[file_path] = -1  # Инициализация времени обновления
                     print(f"Файл добавлен для отслеживания: {file_path}")
         except PermissionError as e:
             print(f"Ошибка доступа: {e}")
@@ -85,16 +83,13 @@ class FileChangeHandler(FileSystemEventHandler):
                             copy_file_without_waiting(source_file, dest_file)
                             print(f'Скопирован файл {filename} из директории A в {self.directory}')
                             copied = True
-                            self.check_new_errors(dest_file)  # Проверка новых ошибок после копирования
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
                                 copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')
                                 copied = True
-                                self.check_new_errors(dest_file)  # Проверка новых ошибок после обновления
-
-            # Очищаем множество ошибок после каждого копирования
-            self.last_error_lines = set()
+                    else:
+                        print(f'Файл {source_file} в данный момент используется и не может быть скопирован.')
 
             for filename in os.listdir(self.directory):
                 if filename.endswith('.log'):
@@ -109,15 +104,6 @@ class FileChangeHandler(FileSystemEventHandler):
                 print(f'Завершено копирование из {directory_A} в {self.directory}.')
         except Exception as e:
             print(f"Ошибка при копировании файлов из директории A: {e}")
-
-    def check_new_errors(self, file_path):
-        new_lines = self.read_new_lines(file_path)
-        current_time = os.path.getmtime(file_path)
-        for line in new_lines:
-            if line.strip().startswith(self.word) and line not in self.last_error_lines and current_time > self.last_update_time.get(file_path, -1):
-                print(f"Новая строка с ошибкой: {line.strip()}")
-                self.last_error_lines.add(line)  # Добавляем новую строку в множество
-        self.last_update_time[file_path] = current_time  # Обновляем время последнего обновления файла
 
     def can_read_file(self, file_path):
         try:
@@ -134,7 +120,7 @@ class FileChangeHandler(FileSystemEventHandler):
         try:
             time.sleep(1)
             with open(file_path, 'r', encoding='utf-8') as file:
-                file.seek(self.file_paths.get(file_path, 0))
+                file.seek(self.file_paths[file_path])
                 new_lines = file.readlines()
                 self.file_paths[file_path] = current_size
         except PermissionError as e:
@@ -154,7 +140,19 @@ class FileChangeHandler(FileSystemEventHandler):
                 print(f"Файл {event.src_path} был удален. Остановлено отслеживание.")
             else:
                 print(f"Изменен файл: {event.src_path}")
-                self.check_new_errors(event.src_path)
+                new_lines = self.read_new_lines(event.src_path)
+                for line in new_lines:
+                    if line.strip().startswith(self.word) and line not in self.last_error_lines:
+                        print(f"Новая строка с ошибкой: {line.strip()}")
+                        self.last_error_lines.add(line)  # Добавляем новую строку в множество
+
+                directory_A = r'C:\ProgramData\ADAICA Schweiz AG\ADAICA\Logs\ichernevoy'
+                filename = os.path.basename(event.src_path)
+                source_file = os.path.join(directory_A, filename)
+                dest_file = os.path.join(self.directory, filename)
+                if os.path.exists(dest_file) and os.path.getmtime(source_file) > os.path.getmtime(dest_file):
+                    copy_file_without_waiting(source_file, dest_file)
+                    print(f'Обновлен файл {filename} в {self.directory}')
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
