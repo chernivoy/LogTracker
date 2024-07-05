@@ -1,6 +1,9 @@
 import os
 import time
 import shutil
+import queue
+import threading
+import tkinter as tk
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -17,14 +20,17 @@ def copy_file_without_waiting(source_file, dest_file):
         print(f"Не удалось скопировать файл {source_file}: {e}")
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, directory, word):
+    def __init__(self, directory, word, text_widget, event_queue):
         self.directory = directory
         self.word = word
+        self.text_widget = text_widget
+        self.event_queue = event_queue
         self.file_paths = {}
-        self.last_error_line = {}  # Переменная для хранения последней строки с ошибкой для каждого файла
-        self.last_update_time = {}  # Для отслеживания времени последнего обновления файлов
+        self.last_error_line = {}
+        self.last_update_time = {}
         self.track_files()
         self.create_directory_if_not_exists(directory)
+        self.update_text_widget()
 
     def track_files(self):
         print("Отслеживание .log файлов в директории:", self.directory)
@@ -33,7 +39,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 file_path = os.path.join(self.directory, file_name)
                 if file_name.endswith(".log") and self.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
-                    self.last_update_time[file_path] = -1  # Инициализация времени обновления
+                    self.last_update_time[file_path] = -1
                     print(f"Файл добавлен для отслеживания: {file_path}")
         except PermissionError as e:
             print(f"Ошибка доступа: {e}")
@@ -53,14 +59,13 @@ class FileChangeHandler(FileSystemEventHandler):
     def is_file_closed(self, file_path):
         try:
             with open(file_path, 'rb') as file:
-                file.seek(0, os.SEEK_END)  # Убедимся, что можем перемещаться в конец файла
+                file.seek(0, os.SEEK_END)
             return True
         except IOError as e:
             print(f"Файл {file_path} в данный момент используется: {e}")
             return False
 
     def wait_for_file(self, file_path, timeout=30):
-        """Ожидание доступности файла для чтения."""
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self.is_file_closed(file_path):
@@ -70,7 +75,7 @@ class FileChangeHandler(FileSystemEventHandler):
         return False
 
     def copy_files_from_A(self):
-        directory_A = r'C:\ProgramData\ADAICA Schweiz AG\ADAICA\Logs\ichernevoy'  # Путь к директории A
+        directory_A = r'C:\ProgramData\ADAICA Schweiz AG\ADAICA\Logs\ichernevoy'
         try:
             self.create_directory_if_not_exists(self.directory)
 
@@ -85,16 +90,14 @@ class FileChangeHandler(FileSystemEventHandler):
                             copy_file_without_waiting(source_file, dest_file)
                             print(f'Скопирован файл {filename} из директории A в {self.directory}')
                             copied = True
-                            self.check_new_errors(dest_file)  # Проверка новых ошибок после копирования
+                            self.check_new_errors(dest_file)
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
+                                time.sleep(5)
                                 copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')
                                 copied = True
-                                self.check_new_errors(dest_file)  # Проверка новых ошибок после обновления
-
-            # Очищаем множество ошибок после каждого копирования
-            self.last_error_lines = set()
+                                self.check_new_errors(dest_file)
 
             for filename in os.listdir(self.directory):
                 if filename.endswith('.log'):
@@ -107,6 +110,7 @@ class FileChangeHandler(FileSystemEventHandler):
 
             if copied:
                 print(f'Завершено копирование из {directory_A} в {self.directory}.')
+                self.event_queue.put(self.update_text_widget)
         except Exception as e:
             print(f"Ошибка при копировании файлов из директории A: {e}")
 
@@ -116,9 +120,8 @@ class FileChangeHandler(FileSystemEventHandler):
         last_error_line = None
         for line in new_lines:
             if line.strip().startswith(self.word) and current_time > self.last_update_time.get(file_path, -1):
-                last_error_line = line.strip()  # Запоминаем последнюю строку с ошибкой
-        self.last_update_time[file_path] = current_time  # Обновляем время последнего обновления файла
-        # После проверки всех строк выводим последнюю строку с ошибкой для файла
+                last_error_line = line.strip()
+        self.last_update_time[file_path] = current_time
         if last_error_line:
             print(f"Новая строка с ошибкой: {last_error_line}")
 
@@ -158,24 +161,53 @@ class FileChangeHandler(FileSystemEventHandler):
             else:
                 print(f"Изменен файл: {event.src_path}")
                 self.check_new_errors(event.src_path)
+                self.event_queue.put(self.update_text_widget)
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
             del self.file_paths[event.src_path]
+            self.event_queue.put(self.update_text_widget)
 
     def stop_tracking(self, file_path):
         if file_path in self.file_paths:
             del self.file_paths[file_path]
 
+    def update_text_widget(self):
+        self.text_widget.delete(1.0, tk.END)
+        for file_path in self.file_paths:
+            self.text_widget.insert(tk.END, file_path + "\n")
+
+def create_text_window():
+    root = tk.Tk()
+    root.title("Файлы в целевой директории")
+    text_widget = tk.Text(root, wrap="none")
+    text_widget.pack(fill="both", expand=True)
+    return root, text_widget
+
 def main(directory, word):
-    event_handler = FileChangeHandler(directory, word)
+    root, text_widget = create_text_window()
+    event_queue = queue.Queue()
+    event_handler = FileChangeHandler(directory, word, text_widget, event_queue)
     observer = Observer()
     observer.schedule(event_handler, directory, recursive=False)
     observer.start()
 
+    def process_queue():
+        try:
+            while True:
+                event = event_queue.get_nowait()
+                event()
+        except queue.Empty:
+            pass
+        root.after(100, process_queue)
+
+    root.after(100, process_queue)
+
     try:
         while True:
             event_handler.copy_files_from_A()
+            root.update_idletasks()
+            root.update()
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
