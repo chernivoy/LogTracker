@@ -182,7 +182,17 @@ def create_text_window():
     root.title("Файлы в целевой директории")
     text_widget = tk.Text(root, wrap="none")
     text_widget.pack(fill="both", expand=True)
+    pin_button = tk.Button(root, text="Pin", command=lambda: toggle_pin(root, pin_button))
+    pin_button.pack()
     return root, text_widget
+
+def toggle_pin(root, button):
+    if root.attributes('-topmost'):
+        root.attributes('-topmost', False)
+        button.config(text="Pin")
+    else:
+        root.attributes('-topmost', True)
+        button.config(text="Unpin")
 
 def main(directory, word):
     root, text_widget = create_text_window()
