@@ -73,7 +73,7 @@ class FileChangeHandler(FileSystemEventHandler):
         while time.time() - start_time < timeout:
             if self.is_file_closed(file_path):
                 return True
-            time.sleep(1)
+            # time.sleep(1)
         print(f"Файл {file_path} все еще используется после {timeout} секунд.")
         return False
 
@@ -96,7 +96,7 @@ class FileChangeHandler(FileSystemEventHandler):
                             self.check_new_errors(dest_file)
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
-                                # time.sleep(1)
+                                # time.sleep(5)
                                 copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')
                                 copied = True
@@ -129,7 +129,7 @@ class FileChangeHandler(FileSystemEventHandler):
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.config(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
-            self.error_text_widget.insert(tk.END, last_error_line)
+            self.error_text_widget.insert(tk.END, last_error_line + "\n")
             self.error_text_widget.config(state=tk.DISABLED)
 
     def can_read_file(self, file_path):
@@ -145,7 +145,7 @@ class FileChangeHandler(FileSystemEventHandler):
         new_lines = []
         current_size = os.path.getsize(file_path)
         try:
-            time.sleep(1)
+            # time.sleep(1)
             with open(file_path, 'r', encoding='utf-8') as file:
                 file.seek(self.file_paths.get(file_path, 0))
                 new_lines = file.readlines()
@@ -198,13 +198,13 @@ def create_text_window():
     error_label = tk.Label(error_frame, text="Последняя ошибка:")
     error_label.pack(side="left", padx=(10, 0))
 
-    error_text_widget = tk.Text(error_frame, height=1, wrap="none", state=tk.DISABLED)
+    error_text_widget = tk.Text(error_frame, height=6, wrap=tk.WORD, state=tk.DISABLED)
     error_text_widget.pack(fill="both", expand=True, padx=(5, 10))
 
     pin_button = tk.Button(root, text="Pin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.pack()
+    pin_button.pack(pady=10)
 
-    return root, text_widget, error_text_widget
+    return root, text_widget, error_text_widget, pin_button
 
 
 def toggle_pin(root, button):
@@ -217,7 +217,7 @@ def toggle_pin(root, button):
 
 
 def main(directory, word):
-    root, text_widget, error_text_widget = create_text_window()
+    root, text_widget, error_text_widget, pin_button = create_text_window()
     event_queue = queue.Queue()
     event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, event_queue)
     observer = Observer()
