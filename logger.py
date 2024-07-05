@@ -93,7 +93,7 @@ class FileChangeHandler(FileSystemEventHandler):
                             self.check_new_errors(dest_file)
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
-                                time.sleep(5)
+                                time.sleep(1)
                                 copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')
                                 copied = True
@@ -166,6 +166,7 @@ class FileChangeHandler(FileSystemEventHandler):
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
             del self.file_paths[event.src_path]
+            print(f"Файл {event.src_path} был удален.")
             self.event_queue.put(self.update_text_widget)
 
     def stop_tracking(self, file_path):
@@ -211,14 +212,15 @@ def main(directory, word):
             pass
         root.after(100, process_queue)
 
+    def periodic_sync():
+        event_handler.copy_files_from_A()
+        root.after(5000, periodic_sync)
+
     root.after(100, process_queue)
+    root.after(5000, periodic_sync)
 
     try:
-        while True:
-            event_handler.copy_files_from_A()
-            root.update_idletasks()
-            root.update()
-            time.sleep(1)
+        root.mainloop()
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
