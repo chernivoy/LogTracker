@@ -21,7 +21,6 @@ class FileChangeHandler(FileSystemEventHandler):
         self.directory = directory
         self.word = word
         self.file_paths = {}
-        self.last_error_lines = set()  # Для отслеживания уже выведенных строк с ошибками
         self.last_error_line = {}  # Переменная для хранения последней строки с ошибкой для каждого файла
         self.last_update_time = {}  # Для отслеживания времени последнего обновления файлов
         self.track_files()
@@ -116,9 +115,6 @@ class FileChangeHandler(FileSystemEventHandler):
         current_time = os.path.getmtime(file_path)
         last_error_line = None
         for line in new_lines:
-            if line.strip().startswith(self.word) and line not in self.last_error_lines and current_time > self.last_update_time.get(file_path, -1):
-                print(f"Новая строка с ошибкой: {line.strip()}")
-                self.last_error_lines.add(line)  # Добавляем новую строку в множество
             if line.strip().startswith(self.word) and current_time > self.last_update_time.get(file_path, -1):
                 last_error_line = line.strip()  # Запоминаем последнюю строку с ошибкой
         self.last_update_time[file_path] = current_time  # Обновляем время последнего обновления файла
@@ -189,4 +185,3 @@ if __name__ == "__main__":
     directory = r"C:\temp\logger"
     word = "ERR"
     main(directory, word)
-
