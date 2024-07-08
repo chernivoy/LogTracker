@@ -6,6 +6,9 @@ import threading
 import tkinter as tk
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import configparser
+
+CONFIG_FILE = "window_config.ini"
 
 
 def copy_file_without_waiting(source_file, dest_file):
@@ -73,7 +76,7 @@ class FileChangeHandler(FileSystemEventHandler):
         while time.time() - start_time < timeout:
             if self.is_file_closed(file_path):
                 return True
-            time.sleep(1)
+            # time.sleep(1)
         print(f"Файл {file_path} все еще используется после {timeout} секунд.")
         return False
 
@@ -96,7 +99,7 @@ class FileChangeHandler(FileSystemEventHandler):
                             self.check_new_errors(dest_file)
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
-                                time.sleep(5)
+                                # time.sleep(5)
                                 copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')
                                 copied = True
@@ -145,7 +148,7 @@ class FileChangeHandler(FileSystemEventHandler):
         new_lines = []
         current_size = os.path.getsize(file_path)
         try:
-            time.sleep(1)
+            # time.sleep(1)
             with open(file_path, 'r', encoding='utf-8') as file:
                 file.seek(self.file_paths.get(file_path, 0))
                 new_lines = file.readlines()
@@ -190,44 +193,69 @@ def create_text_window():
     root = tk.Tk()
     root.title("Файлы в целевой директории")
 
-    text_widget_frame = tk.Frame(root)
-    text_widget_frame.pack(fill="both", expand=True)
-    text_widget_frame.pack_propagate(False)
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE)
+
+    if config.has_section("Window"):
+        width = config.getint("Window", "width")
+        height = config.getint("Window", "height")
+        root.geometry(f"{width}x{height}")
+    else:
+        root.geometry("800x600")  # Default size
+
+    main_frame = tk.Frame(root)
+    main_frame.pack(fill="both", expand=True)
+
+    pin_button = tk.Button(main_frame, text="Pin", command=lambda: toggle_pin(root, pin_button))
+    pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+
+    text_widget_frame = tk.Frame(main_frame)
+    text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
     text_widget = tk.Text(text_widget_frame, wrap="none")
     text_widget.pack(fill="both", expand=True)
 
-    error_frame = tk.Frame(root)
-    error_frame.pack(fill="x", pady=10)
+    error_frame = tk.Frame(main_frame)
+    error_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
 
     error_label = tk.Label(error_frame, text="Последняя ошибка:")
     error_label.pack(side="left", padx=(10, 0))
 
     error_text_widget_frame = tk.Frame(error_frame)
     error_text_widget_frame.pack(fill="both", expand=True)
-    error_text_widget_frame.pack_propagate(False)
 
     error_text_widget = tk.Text(error_text_widget_frame, height=3, wrap=tk.WORD, state=tk.DISABLED)
     error_text_widget.pack(fill="both", expand=True, padx=(5, 10))
 
-    pin_button = tk.Button(root, text="Pin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.pack(pady=10)
+    root.update()
+    text_widget_frame.configure(height=root.winfo_height() - error_frame.winfo_height() - pin_button.winfo_height())
+    error_text_widget_frame.configure(height=error_text_widget.winfo_reqheight())
 
-    return root, text_widget, error_text_widget, pin_button
+    main_frame.grid_rowconfigure(1, weight=1)
+    main_frame.grid_columnconfigure(0, weight=1)
+
+    def resize(event):
+        text_widget_frame.configure(height=root.winfo_height() - error_frame.winfo_height() - pin_button.winfo_height())
+        error_text_widget_frame.configure(height=error_text_widget.winfo_reqheight())
+
+    root.bind("<Configure>", resize)
+
+    return root, text_widget, error_text_widget
 
 
-def toggle_pin(root, button):
+def toggle_pin(root, pin_button):
     if root.attributes('-topmost'):
         root.attributes('-topmost', False)
-        button.config(text="Pin")
+        pin_button.config(text="Pin")
     else:
         root.attributes('-topmost', True)
-        button.config(text="Unpin")
+        pin_button.config(text="Unpin")
 
 
 def main(directory, word):
-    root, text_widget, error_text_widget, pin_button = create_text_window()
+    root, text_widget, error_text_widget = create_text_window()
     event_queue = queue.Queue()
+
     event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, event_queue)
     observer = Observer()
     observer.schedule(event_handler, directory, recursive=False)
@@ -248,6 +276,18 @@ def main(directory, word):
 
     root.after(100, process_queue)
     root.after(5000, periodic_sync)
+
+    def on_closing():
+        config = configparser.ConfigParser()
+        config['Window'] = {
+            'width': root.winfo_width(),
+            'height': root.winfo_height()
+        }
+        with open(CONFIG_FILE, 'w') as configfile:
+            config.write(configfile)
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
 
     try:
         root.mainloop()
