@@ -192,8 +192,7 @@ def create_text_window():
     root = ttk.Window(themename="litera")
     root.title("Файлы в целевой директории")
     root.attributes('-topmost', True)
-    root.geometry("800x600")
-    root.geometry("800x600+100+100")
+    load_window_size(root)
 
     main_frame = ttk.Frame(root)
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -216,13 +215,26 @@ def create_text_window():
     error_text_widget_frame = ttk.Frame(error_frame)
     error_text_widget_frame.pack(fill="both", expand=True)
 
-    error_text_widget = ttk.Text(error_text_widget_frame, height=3, wrap=WORD, state=DISABLED)
+    error_text_widget = ttk.Text(error_text_widget_frame, height=3, wrap=WORD, state=tk.DISABLED)
     error_text_widget.pack(fill="both", expand=True, padx=(5, 10))
 
     main_frame.grid_rowconfigure(1, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
 
     return root, text_widget, error_text_widget
+
+def load_window_size(root):
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        if 'Window' in config:
+            width = config.getint('Window', 'width', fallback=800)
+            height = config.getint('Window', 'height', fallback=600)
+            x = config.getint('Window', 'x', fallback=100)
+            y = config.getint('Window', 'y', fallback=100)
+            root.geometry(f'{width}x{height}+{x}+{y}')
+    else:
+        root.geometry('800x600+100+100')
 
 def toggle_pin(root, pin_button):
     if root.attributes('-topmost'):
