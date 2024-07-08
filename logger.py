@@ -10,7 +10,6 @@ import configparser
 
 CONFIG_FILE = "window_config.ini"
 
-
 def copy_file_without_waiting(source_file, dest_file):
     try:
         with open(source_file, 'rb') as src, open(dest_file, 'wb') as dst:
@@ -22,7 +21,6 @@ def copy_file_without_waiting(source_file, dest_file):
         print(f"Файл {source_file} не найден: {e}")
     except Exception as e:
         print(f"Не удалось скопировать файл {source_file}: {e}")
-
 
 class FileChangeHandler(FileSystemEventHandler):
     def __init__(self, directory, word, text_widget, error_text_widget, event_queue):
@@ -76,7 +74,7 @@ class FileChangeHandler(FileSystemEventHandler):
         while time.time() - start_time < timeout:
             if self.is_file_closed(file_path):
                 return True
-            # time.sleep(1)
+            time.sleep(1)
         print(f"Файл {file_path} все еще используется после {timeout} секунд.")
         return False
 
@@ -99,7 +97,6 @@ class FileChangeHandler(FileSystemEventHandler):
                             self.check_new_errors(dest_file)
                         else:
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
-                                # time.sleep(5)
                                 copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')
                                 copied = True
@@ -148,7 +145,6 @@ class FileChangeHandler(FileSystemEventHandler):
         new_lines = []
         current_size = os.path.getsize(file_path)
         try:
-            # time.sleep(1)
             with open(file_path, 'r', encoding='utf-8') as file:
                 file.seek(self.file_paths.get(file_path, 0))
                 new_lines = file.readlines()
@@ -188,7 +184,6 @@ class FileChangeHandler(FileSystemEventHandler):
         for file_path in self.file_paths:
             self.text_widget.insert(tk.END, file_path + "\n")
 
-
 def create_text_window():
     root = tk.Tk()
     root.title("Файлы в целевой директории")
@@ -196,12 +191,22 @@ def create_text_window():
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
 
+    width = 800  # Значение по умолчанию
+    height = 600  # Значение по умолчанию
+    x = 0  # Значение по умолчанию
+    y = 0  # Значение по умолчанию
+
     if config.has_section("Window"):
-        width = config.getint("Window", "width")
-        height = config.getint("Window", "height")
-        root.geometry(f"{width}x{height}")
-    else:
-        root.geometry("800x600")  # Default size
+        if config.has_option("Window", "width"):
+            width = config.getint("Window", "width")
+        if config.has_option("Window", "height"):
+            height = config.getint("Window", "height")
+        if config.has_option("Window", "x"):
+            x = config.getint("Window", "x")
+        if config.has_option("Window", "y"):
+            y = config.getint("Window", "y")
+
+    root.geometry(f"{width}x{height}+{x}+{y}")
 
     main_frame = tk.Frame(root)
     main_frame.pack(fill="both", expand=True)
@@ -242,7 +247,6 @@ def create_text_window():
 
     return root, text_widget, error_text_widget
 
-
 def toggle_pin(root, pin_button):
     if root.attributes('-topmost'):
         root.attributes('-topmost', False)
@@ -251,6 +255,16 @@ def toggle_pin(root, pin_button):
         root.attributes('-topmost', True)
         pin_button.config(text="Unpin")
 
+def save_window_size(root):
+    config = configparser.ConfigParser()
+    config['Window'] = {
+        'width': root.winfo_width(),
+        'height': root.winfo_height(),
+        'x': root.winfo_x(),
+        'y': root.winfo_y()
+    }
+    with open(CONFIG_FILE, 'w') as configfile:
+        config.write(configfile)
 
 def main(directory, word):
     root, text_widget, error_text_widget = create_text_window()
@@ -274,18 +288,12 @@ def main(directory, word):
         event_handler.copy_files_from_A()
         root.after(5000, periodic_sync)
 
+    def on_closing():
+        save_window_size(root)
+        root.destroy()
+
     root.after(100, process_queue)
     root.after(5000, periodic_sync)
-
-    def on_closing():
-        config = configparser.ConfigParser()
-        config['Window'] = {
-            'width': root.winfo_width(),
-            'height': root.winfo_height()
-        }
-        with open(CONFIG_FILE, 'w') as configfile:
-            config.write(configfile)
-        root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
 
@@ -294,7 +302,6 @@ def main(directory, word):
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
-
 
 if __name__ == "__main__":
     directory = r"C:\temp\logger"
