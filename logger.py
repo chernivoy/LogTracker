@@ -279,7 +279,10 @@ def main(directory, word):
 
     def on_closing():
         save_window_size(root)
+        observer.stop()
+        observer.join()
         root.destroy()
+        os._exit(0)  # Полностью завершить скрипт
 
     root.after(100, process_queue)
     root.after(5000, periodic_sync)
