@@ -4,9 +4,11 @@ import shutil
 import queue
 import threading
 import tkinter as tk
+from tkinter import messagebox
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import configparser
+import subprocess
 import ctypes
 from ctypes import wintypes
 import ttkbootstrap as ttk
@@ -34,6 +36,7 @@ class FileChangeHandler(FileSystemEventHandler):
         self.error_text_widget = error_text_widget
         self.event_queue = event_queue
         self.file_paths = {}
+        self.last_error_file = None
         self.last_error_line = {}
         self.last_update_time = {}
         self.track_files()
@@ -130,6 +133,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 last_error_line = line.strip()
         self.last_update_time[file_path] = current_time
         if last_error_line:
+            self.last_error_file = file_path
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.config(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
@@ -216,10 +220,16 @@ def create_text_window():
     error_text_widget_frame.pack(fill="both", expand=True)
 
     error_text_widget = ttk.Text(error_text_widget_frame, height=3, wrap=WORD, state=tk.DISABLED)
-    error_text_widget.pack(fill="both", expand=True, padx=(5, 10))
+    error_text_widget.pack(fill="both", expand=True, padx=10)
 
+    root.grid_columnconfigure(0, weight=1)
+    root.grid_rowconfigure(1, weight=1)
     main_frame.grid_rowconfigure(1, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
+    text_widget_frame.grid_rowconfigure(0, weight=1)
+    text_widget_frame.grid_columnconfigure(0, weight=1)
+    error_frame.grid_rowconfigure(0, weight=1)
+    error_text_widget_frame.grid_columnconfigure(0, weight=1)
 
     return root, text_widget, error_text_widget
 
@@ -255,6 +265,15 @@ def save_window_size(root):
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
+def open_file(file_path):
+    try:
+        if os.name == 'nt':  # Windows
+            os.startfile(file_path)
+        elif os.name == 'posix':  # macOS, Linux
+            subprocess.call(('xdg-open', file_path))
+    except Exception as e:
+        print(f"Не удалось открыть файл {file_path}: {e}")
+
 def main(directory, word):
     root, text_widget, error_text_widget = create_text_window()
     event_queue = queue.Queue()
@@ -283,6 +302,12 @@ def main(directory, word):
         observer.join()
         root.destroy()
         os._exit(0)  # Полностью завершить скрипт
+
+    def on_error_double_click(event):
+        if event_handler.last_error_file:
+            open_file(event_handler.last_error_file)
+
+    error_text_widget.bind("<Double-Button-1>", on_error_double_click)
 
     root.after(100, process_queue)
     root.after(5000, periodic_sync)
