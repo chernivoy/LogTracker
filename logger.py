@@ -13,6 +13,8 @@ import ctypes
 from ctypes import wintypes
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
+import pystray
+from PIL import Image, ImageDraw
 
 CONFIG_FILE = "window_config.ini"
 
@@ -204,6 +206,9 @@ def create_text_window():
     pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
     pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="ne")
 
+    minimize_button = ttk.Button(main_frame, text="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    minimize_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+
     text_widget_frame = ttk.Frame(main_frame)
     text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
 
@@ -274,7 +279,41 @@ def open_file(file_path):
     except Exception as e:
         print(f"Не удалось открыть файл {file_path}: {e}")
 
+def minimize_to_tray(root):
+    def create_image(width, height, color1, color2):
+        image = Image.new('RGB', (width, height), color1)
+        dc = ImageDraw.Draw(image)
+        dc.rectangle(
+            (width // 2, 0, width, height // 2),
+            fill=color2)
+        dc.rectangle(
+            (0, height // 2, width // 2, height),
+            fill=color2)
+        return image
+
+    def on_click(icon, item):
+        root.after(0, icon.stop)
+        root.deiconify()
+
+    def on_quit(icon, item):
+        save_window_size(root)
+        observer.stop()
+        observer.join()
+        icon.stop()
+        root.destroy()
+        os._exit(0)  # Полностью завершить скрипт
+
+    menu = (
+        pystray.MenuItem('Открыть', on_click),
+        pystray.MenuItem('Выход', on_quit)
+    )
+    icon_image = create_image(64, 64, 'black', 'white')
+    icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
+    root.withdraw()
+    icon.run()
+
 def main(directory, word):
+    global observer
     root, text_widget, error_text_widget = create_text_window()
     event_queue = queue.Queue()
 
