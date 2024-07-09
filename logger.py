@@ -202,10 +202,10 @@ def create_text_window():
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
     pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+    pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="ne")
 
     text_widget_frame = ttk.Frame(main_frame)
-    text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+    text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
 
     text_widget = ttk.Text(text_widget_frame, wrap="none")
     text_widget.pack(fill="both", expand=True)
@@ -213,14 +213,14 @@ def create_text_window():
     error_frame = ttk.Frame(main_frame)
     error_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
 
-    error_label = ttk.Label(error_frame, text="Last ERR:")
+    error_label = ttk.Label(error_frame, text="ERR:")
     error_label.pack(side="left", padx=(10, 0))
 
     error_text_widget_frame = ttk.Frame(error_frame)
     error_text_widget_frame.pack(fill="both", expand=True)
 
     error_text_widget = ttk.Text(error_text_widget_frame, height=3, wrap=WORD, state=tk.DISABLED)
-    error_text_widget.pack(fill="both", expand=True, padx=10)
+    error_text_widget.pack(fill="both", expand=True, padx=5)
 
     root.grid_columnconfigure(0, weight=1)
     root.grid_rowconfigure(1, weight=1)
