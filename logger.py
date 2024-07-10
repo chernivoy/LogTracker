@@ -141,6 +141,7 @@ class FileChangeHandler(FileSystemEventHandler):
             self.error_text_widget.delete(1.0, tk.END)
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
             self.error_text_widget.config(state=tk.DISABLED)
+            self.event_queue.put(self.show_window_from_tray)
 
     def can_read_file(self, file_path):
         try:
@@ -193,6 +194,9 @@ class FileChangeHandler(FileSystemEventHandler):
         self.text_widget.delete(1.0, tk.END)
         for file_path in self.file_paths:
             self.text_widget.insert(tk.END, file_path + "\n")
+
+    def show_window_from_tray(self):
+        root.after(0, restore_window)
 
 def create_text_window():
     root = ttk.Window(themename="litera")
@@ -293,7 +297,7 @@ def minimize_to_tray(root):
 
     def on_click(icon, item):
         root.after(0, icon.stop)
-        root.deiconify()
+        restore_window()
 
     def on_quit(icon, item):
         save_window_size(root)
@@ -311,8 +315,13 @@ def minimize_to_tray(root):
     root.withdraw()
     icon.run_detached()
 
+def restore_window():
+    root.deiconify()
+    root.lift()
+
 def main(directory, word):
     global observer
+    global root
     root, text_widget, error_text_widget = create_text_window()
     event_queue = queue.Queue()
 
