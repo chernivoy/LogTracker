@@ -300,8 +300,7 @@ def minimize_to_tray(root):
         observer.stop()
         observer.join()
         icon.stop()
-        root.destroy()
-        os._exit(0)  # Полностью завершить скрипт
+        root.quit()
 
     menu = (
         pystray.MenuItem('Открыть', on_click),
@@ -339,8 +338,7 @@ def main(directory, word):
         save_window_size(root)
         observer.stop()
         observer.join()
-        root.destroy()
-        os._exit(0)  # Полностью завершить скрипт
+        root.quit()
 
     def on_error_double_click(event):
         if event_handler.last_error_file:
