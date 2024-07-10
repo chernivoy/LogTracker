@@ -218,7 +218,7 @@ def create_text_window():
     error_frame = ttk.Frame(main_frame)
     error_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
 
-    error_label = ttk.Label(error_frame, text="ERR:")
+    error_label = ttk.Label(error_frame, text="Последняя ошибка:", anchor="w")
     error_label.pack(side="left", padx=(10, 0))
 
     error_text_widget_frame = ttk.Frame(error_frame)
@@ -310,7 +310,7 @@ def minimize_to_tray(root):
     icon_image = create_image(64, 64, 'black', 'white')
     icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
     root.withdraw()
-    icon.run()
+    icon.run_detached()
 
 def main(directory, word):
     global observer
@@ -351,7 +351,7 @@ def main(directory, word):
     root.after(100, process_queue)
     root.after(5000, periodic_sync)
 
-    root.protocol("WM_DELETE_WINDOW", on_closing)
+    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
 
     try:
         root.mainloop()
