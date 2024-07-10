@@ -17,6 +17,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 CONFIG_FILE = "window_config.ini"
+tray_icon = None
 
 def copy_file_without_waiting(source_file, dest_file):
     try:
@@ -220,9 +221,9 @@ def create_text_window():
     text_widget.pack(fill="both", expand=True)
 
     error_frame = ttk.Frame(main_frame)
-    error_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
+    error_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
 
-    error_label = ttk.Label(error_frame, text="Последняя ошибка:", anchor="w")
+    error_label = ttk.Label(error_frame, text="ERR:", anchor="w")
     error_label.pack(side="left", padx=(10, 0))
 
     error_text_widget_frame = ttk.Frame(error_frame)
@@ -284,6 +285,8 @@ def open_file(file_path):
         print(f"Не удалось открыть файл {file_path}: {e}")
 
 def minimize_to_tray(root):
+    global tray_icon
+
     def create_image(width, height, color1, color2):
         image = Image.new('RGB', (width, height), color1)
         dc = ImageDraw.Draw(image)
@@ -311,13 +314,17 @@ def minimize_to_tray(root):
         pystray.MenuItem('Выход', on_quit)
     )
     icon_image = create_image(64, 64, 'black', 'white')
-    icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
+    tray_icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
     root.withdraw()
-    icon.run_detached()
+    tray_icon.run_detached()
 
 def restore_window():
+    global tray_icon
     root.deiconify()
     root.lift()
+    if tray_icon:
+        tray_icon.stop()
+        tray_icon = None
 
 def main(directory, word):
     global observer
