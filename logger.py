@@ -139,7 +139,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if last_error_line:
             self.last_error_file = file_path
             file_name = os.path.basename(file_path)
-            self.event_queue.put(lambda: self.file_label.config(text=f"Последняя ошибка в файле: {file_name}"))
+            self.event_queue.put(lambda: self.file_label.config(text=f"File: {file_name}"))
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.config(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
@@ -214,10 +214,10 @@ def create_text_window():
     pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
     pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="ne")
 
-    minimize_button = ttk.Button(main_frame, text="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    minimize_button = ttk.Button(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
     minimize_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-    file_label = ttk.Label(main_frame, text="Последняя ошибка в файле:")
+    file_label = ttk.Label(main_frame, text="File: ")
     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
 
     text_widget_frame = ttk.Frame(main_frame)
