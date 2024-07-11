@@ -32,11 +32,12 @@ def copy_file_without_waiting(source_file, dest_file):
         print(f"Не удалось скопировать файл {source_file}: {e}")
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, directory, word, text_widget, error_text_widget, event_queue):
+    def __init__(self, directory, word, text_widget, error_text_widget, file_label, event_queue):
         self.directory = directory
         self.word = word
         self.text_widget = text_widget
         self.error_text_widget = error_text_widget
+        self.file_label = file_label
         self.event_queue = event_queue
         self.file_paths = {}
         self.last_error_file = None
@@ -137,6 +138,8 @@ class FileChangeHandler(FileSystemEventHandler):
         self.last_update_time[file_path] = current_time
         if last_error_line:
             self.last_error_file = file_path
+            file_name = os.path.basename(file_path)
+            self.event_queue.put(lambda: self.file_label.config(text=f"Последняя ошибка в файле: {file_name}"))
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.config(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
@@ -214,6 +217,9 @@ def create_text_window():
     minimize_button = ttk.Button(main_frame, text="Свернуть в трей", command=lambda: minimize_to_tray(root))
     minimize_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
+    file_label = ttk.Label(main_frame, text="Последняя ошибка в файле:")
+    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+
     text_widget_frame = ttk.Frame(main_frame)
     text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
 
@@ -241,7 +247,7 @@ def create_text_window():
     error_frame.grid_rowconfigure(0, weight=1)
     error_text_widget_frame.grid_columnconfigure(0, weight=1)
 
-    return root, text_widget, error_text_widget
+    return root, text_widget, error_text_widget, file_label
 
 def load_window_size(root):
     config = configparser.ConfigParser()
@@ -329,10 +335,10 @@ def restore_window():
 def main(directory, word):
     global observer
     global root
-    root, text_widget, error_text_widget = create_text_window()
+    root, text_widget, error_text_widget, file_label = create_text_window()
     event_queue = queue.Queue()
 
-    event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, event_queue)
+    event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, file_label, event_queue)
     observer = Observer()
     observer.schedule(event_handler, directory, recursive=False)
     observer.start()
