@@ -206,16 +206,17 @@ def create_text_window():
     root = ttk.Window(themename="litera")
     root.title("Файлы в целевой директории")
     root.attributes('-topmost', True)
+    root.overrideredirect(True)
     load_window_size(root)
 
     main_frame = ttk.Frame(root)
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
     pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="ne")
+    pin_button.grid(row=3, column=0, padx=5, pady=5, sticky="ne")
 
     minimize_button = ttk.Button(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
-    minimize_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+    minimize_button.grid(row=3, column=1, padx=5, pady=5, sticky="ne")
 
     file_label = ttk.Label(main_frame, text="File: ")
     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
@@ -247,8 +248,14 @@ def create_text_window():
     error_frame.grid_rowconfigure(0, weight=1)
     error_text_widget_frame.grid_columnconfigure(0, weight=1)
 
-    toggle_button = tk.Button(main_frame, text="X1", command=lambda: show_context_menu(root))
-    toggle_button.grid(row=0, column=0, padx=5, pady=5, sticky="sw")
+
+
+    style = ttk.Style()
+    style.configure("Flat.TButton", relief="flat", borderwidth=0, background="white", foreground="black")  # Настройка стиля здесь
+
+    toggle_button = ttk.Button(main_frame, text="...", command=lambda: show_context_menu(root), style="Flat.TButton")
+    toggle_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+
 
     return root, text_widget, error_text_widget, file_label
 
