@@ -15,6 +15,7 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 import pystray
 from PIL import Image, ImageDraw
+from tkinter import PhotoImage
 
 CONFIG_FILE = "window_config.ini"
 tray_icon = None
@@ -206,7 +207,7 @@ def create_text_window():
     root = ttk.Window(themename="litera")
     root.title("Файлы в целевой директории")
     root.attributes('-topmost', True)
-    root.overrideredirect(True)
+    # root.overrideredirect(True)
     load_window_size(root)
 
     main_frame = ttk.Frame(root)
@@ -248,12 +249,19 @@ def create_text_window():
     error_frame.grid_rowconfigure(0, weight=1)
     error_text_widget_frame.grid_columnconfigure(0, weight=1)
 
+    # Загрузка иконки
+    icon_image = PhotoImage(file="err_pic.png")
+
 
 
     style = ttk.Style()
     style.configure("Flat.TButton", relief="flat", borderwidth=0, background="white", foreground="black")  # Настройка стиля здесь
 
-    toggle_button = ttk.Button(main_frame, text="...", command=lambda: show_context_menu(root), style="Flat.TButton")
+    # toggle_button = ttk.Button(main_frame, text="...", command=lambda: show_context_menu(root), style="Flat.TButton")
+    # toggle_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+    # Создание кнопки с изображением
+    toggle_button = ttk.Button(main_frame, image=icon_image, command=lambda: show_context_menu(root), style="Flat.TButton")
+    toggle_button.image = icon_image  # Присваиваем объекту кнопки изображение, чтобы избежать удаления из памяти
     toggle_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
 
