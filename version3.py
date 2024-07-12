@@ -17,7 +17,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 CONFIG_FILE = "window_config.ini"
-
+tray_icon = None
 
 def copy_file_without_waiting(source_file, dest_file):
     try:
@@ -30,7 +30,6 @@ def copy_file_without_waiting(source_file, dest_file):
         print(f"Файл {source_file} не найден: {e}")
     except Exception as e:
         print(f"Не удалось скопировать файл {source_file}: {e}")
-
 
 class FileChangeHandler(FileSystemEventHandler):
     def __init__(self, directory, word, text_widget, error_text_widget, file_label, event_queue):
@@ -139,13 +138,14 @@ class FileChangeHandler(FileSystemEventHandler):
         self.last_update_time[file_path] = current_time
         if last_error_line:
             self.last_error_file = file_path
-            self.file_label.config(text=f"Последняя ошибка в файле: {os.path.basename(file_path)}")
+            file_name = os.path.basename(file_path)
+            self.event_queue.put(lambda: self.file_label.config(text=f"File: {file_name}"))
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.config(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
             self.error_text_widget.config(state=tk.DISABLED)
-            self.show_window_from_tray()
+            self.event_queue.put(self.show_window_from_tray)
 
     def can_read_file(self, file_path):
         try:
@@ -195,17 +195,12 @@ class FileChangeHandler(FileSystemEventHandler):
             del self.file_paths[file_path]
 
     def update_text_widget(self):
-        self.text_widget.config(state=tk.NORMAL)
         self.text_widget.delete(1.0, tk.END)
         for file_path in self.file_paths:
             self.text_widget.insert(tk.END, file_path + "\n")
-        self.text_widget.config(state=tk.DISABLED)
 
     def show_window_from_tray(self):
-        root.deiconify()
-        root.attributes('-topmost', True)
-        root.attributes('-topmost', False)
-
+        root.after(0, restore_window)
 
 def create_text_window():
     root = ttk.Window(themename="litera")
@@ -217,136 +212,154 @@ def create_text_window():
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
     pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+    pin_button.grid(row=0, column=0, padx=5, pady=5, sticky="ne")
 
-    minimize_button = ttk.Button(main_frame, text="Свернуть в трей", command=lambda: minimize_to_tray(root))
-    minimize_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+    minimize_button = ttk.Button(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
+    minimize_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-    file_label = ttk.Label(main_frame, text="Последняя ошибка в файле:")
+    file_label = ttk.Label(main_frame, text="File: ")
     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
 
     text_widget_frame = ttk.Frame(main_frame)
-    text_widget_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", pady=5)
+    text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
 
-    text_widget = tk.Text(text_widget_frame, wrap="word", state=tk.DISABLED)
-    text_widget.pack(side="left", fill="both", expand=True)
+    text_widget = tk.Text(text_widget_frame, height=20, width=80, state=tk.DISABLED)
+    text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    text_scrollbar = ttk.Scrollbar(text_widget_frame, command=text_widget.yview)
-    text_scrollbar.pack(side="right", fill="y")
-    text_widget.config(yscrollcommand=text_scrollbar.set)
+    scrollbar = ttk.Scrollbar(text_widget_frame, command=text_widget.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    text_widget.config(yscrollcommand=scrollbar.set)
 
     error_text_widget_frame = ttk.Frame(main_frame)
-    error_text_widget_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=5)
+    error_text_widget_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=5)
 
-    error_text_widget = tk.Text(error_text_widget_frame, wrap="word", state=tk.DISABLED)
-    error_text_widget.pack(side="left", fill="both", expand=True)
+    error_text_widget = tk.Text(error_text_widget_frame, height=5, width=80, state=tk.DISABLED, foreground="red")
+    error_text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    error_text_scrollbar = ttk.Scrollbar(error_text_widget_frame, command=error_text_widget.yview)
-    error_text_scrollbar.pack(side="right", fill="y")
-    error_text_widget.config(yscrollcommand=error_text_scrollbar.set)
+    error_scrollbar = ttk.Scrollbar(error_text_widget_frame, command=error_text_widget.yview)
+    error_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    error_text_widget.config(yscrollcommand=error_scrollbar.set)
 
-    main_frame.columnconfigure(0, weight=1)
-    main_frame.columnconfigure(1, weight=0)
-    main_frame.columnconfigure(2, weight=0)
-    main_frame.rowconfigure(1, weight=1)
-    main_frame.rowconfigure(2, weight=1)
+    root.grid_rowconfigure(1, weight=1)
+    root.grid_columnconfigure(0, weight=1)
 
-    return root, text_widget, error_text_widget, file_label, pin_button
+    toggle_button = tk.Button(main_frame, text="X1", command=lambda: show_context_menu(root))
+    toggle_button.grid(row=3, column=0, padx=5, pady=5, sticky="sw")
 
+    return root, text_widget, error_text_widget, file_label
 
-def save_window_size(root):
+def show_context_menu(root):
+    context_menu = tk.Menu(root, tearoff=0)
+    context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
+    context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
+
+def save_window_size(window):
     config = configparser.ConfigParser()
     config['Window'] = {
-        'width': root.winfo_width(),
-        'height': root.winfo_height(),
-        'x': root.winfo_x(),
-        'y': root.winfo_y()
+        'width': window.winfo_width(),
+        'height': window.winfo_height(),
+        'x': window.winfo_x(),
+        'y': window.winfo_y()
     }
-    with open(CONFIG_FILE, 'w') as configfile:
-        config.write(configfile)
+    with open(CONFIG_FILE, 'w') as config_file:
+        config.write(config_file)
 
-
-def load_window_size(root):
+def load_window_size(window):
     config = configparser.ConfigParser()
-    if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE)
-        if 'Window' in config:
-            width = config.getint('Window', 'width', fallback=600)
-            height = config.getint('Window', 'height', fallback=400)
-            x = config.getint('Window', 'x', fallback=100)
-            y = config.getint('Window', 'y', fallback=100)
-            root.geometry(f'{width}x{height}+{x}+{y}')
+    config.read(CONFIG_FILE)
+    if 'Window' in config:
+        window.geometry(f"{config['Window'].getint('width', 800)}x{config['Window'].getint('height', 600)}+{config['Window'].getint('x', 100)}+{config['Window'].getint('y', 100)}")
 
-
-def toggle_pin(root, pin_button):
-    if root.attributes('-topmost'):
-        root.attributes('-topmost', False)
-        pin_button.config(text="Pin")
+def toggle_pin(window, pin_button):
+    if window.attributes('-topmost'):
+        window.attributes('-topmost', False)
+        if pin_button:
+            pin_button.config(text="Pin")
     else:
-        root.attributes('-topmost', True)
-        pin_button.config(text="Unpin")
+        window.attributes('-topmost', True)
+        if pin_button:
+            pin_button.config(text="Unpin")
 
+def minimize_to_tray(window):
+    hide_window(window)
+    create_tray_icon(window)
 
-def minimize_to_tray(root):
-    root.withdraw()
-    show_tray_icon(root)
+def hide_window(window):
+    window.withdraw()
 
-
-def show_window_from_tray(root, pin_button):
+def restore_window():
     root.deiconify()
     root.attributes('-topmost', True)
     root.attributes('-topmost', False)
-    pin_button.config(text="Unpin" if root.attributes('-topmost') else "Pin")
 
+def create_tray_icon(window):
+    global tray_icon
+    if tray_icon is None:
+        image = create_tray_image()
+        menu = (pystray.MenuItem('Restore', lambda: restore_window()),
+                pystray.MenuItem('Exit', lambda: exit_app(window)))
+        tray_icon = pystray.Icon("name", image, "App Title", menu)
+        tray_icon.run_detached()
 
-def on_quit(root):
-    save_window_size(root)
-    root.destroy()
+def create_tray_image():
+    width, height = 64, 64
+    color1, color2 = "white", "black"
+    image = Image.new("RGB", (width, height), color1)
+    dc = ImageDraw.Draw(image)
+    dc.rectangle(
+        (width // 2, 0, width, height // 2),
+        fill=color2
+    )
+    dc.rectangle(
+        (0, height // 2, width // 2, height),
+        fill=color2
+    )
+    return image
 
-
-def show_tray_icon(root):
-    def on_exit(icon, item):
-        icon.stop()
-        root.quit()
-
-    def show_window(icon, item):
-        icon.stop()
-        show_window_from_tray(root, pin_button)
-
-    menu = (pystray.MenuItem('Открыть', show_window), pystray.MenuItem('Выход', on_exit))
-    image = Image.new('RGB', (64, 64), (255, 255, 255))
-    draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 0, 64, 64), fill=(255, 0, 0))
-
-    icon = pystray.Icon("test_icon", image, "Test", menu)
-    icon.run_detached()
-
-
-def monitor_directory(directory, word, text_widget, error_text_widget, file_label, event_queue):
-    event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, file_label, event_queue)
-    observer = Observer()
-    observer.schedule(event_handler, directory, recursive=False)
-    observer.start()
-
-    try:
-        while True:
-            event_handler.copy_files_from_A()
-            time.sleep(10)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
-
+def exit_app(window):
+    global tray_icon
+    save_window_size(window)
+    if tray_icon:
+        tray_icon.stop()
+    window.destroy()
 
 if __name__ == "__main__":
-    root, text_widget, error_text_widget, file_label, pin_button = create_text_window()
-
+    directory_B = r'C:\Monitor'
+    search_word = "ERR"
     event_queue = queue.Queue()
-    directory = r'C:\TestLogs'
-    word = 'ERR'
 
-    threading.Thread(target=monitor_directory,
-                     args=(directory, word, text_widget, error_text_widget, file_label, event_queue),
-                     daemon=True).start()
+    root, text_widget, error_text_widget, file_label = create_text_window()
 
-    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
-    root.mainloop()
+    event_handler = FileChangeHandler(directory_B, search_word, text_widget, error_text_widget, file_label, event_queue)
+    observer = Observer()
+    observer.schedule(event_handler, directory_B, recursive=False)
+    observer.start()
+
+    def periodic_copy():
+        while True:
+            event_handler.copy_files_from_A()
+            time.sleep(30)
+
+    threading.Thread(target=periodic_copy, daemon=True).start()
+
+    def process_event_queue():
+        try:
+            while True:
+                event = event_queue.get(block=False)
+                event()
+                event_queue.task_done()
+        except queue.Empty:
+            pass
+        root.after(100, process_event_queue)
+
+    try:
+        root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
+        root.after(100, process_event_queue)
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("Программа прервана пользователем.")
+    finally:
+        observer.stop()
+        observer.join()
+

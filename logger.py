@@ -247,7 +247,16 @@ def create_text_window():
     error_frame.grid_rowconfigure(0, weight=1)
     error_text_widget_frame.grid_columnconfigure(0, weight=1)
 
+    toggle_button = tk.Button(main_frame, text="X1", command=lambda: show_context_menu(root))
+    toggle_button.grid(row=0, column=0, padx=5, pady=5, sticky="sw")
+
     return root, text_widget, error_text_widget, file_label
+
+def show_context_menu(root):
+    context_menu = tk.Menu(root, tearoff=0)
+    context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
+    context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
 def load_window_size(root):
     config = configparser.ConfigParser()
@@ -265,10 +274,12 @@ def load_window_size(root):
 def toggle_pin(root, pin_button):
     if root.attributes('-topmost'):
         root.attributes('-topmost', False)
-        pin_button.config(text="Pin")
+        if pin_button:
+            pin_button.config(text="Pin")
     else:
         root.attributes('-topmost', True)
-        pin_button.config(text="Unpin")
+        if pin_button:
+            pin_button.config(text="Unpin")
 
 def save_window_size(root):
     config = configparser.ConfigParser()
