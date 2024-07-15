@@ -203,11 +203,11 @@ class FileChangeHandler(FileSystemEventHandler):
     def show_window_from_tray(self):
         root.after(0, restore_window)
 
-def create_text_window():
+def create_text_window_old():
     root = ttk.Window(themename="litera")
-    root.title("Файлы в целевой директории")
+    root.title("Logs")
     root.attributes('-topmost', True)
-    root.configure(bg="lightblue")
+    root.configure()
     # root.overrideredirect(True)
     load_window_size(root)
 
@@ -267,6 +267,71 @@ def create_text_window():
 
 
     return root, text_widget, error_text_widget, file_label
+def create_text_window():
+    root = ttk.Window(themename="litera")
+    root.title("Logs")
+    root.attributes('-topmost', True)
+    root.configure()
+    # root.overrideredirect(True)
+    load_window_size(root)
+
+    main_frame = ttk.Frame(root)
+    main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
+    pin_button.grid(row=3, column=0, padx=5, pady=5, sticky="ne")
+
+    minimize_button = ttk.Button(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
+    minimize_button.grid(row=3, column=1, padx=5, pady=5, sticky="ne")
+
+    # Label for file display
+    # file_label = ttk.Label(main_frame, text="File: ", font=("Arial", 12), anchor="w")
+    file_label = ttk.Label(main_frame, font=("Arial", 12), anchor="w")
+    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+
+    # Frame for error display
+    error_frame = ttk.Frame(main_frame)
+    error_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
+
+    error_label = ttk.Label(error_frame, text="ERR:", anchor="w")
+    error_label.pack(side="left", padx=(10, 0))
+
+    error_text_widget_frame = ttk.Frame(error_frame)
+    error_text_widget_frame.pack(fill="both", expand=True)
+
+    error_text_widget = ttk.Text(error_text_widget_frame, height=4, wrap=WORD, state=tk.DISABLED)
+    error_text_widget.pack(fill="both", expand=True, padx=5)
+
+    text_widget_frame = ttk.Frame(main_frame)
+    text_widget_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=5)
+
+    text_widget = ttk.Text(text_widget_frame, wrap="none")
+    text_widget.pack(fill="both", expand=True)
+
+    root.grid_columnconfigure(0, weight=1)
+    root.grid_rowconfigure(1, weight=1)
+    main_frame.grid_rowconfigure(2, weight=1)
+    main_frame.grid_columnconfigure(0, weight=1)
+    text_widget_frame.grid_rowconfigure(0, weight=1)
+    text_widget_frame.grid_columnconfigure(0, weight=1)
+    error_frame.grid_rowconfigure(0, weight=1)
+    error_text_widget_frame.grid_columnconfigure(0, weight=1)
+
+    # Загрузка иконки (не забудьте импортировать PhotoImage)
+    icon_image = PhotoImage(file="err_pic.png")
+
+    style = ttk.Style()
+    style.configure("Flat.TButton", relief="flat", borderwidth=0, background="white", foreground="black")
+
+    toggle_button = ttk.Button(main_frame, image=icon_image, command=lambda: show_context_menu(root), style="Flat.TButton")
+    toggle_button.image = icon_image
+    toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
+
+    return root, text_widget, error_text_widget, file_label
+
+
+
+
 
 def show_context_menu(root):
     context_menu = tk.Menu(root, tearoff=0)
