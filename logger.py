@@ -207,6 +207,7 @@ def create_text_window():
     root = ttk.Window(themename="litera")
     root.title("Файлы в целевой директории")
     root.attributes('-topmost', True)
+    root.configure(bg="lightblue")
     # root.overrideredirect(True)
     load_window_size(root)
 
@@ -237,7 +238,7 @@ def create_text_window():
     error_text_widget_frame = ttk.Frame(error_frame)
     error_text_widget_frame.pack(fill="both", expand=True)
 
-    error_text_widget = ttk.Text(error_text_widget_frame, height=3, wrap=WORD, state=tk.DISABLED)
+    error_text_widget = ttk.Text(error_text_widget_frame, height=4, wrap=WORD, state=tk.DISABLED)
     error_text_widget.pack(fill="both", expand=True, padx=5)
 
     root.grid_columnconfigure(0, weight=1)
