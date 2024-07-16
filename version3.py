@@ -140,12 +140,12 @@ class FileChangeHandler(FileSystemEventHandler):
         if last_error_line:
             self.last_error_file = file_path
             file_name = os.path.basename(file_path)
-            self.event_queue.put(lambda: self.file_label.config(text=f"File: {file_name}"))
+            self.event_queue.put(lambda: self.file_label.configure(text=f"File: {file_name}"))
             print(f"Новая строка с ошибкой: {last_error_line}")
-            self.error_text_widget.config(state=tk.NORMAL)
+            self.error_text_widget.configure(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
-            self.error_text_widget.config(state=tk.DISABLED)
+            self.error_text_widget.configure(state=tk.DISABLED)
             self.event_queue.put(self.show_window_from_tray)
 
     def can_read_file(self, file_path):
@@ -203,17 +203,23 @@ class FileChangeHandler(FileSystemEventHandler):
     def show_window_from_tray(self):
         root.after(0, restore_window)
 
+
+
+
+
 def create_text_window():
+    ctk.set_appearance_mode("dark")
     global root
     root = ctk.CTk()
     root.title("Logs")
-    root.geometry("800x600")
+    root.attributes('-topmost', True)
+    # root.geometry("800x600")
     root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
 
     load_window_size(root)
 
     main_frame = ctk.CTkFrame(root)
-    main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+    main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 
     pin_button = ctk.CTkButton(main_frame, text="Pin", command=lambda: toggle_pin(root, pin_button))
     pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
@@ -239,14 +245,16 @@ def create_text_window():
     text_widget = ctk.CTkTextbox(text_widget_frame, wrap="none")
     text_widget.pack(fill="both", expand=True)
 
+    # Настройка растягивания для окна и фреймов
+    root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
-    root.grid_rowconfigure(1, weight=1)
     main_frame.grid_rowconfigure(2, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
     text_widget_frame.grid_rowconfigure(0, weight=1)
     text_widget_frame.grid_columnconfigure(0, weight=1)
-    error_frame.grid_rowconfigure(0, weight=1)
+    error_frame.grid_columnconfigure(0, weight=1)
     error_text_widget_frame.grid_columnconfigure(0, weight=1)
+    error_text_widget_frame.grid_rowconfigure(0, weight=1)
 
     icon_image = PhotoImage(file="err_pic.png")
 
@@ -255,6 +263,7 @@ def create_text_window():
     toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
 
     return root, text_widget, error_text_widget, file_label
+
 
 def save_window_size(root):
     config = configparser.ConfigParser()

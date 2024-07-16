@@ -86,7 +86,6 @@ class FileChangeHandler(FileSystemEventHandler):
         while time.time() - start_time < timeout:
             if self.is_file_closed(file_path):
                 return True
-            time.sleep(1)
         print(f"Файл {file_path} все еще используется после {timeout} секунд.")
         return False
 
@@ -293,7 +292,7 @@ def create_text_window():
     error_frame = ttk.Frame(main_frame)
     error_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
 
-    error_label = ttk.Label(error_frame, text="ERR:", anchor="w")
+    error_label = ttk.Label(error_frame, text="", anchor="w")
     error_label.pack(side="left", padx=(10, 0))
 
     error_text_widget_frame = ttk.Frame(error_frame)
