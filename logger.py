@@ -266,8 +266,14 @@ def create_text_window_old():
 
 
     return root, text_widget, error_text_widget, file_label
+
+
+def toggle_overrideredirect(root):
+    current_state = root.overrideredirect()
+    root.overrideredirect(not current_state)
 def create_text_window():
-    root = ttk.Window(themename="litera")
+    root = ttk.Window(themename="cosmo")
+    # root = ttk.Window(themename="journal")
     root.title("Logs")
     root.attributes('-topmost', True)
     root.configure()
@@ -285,8 +291,8 @@ def create_text_window():
 
     # Label for file display
     # file_label = ttk.Label(main_frame, text="File: ", font=("Arial", 12), anchor="w")
-    file_label = ttk.Label(main_frame, font=("Arial", 12), anchor="w")
-    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+    file_label = ttk.Label(main_frame, font=("Helvetica Neue", 10), anchor="w")
+    file_label.grid(row=0, column=0, padx=15, pady=5, sticky="nw")
 
     # Frame for error display
     error_frame = ttk.Frame(main_frame)
@@ -320,22 +326,28 @@ def create_text_window():
     icon_image = PhotoImage(file="err_pic.png")
 
     style = ttk.Style()
-    style.configure("Flat.TButton", relief="flat", borderwidth=0, background="white", foreground="black")
+    style.configure("Flat.TButton", relief="flat", borderwidth=0, background="white", foreground="blue", compound="left")
 
     toggle_button = ttk.Button(main_frame, image=icon_image, command=lambda: show_context_menu(root), style="Flat.TButton")
+    # toggle_button = ttk.Button(main_frame, image=icon_image, command=lambda: show_context_menu(root))
     toggle_button.image = icon_image
     toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
 
     return root, text_widget, error_text_widget, file_label
 
 
-
-
+def on_closing():
+    save_window_size(root)
+    observer.stop()
+    observer.join()
+    root.quit()
 
 def show_context_menu(root):
     context_menu = tk.Menu(root, tearoff=0)
     context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
     context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    context_menu.add_command(label="Window border", command=lambda: toggle_overrideredirect(root))
+    context_menu.add_command(label="Выйти", command=lambda: on_closing())
     context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
 def load_window_size(root):
@@ -381,6 +393,7 @@ def open_file(file_path):
     except Exception as e:
         print(f"Не удалось открыть файл {file_path}: {e}")
 
+
 def minimize_to_tray(root):
     global tray_icon
 
@@ -406,9 +419,11 @@ def minimize_to_tray(root):
         icon.stop()
         root.quit()
 
+
     menu = (
         pystray.MenuItem('Открыть', on_click),
         pystray.MenuItem('Выход', on_quit)
+
     )
     icon_image = create_image(64, 64, 'black', 'white')
     tray_icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
