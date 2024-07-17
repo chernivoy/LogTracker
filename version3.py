@@ -15,10 +15,14 @@ import pystray
 from PIL import Image, ImageDraw, ImageFont
 from tkinter import PhotoImage
 import customtkinter as ctk
+from ctypes import windll
 
 CONFIG_FILE = "window_config.ini"
 tray_icon = None
 root = None
+
+# Установка DPI-осведомленности
+windll.shcore.SetProcessDpiAwareness(2)
 
 def copy_file_without_waiting(source_file, dest_file):
     try:
@@ -209,11 +213,13 @@ class FileChangeHandler(FileSystemEventHandler):
 
 def create_text_window():
     ctk.set_appearance_mode("dark")
+    # ctk.deactivate_automatic_dpi_awareness()
+    # ctk.set_window_scaling(0.5)
+    # ctk.set_widget_scaling(0.5)
     global root
     root = ctk.CTk()
     root.title("Logs")
     root.attributes('-topmost', True)
-    # root.geometry("800x600")
     root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
 
     load_window_size(root)
@@ -228,7 +234,7 @@ def create_text_window():
     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
 
     error_frame = ctk.CTkFrame(main_frame)
-    error_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
+    error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
 
     error_label = ctk.CTkLabel(error_frame, text="ERR:", anchor="w")
     error_label.pack(side="left", padx=(10, 0))
@@ -248,13 +254,17 @@ def create_text_window():
     # Настройка растягивания для окна и фреймов
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
+    main_frame.grid_rowconfigure(0, weight=0)
+    main_frame.grid_rowconfigure(1, weight=1)
     main_frame.grid_rowconfigure(2, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
+    main_frame.grid_columnconfigure(1, weight=0)
+
+    error_frame.grid_rowconfigure(0, weight=1)
+    error_frame.grid_columnconfigure(0, weight=1)
+
     text_widget_frame.grid_rowconfigure(0, weight=1)
     text_widget_frame.grid_columnconfigure(0, weight=1)
-    error_frame.grid_columnconfigure(0, weight=1)
-    error_text_widget_frame.grid_columnconfigure(0, weight=1)
-    error_text_widget_frame.grid_rowconfigure(0, weight=1)
 
     icon_image = PhotoImage(file="err_pic.png")
 
@@ -263,6 +273,13 @@ def create_text_window():
     toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
 
     return root, text_widget, error_text_widget, file_label
+
+
+def on_closing():
+    save_window_size(root)
+    observer.stop()
+    observer.join()
+    root.quit()
 
 
 def save_window_size(root):
@@ -276,25 +293,38 @@ def save_window_size(root):
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
+def show_context_menu(root):
+    context_menu = tk.Menu(root, tearoff=0)
+    context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
+    context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    context_menu.add_command(label="Window border", command=lambda: toggle_overrideredirect(root))
+    context_menu.add_command(label="Выйти", command=lambda: on_closing())
+    context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
+
+
 def load_window_size(root):
     config = configparser.ConfigParser()
-    config.read(CONFIG_FILE)
-    if 'Window' in config:
-        width = config.getint('Window', 'width', fallback=800)
-        height = config.getint('Window', 'height', fallback=600)
-        x = config.getint('Window', 'x', fallback=100)
-        y = config.getint('Window', 'y', fallback=100)
-        root.geometry(f'{width}x{height}+{x}+{y}')
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        if 'Window' in config:
+            width = config.getint('Window', 'width', fallback=800)
+            height = config.getint('Window', 'height', fallback=600)
+            x = config.getint('Window', 'x', fallback=100)
+            y = config.getint('Window', 'y', fallback=100)
+            root.geometry(f'{width}x{height}+{x}+{y}')
+    else:
+        root.geometry('800x600+100+100')
 
-def create_image_with_text(text, width=64, height=64, font_size=40):
-    image = Image.new('RGBA', (width, height), (255, 255, 255, 0))
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype('arial.ttf', font_size)
-    text_bbox = draw.textbbox((0, 0), text, font=font)
-    text_width, text_height = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
-    text_x = (width - text_width) // 2
-    text_y = (height - text_height) // 2
-    draw.text((text_x, text_y), text, font=font, fill=(0, 0, 0, 255))
+
+def create_image(width, height, color1, color2):
+    image = Image.new('RGB', (width, height), color1)
+    dc = ImageDraw.Draw(image)
+    dc.rectangle(
+        (width // 2, 0, width, height // 2),
+        fill=color2)
+    dc.rectangle(
+        (0, height // 2, width // 2, height),
+        fill=color2)
     return image
 
 def on_quit(icon, item):
@@ -302,18 +332,48 @@ def on_quit(icon, item):
     icon.stop()
     root.quit()
 
-def show_context_menu(event):
-    context_menu.post(event.x_root, event.y_root)
+def show_context_menu(root):
+    context_menu = tk.Menu(root, tearoff=0)
+    context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
+    context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
+    context_menu.add_command(label="Window border", command=lambda: toggle_overrideredirect(root))
+    context_menu.add_command(label="Выйти", command=lambda: on_closing())
+    context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
-def minimize_to_tray(window):
+def minimize_to_tray(root):
     global tray_icon
-    window.withdraw()
-    if not tray_icon:
-        tray_icon = pystray.Icon("test")
-        tray_icon.icon = create_image_with_text("E")
-        tray_icon.menu = pystray.Menu(pystray.MenuItem("Open", lambda: restore_window()),
-                                      pystray.MenuItem("Exit", on_quit))
-        tray_icon.run()
+
+    def create_image(width, height, color1, color2):
+        image = Image.new('RGB', (width, height), color1)
+        dc = ImageDraw.Draw(image)
+        dc.rectangle(
+            (width // 2, 0, width, height // 2),
+            fill=color2)
+        dc.rectangle(
+            (0, height // 2, width // 2, height),
+            fill=color2)
+        return image
+
+    def on_click(icon, item):
+        root.after(0, icon.stop)
+        restore_window()
+
+    def on_quit(icon, item):
+        save_window_size(root)
+        observer.stop()
+        observer.join()
+        icon.stop()
+        root.quit()
+
+    menu = (
+        pystray.MenuItem('Открыть', on_click),
+        pystray.MenuItem('Выход', on_quit)
+
+    )
+    icon_image = create_image(64, 64, 'black', 'white')
+    tray_icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
+    root.withdraw()
+    tray_icon.run_detached()
 
 def restore_window():
     global root
@@ -354,13 +414,52 @@ def monitor_directory(directory, word, text_widget, error_text_widget, file_labe
     observer.join()
 
 def main(directory, word):
+    global observer
     global root
     root, text_widget, error_text_widget, file_label = create_text_window()
-    monitor_thread = threading.Thread(target=monitor_directory, args=(directory, word, text_widget, error_text_widget, file_label))
-    monitor_thread.daemon = True
-    monitor_thread.start()
+    event_queue = queue.Queue()
+
+    event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, file_label, event_queue)
+    observer = Observer()
+    observer.schedule(event_handler, directory, recursive=False)
+    observer.start()
+
+    def process_queue():
+        try:
+            while True:
+                event = event_queue.get_nowait()
+                event()
+        except queue.Empty:
+            pass
+        root.after(100, process_queue)
+
+    def periodic_sync():
+        event_handler.copy_files_from_A()
+        root.after(5000, periodic_sync)
+
+    def on_closing():
+        save_window_size(root)
+        observer.stop()
+        observer.join()
+        root.quit()
+
+    def on_error_double_click(event):
+        if event_handler.last_error_file:
+            open_file(event_handler.last_error_file)
+
+    error_text_widget.bind("<Double-Button-1>", on_error_double_click)
+
+    root.after(100, process_queue)
+    root.after(5000, periodic_sync)
+
     root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
-    root.mainloop()
+
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
 
 if __name__ == "__main__":
     directory = r"C:\temp\logger"
