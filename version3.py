@@ -289,7 +289,7 @@ def on_closing():
     root.quit()
 
 
-def save_window_size(root):
+def save_window_size_old(root):
     config = configparser.ConfigParser()
     config['Window'] = {
         'width': root.winfo_width(),
@@ -297,6 +297,27 @@ def save_window_size(root):
         'x': root.winfo_x(),
         'y': root.winfo_y()
     }
+    with open(CONFIG_FILE, 'w') as configfile:
+        config.write(configfile)
+
+def save_window_size(root):
+    # Получаем коэффициент масштабирования DPI
+    user32 = ctypes.windll.user32
+    user32.SetProcessDPIAware()
+    dpi_scale = user32.GetDpiForWindow(root.winfo_id()) / 96.0
+
+    # Корректируем ширину и высоту с учетом масштаба DPI
+    width = int(root.winfo_width() / dpi_scale)
+    height = int(root.winfo_height() / dpi_scale)
+
+    config = configparser.ConfigParser()
+    config['Window'] = {
+        'width': width,
+        'height': height,
+        'x': root.winfo_x(),
+        'y': root.winfo_y()
+    }
+
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
@@ -316,8 +337,6 @@ def load_window_size(root):
         if 'Window' in config:
             width = config.getint('Window', 'width', fallback=800)
             height = config.getint('Window', 'height', fallback=600)
-            width = int(width/2)
-            height = int(height/2)
             x = config.getint('Window', 'x', fallback=100)
             y = config.getint('Window', 'y', fallback=100)
             root.geometry(f'{width}x{height}+{x}+{y}')
