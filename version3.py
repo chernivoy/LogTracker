@@ -208,7 +208,9 @@ class FileChangeHandler(FileSystemEventHandler):
         root.after(0, restore_window)
 
 
-
+def toggle_overrideredirect(root):
+    current_state = root.overrideredirect()
+    root.overrideredirect(not current_state)
 
 
 def create_text_window():
@@ -218,6 +220,7 @@ def create_text_window():
     # ctk.set_widget_scaling(0.5)
     global root
     root = ctk.CTk()
+    # root.tk.call('tk', 'scaling', 0.5)
     root.title("Logs")
     root.attributes('-topmost', True)
     root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
@@ -229,6 +232,10 @@ def create_text_window():
 
     pin_button = ctk.CTkButton(main_frame, text="Pin", command=lambda: toggle_pin(root, pin_button))
     pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+
+    minimize_button = ctk.CTkButton(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
+    minimize_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+
 
     file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
@@ -255,7 +262,7 @@ def create_text_window():
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
     main_frame.grid_rowconfigure(0, weight=0)
-    main_frame.grid_rowconfigure(1, weight=1)
+    main_frame.grid_rowconfigure(1, weight=0)
     main_frame.grid_rowconfigure(2, weight=1)
     main_frame.grid_columnconfigure(0, weight=1)
     main_frame.grid_columnconfigure(1, weight=0)
@@ -268,7 +275,7 @@ def create_text_window():
 
     icon_image = PhotoImage(file="err_pic.png")
 
-    toggle_button = ctk.CTkButton(main_frame, image=icon_image, command=lambda: show_context_menu(root))
+    toggle_button = ctk.CTkButton(main_frame, image=icon_image, text="", command=lambda: show_context_menu(root))
     toggle_button.image = icon_image
     toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
 
@@ -309,9 +316,12 @@ def load_window_size(root):
         if 'Window' in config:
             width = config.getint('Window', 'width', fallback=800)
             height = config.getint('Window', 'height', fallback=600)
+            width = int(width/2)
+            height = int(height/2)
             x = config.getint('Window', 'x', fallback=100)
             y = config.getint('Window', 'y', fallback=100)
             root.geometry(f'{width}x{height}+{x}+{y}')
+
     else:
         root.geometry('800x600+100+100')
 
@@ -340,6 +350,14 @@ def show_context_menu(root):
     context_menu.add_command(label="Выйти", command=lambda: on_closing())
     context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
+def open_file(file_path):
+    try:
+        if os.name == 'nt':  # Windows
+            os.startfile(file_path)
+        elif os.name == 'posix':  # macOS, Linux
+            subprocess.call(('xdg-open', file_path))
+    except Exception as e:
+        print(f"Не удалось открыть файл {file_path}: {e}")
 def minimize_to_tray(root):
     global tray_icon
 
