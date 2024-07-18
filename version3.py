@@ -413,8 +413,12 @@ def minimize_to_tray(root):
     tray_icon.run_detached()
 
 def restore_window():
-    global root
-    root.after(0, root.deiconify)
+    global tray_icon
+    root.deiconify()
+    root.lift()
+    if tray_icon:
+        tray_icon.stop()
+        tray_icon = None
 
 def toggle_pin(root, pin_button):
     if root.attributes('-topmost'):
