@@ -4,7 +4,6 @@ import shutil
 import queue
 import threading
 import tkinter as tk
-import customtkinter as ctk
 from tkinter import messagebox
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -12,14 +11,18 @@ import configparser
 import subprocess
 import ctypes
 from ctypes import wintypes
-# import ttkbootstrap as ttk
-# from ttkbootstrap.constants import *
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from tkinter import PhotoImage
+import customtkinter as ctk
+from ctypes import windll
 
 CONFIG_FILE = "window_config.ini"
 tray_icon = None
+root = None
+
+# Установка DPI-осведомленности
+windll.shcore.SetProcessDpiAwareness(2)
 
 def copy_file_without_waiting(source_file, dest_file):
     try:
@@ -202,272 +205,104 @@ class FileChangeHandler(FileSystemEventHandler):
             self.text_widget.insert(tk.END, file_path + "\n")
 
     def show_window_from_tray(self):
-        root.after(0, restore_window)
+        if root.state() == "withdrawn":
+            root.deiconify()
 
-# def create_text_window_old():
-#     root = ttk.Window(themename="litera")
-#     root.title("Logs")
-#     root.attributes('-topmost', True)
-#     root.configure()
-#     # root.overrideredirect(True)
-#     load_window_size(root)
-#
-#     main_frame = ttk.Frame(root)
-#     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-#
-#     pin_button = ttk.Button(main_frame, text="Unpin", command=lambda: toggle_pin(root, pin_button))
-#     pin_button.grid(row=3, column=0, padx=5, pady=5, sticky="ne")
-#
-#     minimize_button = ttk.Button(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
-#     minimize_button.grid(row=3, column=1, padx=5, pady=5, sticky="ne")
-#
-#     file_label = ttk.Label(main_frame, text="File: ")
-#     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-#
-#     text_widget_frame = ttk.Frame(main_frame)
-#     text_widget_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
-#
-#     text_widget = ttk.Text(text_widget_frame, wrap="none")
-#     text_widget.pack(fill="both", expand=True)
-#
-#     error_frame = ttk.Frame(main_frame)
-#     error_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=5)
-#
-#     error_label = ttk.Label(error_frame, text="ERR:", anchor="w")
-#     error_label.pack(side="left", padx=(10, 0))
-#
-#     error_text_widget_frame = ttk.Frame(error_frame)
-#     error_text_widget_frame.pack(fill="both", expand=True)
-#
-#     error_text_widget = ttk.Text(error_text_widget_frame, height=4, wrap=WORD, state=tk.DISABLED)
-#     error_text_widget.pack(fill="both", expand=True, padx=5)
-#
-#     root.grid_columnconfigure(0, weight=1)
-#     root.grid_rowconfigure(1, weight=1)
-#     main_frame.grid_rowconfigure(1, weight=1)
-#     main_frame.grid_columnconfigure(0, weight=1)
-#     text_widget_frame.grid_rowconfigure(0, weight=1)
-#     text_widget_frame.grid_columnconfigure(0, weight=1)
-#     error_frame.grid_rowconfigure(0, weight=1)
-#     error_text_widget_frame.grid_columnconfigure(0, weight=1)
-#
-#     # Загрузка иконки
-#     icon_image = PhotoImage(file="err_pic.png")
-#
-#
-#
-#     style = ttk.Style()
-#     style.configure("Flat.TButton", relief="flat", borderwidth=0, background="white", foreground="black")  # Настройка стиля здесь
-#
-#     # toggle_button = ttk.Button(main_frame, text="...", command=lambda: show_context_menu(root), style="Flat.TButton")
-#     # toggle_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-#     # Создание кнопки с изображением
-#     toggle_button = ttk.Button(main_frame, image=icon_image, command=lambda: show_context_menu(root), style="Flat.TButton")
-#     toggle_button.image = icon_image  # Присваиваем объекту кнопки изображение, чтобы избежать удаления из памяти
-#     toggle_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-#
-#
-#     return root, text_widget, error_text_widget, file_label
-def create_text_window():
-    global root
-    ctk.set_appearance_mode("dark")
-    root = ctk.CTk()
-    root.title("Logs")
-    root.attributes('-topmost', True)
-    root.tk.call('tk', 'scaling', 3.0)
-    # root.geometry("800x600")
-    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
+class CustomTkinterApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.protocol("WM_DELETE_WINDOW", self.minimize_to_tray)
+        self.text_widget = ctk.CTkTextbox(root)
+        self.text_widget.pack(fill=ctk.BOTH, expand=True)
+        self.error_text_widget = ctk.CTkTextbox(root, height=1)
+        self.error_text_widget.pack(fill=ctk.BOTH, expand=True)
+        self.file_label = ctk.CTkLabel(root, text="File: ")
+        self.file_label.pack()
+        self.load_window_size()
+        self.word = "ERR"
+        self.directory = r'C:\ProgramData\ADAICA Schweiz AG\ADAICA\Logs\ichernevoy'
+        self.event_queue = queue.Queue()
+        self.event_handler = FileChangeHandler(self.directory, self.word, self.text_widget, self.error_text_widget, self.file_label, self.event_queue)
+        self.observer = Observer()
+        self.observer.schedule(self.event_handler, path=self.directory, recursive=False)
+        self.observer.start()
+        self.check_files_thread = threading.Thread(target=self.periodically_check_files, daemon=True)
+        self.check_files_thread.start()
+        self.process_queue()
 
-    load_window_size(root)
+    def periodically_check_files(self):
+        while True:
+            try:
+                self.event_handler.copy_files_from_A()
+                time.sleep(60)
+            except Exception as e:
+                print(f"Ошибка при периодической проверке файлов: {e}")
 
-    main_frame = ctk.CTkFrame(root)
-    main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+    def process_queue(self):
+        while not self.event_queue.empty():
+            try:
+                task = self.event_queue.get_nowait()
+                task()
+            except queue.Empty:
+                pass
+            except Exception as e:
+                print(f"Ошибка при обработке очереди: {e}")
+        self.root.after(1000, self.process_queue)
 
-    pin_button = ctk.CTkButton(main_frame, text="Pin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+    def minimize_to_tray(self):
+        self.create_tray_icon()
+        self.root.withdraw()
 
-    file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
-    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+    def create_tray_icon(self):
+        icon_image = Image.new("RGB", (64, 64), (255, 255, 255))
+        draw = ImageDraw.Draw(icon_image)
+        font = ImageFont.load_default()
+        draw.text((14, 22), "App", font=font, fill=(0, 0, 0))
+        self.tray_icon = pystray.Icon("test", icon_image, "App", menu=pystray.Menu(
+            pystray.MenuItem("Показать", self.show_window),
+            pystray.MenuItem("Выход", self.exit_application)
+        ))
+        self.tray_icon.run_detached()
 
-    error_frame = ctk.CTkFrame(main_frame)
-    error_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=5)
+    def show_window(self):
+        if self.root.state() == "withdrawn":
+            self.root.deiconify()
+        if self.tray_icon:
+            self.tray_icon.stop()
 
-    error_label = ctk.CTkLabel(error_frame, text="ERR:", anchor="w")
-    error_label.pack(side="left", padx=(10, 0))
+    def exit_application(self):
+        if self.tray_icon:
+            self.tray_icon.stop()
+        self.observer.stop()
+        self.observer.join()
+        self.root.destroy()
 
-    error_text_widget_frame = ctk.CTkFrame(error_frame)
-    error_text_widget_frame.pack(fill="both", expand=True)
+    def save_window_size(self):
+        config = configparser.ConfigParser()
+        config['Window'] = {
+            'width': self.root.winfo_width(),
+            'height': self.root.winfo_height(),
+            'x': self.root.winfo_x(),
+            'y': self.root.winfo_y()
+        }
+        with open(CONFIG_FILE, 'w') as configfile:
+            config.write(configfile)
 
-    error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=4, wrap="word", state="disabled")
-    error_text_widget.pack(fill="both", expand=True, padx=5)
-
-    text_widget_frame = ctk.CTkFrame(main_frame)
-    text_widget_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=5)
-
-    text_widget = ctk.CTkTextbox(text_widget_frame, wrap="none")
-    text_widget.pack(fill="both", expand=True)
-
-    root.grid_columnconfigure(0, weight=1)
-    root.grid_rowconfigure(0, weight=1)
-    main_frame.grid_rowconfigure(2, weight=1)
-    main_frame.grid_columnconfigure(0, weight=1)
-    text_widget_frame.grid_rowconfigure(0, weight=1)
-    text_widget_frame.grid_columnconfigure(0, weight=1)
-    error_frame.grid_rowconfigure(0, weight=1)
-    error_text_widget_frame.grid_columnconfigure(0, weight=1)
-
-    icon_image = PhotoImage(file="err_pic.png")
-
-    toggle_button = ctk.CTkButton(main_frame, text="", image=icon_image, command=lambda: show_context_menu(root))
-    toggle_button.image = icon_image
-    toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
-
-    return root, text_widget, error_text_widget, file_label
-
-
-
-
-
-
-def show_context_menu(root):
-    context_menu = tk.Menu(root, tearoff=0)
-    context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
-    context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
-    context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
-
-def load_window_size(root):
-    config = configparser.ConfigParser()
-    if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE)
-        if 'Window' in config:
-            width = config.getint('Window', 'width', fallback=800)
-            height = config.getint('Window', 'height', fallback=600)
-            x = config.getint('Window', 'x', fallback=100)
-            y = config.getint('Window', 'y', fallback=100)
-            root.geometry(f'{width}x{height}+{x}+{y}')
-    else:
-        root.geometry('800x600+100+100')
-
-def toggle_pin(root, pin_button):
-    if root.attributes('-topmost'):
-        root.attributes('-topmost', False)
-        if pin_button:
-            pin_button.configure(text="Pin")
-    else:
-        root.attributes('-topmost', True)
-        if pin_button:
-            pin_button.configure(text="Unpin")
-
-def save_window_size(root):
-    config = configparser.ConfigParser()
-    config['Window'] = {
-        'width': root.winfo_width(),
-        'height': root.winfo_height(),
-        'x': root.winfo_x(),
-        'y': root.winfo_y()
-    }
-    with open(CONFIG_FILE, 'w') as configfile:
-        config.write(configfile)
-
-def open_file(file_path):
-    try:
-        if os.name == 'nt':  # Windows
-            os.startfile(file_path)
-        elif os.name == 'posix':  # macOS, Linux
-            subprocess.call(('xdg-open', file_path))
-    except Exception as e:
-        print(f"Не удалось открыть файл {file_path}: {e}")
-
-def minimize_to_tray(root):
-    global tray_icon
-
-    def create_image(width, height, color1, color2):
-        image = Image.new('RGB', (width, height), color1)
-        dc = ImageDraw.Draw(image)
-        dc.rectangle(
-            (width // 2, 0, width, height // 2),
-            fill=color2)
-        dc.rectangle(
-            (0, height // 2, width // 2, height),
-            fill=color2)
-        return image
-
-    def on_click(icon, item):
-        root.after(0, icon.stop)
-        restore_window()
-
-    def on_quit(icon, item):
-        save_window_size(root)
-        observer.stop()
-        observer.join()
-        icon.stop()
-        root.quit()
-
-    menu = (
-        pystray.MenuItem('Открыть', on_click),
-        pystray.MenuItem('Выход', on_quit)
-    )
-    icon_image = create_image(64, 64, 'black', 'white')
-    tray_icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
-    root.withdraw()
-    tray_icon.run_detached()
-
-def restore_window():
-    global tray_icon
-    root.deiconify()
-    root.lift()
-    if tray_icon:
-        tray_icon.stop()
-        tray_icon = None
-
-def main(directory, word):
-    global observer
-    global root
-    root, text_widget, error_text_widget, file_label = create_text_window()
-    event_queue = queue.Queue()
-
-    event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, file_label, event_queue)
-    observer = Observer()
-    observer.schedule(event_handler, directory, recursive=False)
-    observer.start()
-
-    def process_queue():
-        try:
-            while True:
-                event = event_queue.get_nowait()
-                event()
-        except queue.Empty:
-            pass
-        root.after(100, process_queue)
-
-    def periodic_sync():
-        event_handler.copy_files_from_A()
-        root.after(5000, periodic_sync)
-
-    def on_closing():
-        save_window_size(root)
-        observer.stop()
-        observer.join()
-        root.quit()
-
-    def on_error_double_click(event):
-        if event_handler.last_error_file:
-            open_file(event_handler.last_error_file)
-
-    error_text_widget.bind("<Double-Button-1>", on_error_double_click)
-
-    root.after(100, process_queue)
-    root.after(5000, periodic_sync)
-
-    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
-
-    try:
-        root.mainloop()
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+    def load_window_size(self):
+        config = configparser.ConfigParser()
+        if os.path.exists(CONFIG_FILE):
+            config.read(CONFIG_FILE)
+            if 'Window' in config:
+                width = int(config['Window'].get('width', self.root.winfo_width()))
+                height = int(config['Window'].get('height', self.root.winfo_height()))
+                x = int(config['Window'].get('x', self.root.winfo_x()))
+                y = int(config['Window'].get('y', self.root.winfo_y()))
+                self.root.geometry(f'{width}x{height}+{x}+{y}')
+                ctk.deactivate_automatic_dpi_awareness()
+                ctk.set_window_scaling(self.root)
 
 if __name__ == "__main__":
-    directory = r"C:\temp\logger"
-    word = "ERR"
-    main(directory, word)
+    root = ctk.CTk()
+    app = CustomTkinterApp(root)
+    root.mainloop()
+    app.save_window_size()
