@@ -219,19 +219,27 @@ def create_text_window():
     global root
     root = ctk.CTk()
     root.title("Logs")
+
+
     root.attributes('-topmost', True)
     root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
 
     load_window_size(root)
 
+    # Убираем кнопки минимизации и максимизации
+
+
     main_frame = ctk.CTkFrame(root)
     main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 
-    pin_button = ctk.CTkButton(main_frame, text="Unpin", height=20, width=20, fg_color="blue", command=lambda: toggle_pin(root, pin_button))
-    pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+    burger_button = ctk.CTkButton(main_frame, text="...", height=20, width=20, fg_color="blue", command=lambda: show_context_menu(root))
+    burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-    minimize_button = ctk.CTkButton(main_frame, text="To Tray", height=20, width=20,command=lambda: minimize_to_tray(root))
-    minimize_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+    # pin_button = ctk.CTkButton(main_frame, text="Unpin", height=20, width=20, fg_color="blue", command=lambda: toggle_pin(root, pin_button))
+    # pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+    #
+    # minimize_button = ctk.CTkButton(main_frame, text="To Tray", height=20, width=20,command=lambda: minimize_to_tray(root))
+    # minimize_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
 
     file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
     file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
@@ -258,6 +266,7 @@ def create_text_window():
     # Настройка растягивания для окна и фреймов
     root.grid_rowconfigure(0, weight=1)
     root.grid_columnconfigure(0, weight=1)
+
     main_frame.grid_rowconfigure(0, weight=0)
     main_frame.grid_rowconfigure(1, weight=1)
     main_frame.grid_rowconfigure(2, weight=1)
@@ -270,83 +279,28 @@ def create_text_window():
     text_widget_frame.grid_rowconfigure(0, weight=1)
     text_widget_frame.grid_columnconfigure(0, weight=1)
 
-    icon_image = PhotoImage(file="err_pic.png")
+    icon_image = PhotoImage(file="err_pic4.png")
+    # icon_image = ImageTk.
     icon_width = icon_image.width()  # Ширина иконки
     icon_height = icon_image.height()  # Высота иконки
 
-    toggle_button = ctk.CTkButton(main_frame, image=icon_image, text="", height=icon_height, width=icon_width,
-                                  fg_color="#1a1a1a", corner_radius=40, command=lambda: show_context_menu(root))
-    toggle_button.image = icon_image
-    toggle_button.grid(row=1, column=2, padx=(5, 0), pady=5, sticky="ne")
+    # toggle_button = ctk.CTkButton(main_frame, image=icon_image, text="", height=icon_height, width=icon_width,
+    #                               fg_color="#1a1a1a", corner_radius=40, border_width=1, border_color="blue", command=lambda: show_context_menu(root))
+    # toggle_button.image = icon_image
+    # toggle_button.grid(row=1, column=2, padx=(5, 0), pady=5, sticky="ne")
+
+    # icon_image2 = PhotoImage(file="err_pic4.png")
+    # toggle_button2 = ctk.CTkButton(main_frame, image= icon_image2,  text="", height=32, width=32,
+    #                               fg_color="#1a1a1a", corner_radius=40, command=lambda: show_context_menu(root))
+    #
+    # toggle_button2.grid(row=3, column=3, padx=(5, 0), pady=5, sticky="ne")
+    #
+    # error_button = ctk.CTkButton(main_frame, height=16, width=16, image=icon_image2, text="", command=lambda: show_context_menu(root))
+    # error_button.grid(row=3, column=1, padx=(5, 0), pady=5, sticky="ne")
     # text_widget_frame.grid()
 
     return root, text_widget, error_text_widget, file_label
 
-def create_text_windowOld4():
-    ctk.set_appearance_mode("dark")
-    global root
-    root = ctk.CTk()
-    root.title("Logs")
-    root.attributes('-topmost', True)
-    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
-
-    load_window_size(root)
-
-    main_frame = ctk.CTkFrame(root)
-    main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
-
-    pin_button = ctk.CTkButton(main_frame, text="Pin", command=lambda: toggle_pin(root, pin_button))
-    pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-
-    minimize_button = ctk.CTkButton(main_frame, text="To Tray", command=lambda: minimize_to_tray(root))
-    minimize_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
-
-    file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
-    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-
-    error_frame = ctk.CTkFrame(main_frame)
-    error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
-
-    error_label = ctk.CTkLabel(error_frame, text="ERR:", anchor="w")
-    error_label.pack(side="left", padx=(10, 0))
-
-    error_text_widget_frame = ctk.CTkFrame(error_frame)
-    error_text_widget_frame.pack(fill="both", expand=True)
-
-    error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=80, corner_radius=20, border_width=1, border_color="blue", wrap="word", state="disabled")
-    error_text_widget.pack(fill="both", expand=True, padx=5)
-
-    text_widget_frame = ctk.CTkFrame(main_frame)
-    text_widget_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=5)
-    text_widget_frame.grid_remove()
-
-    text_widget = ctk.CTkTextbox(text_widget_frame, wrap="none")
-    text_widget.pack(fill="both", expand=True)
-
-    # Настройка растягивания для окна и фреймов
-    root.grid_rowconfigure(0, weight=1)
-    root.grid_columnconfigure(0, weight=1)
-    main_frame.grid_rowconfigure(0, weight=0)
-    main_frame.grid_rowconfigure(1, weight=1)
-    main_frame.grid_rowconfigure(2, weight=1)
-    main_frame.grid_columnconfigure(0, weight=1)
-    main_frame.grid_columnconfigure(1, weight=0)
-
-    error_frame.grid_rowconfigure(0, weight=1)
-    error_frame.grid_columnconfigure(0, weight=1)
-
-    text_widget_frame.grid_rowconfigure(0, weight=1)
-    text_widget_frame.grid_columnconfigure(0, weight=1)
-
-    icon_image = PhotoImage(file="err_pic.png")
-    icon_width = icon_image.width()  # Ширина иконки
-    icon_height = icon_image.height()  # Высота иконки
-
-    toggle_button = ctk.CTkButton(main_frame, image=icon_image, text="", height=icon_height, width=icon_width, fg_color="#1a1a1a", corner_radius=40, command=lambda: show_context_menu(root))
-    toggle_button.image = icon_image
-    toggle_button.grid(row=1, column=2, padx=5, pady=5, sticky="n")
-
-    return root, text_widget, error_text_widget, file_label
 
 
 
