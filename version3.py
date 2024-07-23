@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 from tkinter import PhotoImage
 import customtkinter as ctk
 from ctypes import windll
+import configparser
 
 CONFIG_FILE = "window_config.ini"
 tray_icon = None
@@ -212,13 +213,33 @@ def toggle_overrideredirect(root):
     root.overrideredirect(not current_state)
 
 
+def remove_window_buttons(root):
+    # Получаем дескриптор окна
+    hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+
+    # Получаем текущие стили окна
+    styles = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
+
+    # Убираем стили для кнопок Minimize и Maximize
+    styles &= ~0x00020000  # WS_MINIMIZEBOX
+    styles &= ~0x00010000  # WS_MAXIMIZEBOX
+
+    # Применяем измененные стили
+    ctypes.windll.user32.SetWindowLongW(hwnd, -16, styles)
+    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0040 | 0x0100)  # SWP_NOSIZE | SWP_NOMOVE
+
 
 
 def create_text_window():
+
     ctk.set_appearance_mode("dark")
     global root
     root = ctk.CTk()
-    root.title("Logs")
+
+    root.title("LogTracker")
+
+
+    root.iconbitmap('2.ico')
 
 
     root.attributes('-topmost', True)
@@ -279,7 +300,7 @@ def create_text_window():
     text_widget_frame.grid_rowconfigure(0, weight=1)
     text_widget_frame.grid_columnconfigure(0, weight=1)
 
-    icon_image = PhotoImage(file="err_pic4.png")
+    icon_image = PhotoImage(file="err_pic.png")
     # icon_image = ImageTk.
     icon_width = icon_image.width()  # Ширина иконки
     icon_height = icon_image.height()  # Высота иконки
@@ -337,15 +358,6 @@ def save_window_size(root):
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
-def show_context_menu(root):
-    context_menu = tk.Menu(root, tearoff=0)
-    context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
-    context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
-    context_menu.add_command(label="Window border", command=lambda: toggle_overrideredirect(root))
-    context_menu.add_command(label="Выйти", command=lambda: on_closing())
-    context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
-
-
 def load_window_size(root):
     config = configparser.ConfigParser()
     if os.path.exists(CONFIG_FILE):
@@ -378,7 +390,7 @@ def on_quit(icon, item):
     root.quit()
 
 def show_context_menu(root):
-    context_menu = tk.Menu(root, tearoff=0)
+    context_menu = tk.Menu(root, tearoff=0, bg="#f0f0f0", fg="#000000")
     context_menu.add_command(label="Pin/Unpin", command=lambda: toggle_pin(root, None))
     context_menu.add_command(label="Свернуть в трей", command=lambda: minimize_to_tray(root))
     context_menu.add_command(label="Window border", command=lambda: toggle_overrideredirect(root))
