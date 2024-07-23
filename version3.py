@@ -19,11 +19,21 @@ from ctypes import windll
 import configparser
 
 CONFIG_FILE = "window_config.ini"
+
 tray_icon = None
 root = None
 
 # Установка DPI-осведомленности
 windll.shcore.SetProcessDpiAwareness(2)
+
+
+def load_config(config_file):
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    return config
+
+
+config = load_config("config.ini")
 
 def copy_file_without_waiting(source_file, dest_file):
     try:
@@ -38,10 +48,9 @@ def copy_file_without_waiting(source_file, dest_file):
         print(f"Не удалось скопировать файл {source_file}: {e}")
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, directory, word, text_widget, error_text_widget, file_label, event_queue):
+    def __init__(self, directory, word, error_text_widget, file_label, event_queue):
         self.directory = directory
         self.word = word
-        self.text_widget = text_widget
         self.error_text_widget = error_text_widget
         self.file_label = file_label
         self.event_queue = event_queue
@@ -51,7 +60,7 @@ class FileChangeHandler(FileSystemEventHandler):
         self.last_update_time = {}
         self.track_files()
         self.create_directory_if_not_exists(directory)
-        self.update_text_widget()
+
 
     def track_files(self):
         print("Отслеживание .log файлов в директории:", self.directory)
@@ -95,7 +104,7 @@ class FileChangeHandler(FileSystemEventHandler):
         return False
 
     def copy_files_from_A(self):
-        directory_A = r'C:\ProgramData\ADAICA Schweiz AG\ADAICA\Logs\ichernevoy'
+        directory_A = config.get('Settings', 'directory_A')
         try:
             self.create_directory_if_not_exists(self.directory)
 
@@ -199,10 +208,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if file_path in self.file_paths:
             del self.file_paths[file_path]
 
-    def update_text_widget(self):
-        self.text_widget.delete(1.0, tk.END)
-        for file_path in self.file_paths:
-            self.text_widget.insert(tk.END, file_path + "\n")
+
 
     def show_window_from_tray(self):
         root.after(0, restore_window)
@@ -230,7 +236,7 @@ def remove_window_buttons(root):
 
 
 
-def create_text_window():
+def create_text_window_old():
 
     ctk.set_appearance_mode("dark")
     global root
@@ -296,9 +302,9 @@ def create_text_window():
 
     error_frame.grid_rowconfigure(0, weight=1)
     error_frame.grid_columnconfigure(0, weight=1)
-
-    text_widget_frame.grid_rowconfigure(0, weight=1)
-    text_widget_frame.grid_columnconfigure(0, weight=1)
+    #
+    # text_widget_frame.grid_rowconfigure(0, weight=1)
+    # text_widget_frame.grid_columnconfigure(0, weight=1)
 
     icon_image = PhotoImage(file="err_pic.png")
     # icon_image = ImageTk.
@@ -323,7 +329,56 @@ def create_text_window():
     return root, text_widget, error_text_widget, file_label
 
 
+def create_text_window():
 
+    ctk.set_appearance_mode("dark")
+    global root
+    root = ctk.CTk()
+
+    root.title("LogTracker")
+
+
+    root.iconbitmap('2.ico')
+
+
+    root.attributes('-topmost', True)
+    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
+
+    load_window_size(root)
+
+    main_frame = ctk.CTkFrame(root)
+    main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+
+    file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
+    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+
+    burger_button = ctk.CTkButton(main_frame,
+                                  text="...", height=20, width=20, fg_color="blue",
+                                  command=lambda: show_context_menu(root))
+    burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+
+
+
+    error_frame = ctk.CTkFrame(main_frame)
+    error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
+
+
+    error_text_widget_frame = ctk.CTkFrame(error_frame)
+    error_text_widget_frame.pack(fill="both", expand=True)
+
+    error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=80, corner_radius=20, border_width=1, border_color="blue", wrap="word", state="disabled")
+    error_text_widget.pack(fill="both", expand=True, padx=5, pady=5, anchor="s")
+
+    # Настройка растягивания для окна и фреймов
+    root.grid_rowconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+
+    main_frame.grid_rowconfigure(0, weight=0)
+    main_frame.grid_rowconfigure(1, weight=1)
+    main_frame.grid_rowconfigure(1, weight=1)
+    main_frame.grid_columnconfigure(0, weight=1)
+
+    return root, error_text_widget, file_label
 
 
 
@@ -459,9 +514,9 @@ def toggle_pin(root, pin_button):
             pin_button.configure(text="Unpin")
 
 
-def monitor_directory(directory, word, text_widget, error_text_widget, file_label):
+def monitor_directory(directory, word, error_text_widget, file_label):
     event_queue = queue.Queue()
-    handler = FileChangeHandler(directory, word, text_widget, error_text_widget, file_label, event_queue)
+    handler = FileChangeHandler(directory, word, error_text_widget, file_label, event_queue)
     observer = Observer()
     observer.schedule(handler, directory, recursive=True)
     observer.start()
@@ -484,13 +539,18 @@ def monitor_directory(directory, word, text_widget, error_text_widget, file_labe
         observer.stop()
     observer.join()
 
-def main(directory, word):
+def main():
     global observer
     global root
-    root, text_widget, error_text_widget, file_label = create_text_window()
+
+
+    directory = config.get('Settings', 'directory')
+    word = config.get('Settings', 'word')
+
+    root, error_text_widget, file_label = create_text_window()
     event_queue = queue.Queue()
 
-    event_handler = FileChangeHandler(directory, word, text_widget, error_text_widget, file_label, event_queue)
+    event_handler = FileChangeHandler(directory, word, error_text_widget, file_label, event_queue)
     observer = Observer()
     observer.schedule(event_handler, directory, recursive=False)
     observer.start()
@@ -533,6 +593,6 @@ def main(directory, word):
 
 
 if __name__ == "__main__":
-    directory = r"C:\temp\logger"
-    word = "ERR"
-    main(directory, word)
+    main()
+
+
