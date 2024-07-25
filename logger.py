@@ -219,6 +219,8 @@ def create_text_window():
     # root.overrideredirect(True)
     load_window_size(root)
 
+
+
     main_frame = ttk.Frame(root)
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 

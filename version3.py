@@ -196,7 +196,7 @@ class FileChangeHandler(FileSystemEventHandler):
             else:
                 print(f"Изменен файл: {event.src_path}")
                 self.check_new_errors(event.src_path)
-                self.event_queue.put(self.update_text_widget)
+                # self.event_queue.put(self.update_text_widget)
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
@@ -234,101 +234,6 @@ def remove_window_buttons(root):
     ctypes.windll.user32.SetWindowLongW(hwnd, -16, styles)
     ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0040 | 0x0100)  # SWP_NOSIZE | SWP_NOMOVE
 
-
-
-def create_text_window_old():
-
-    ctk.set_appearance_mode("dark")
-    global root
-    root = ctk.CTk()
-
-    root.title("LogTracker")
-
-
-    root.iconbitmap('2.ico')
-
-
-    root.attributes('-topmost', True)
-    root.protocol("WM_DELETE_WINDOW", lambda: minimize_to_tray(root))
-
-    load_window_size(root)
-
-    # Убираем кнопки минимизации и максимизации
-
-
-    main_frame = ctk.CTkFrame(root)
-    main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
-
-    burger_button = ctk.CTkButton(main_frame, text="...", height=20, width=20, fg_color="blue", command=lambda: show_context_menu(root))
-    burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-
-    # pin_button = ctk.CTkButton(main_frame, text="Unpin", height=20, width=20, fg_color="blue", command=lambda: toggle_pin(root, pin_button))
-    # pin_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-    #
-    # minimize_button = ctk.CTkButton(main_frame, text="To Tray", height=20, width=20,command=lambda: minimize_to_tray(root))
-    # minimize_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
-
-    file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
-    file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-
-    error_frame = ctk.CTkFrame(main_frame)
-    error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=5)
-
-    # error_label = ctk.CTkLabel(error_frame, text="ERR:", anchor="w")
-    # error_label.pack(side="left", padx=(10, 0))
-
-    error_text_widget_frame = ctk.CTkFrame(error_frame)
-    error_text_widget_frame.pack(fill="both", expand=True)
-
-    error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=80, corner_radius=20, border_width=1, border_color="blue", wrap="word", state="disabled")
-    error_text_widget.pack(fill="both", expand=True, padx=5)
-
-    text_widget_frame = ctk.CTkFrame(main_frame)
-    text_widget_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=5)
-    text_widget_frame.grid_remove()  # Скрываем frame сразу после создания
-
-    text_widget = ctk.CTkTextbox(text_widget_frame, wrap="none")
-    text_widget.pack(fill="both", expand=True)
-
-    # Настройка растягивания для окна и фреймов
-    root.grid_rowconfigure(0, weight=1)
-    root.grid_columnconfigure(0, weight=1)
-
-    main_frame.grid_rowconfigure(0, weight=0)
-    main_frame.grid_rowconfigure(1, weight=1)
-    main_frame.grid_rowconfigure(2, weight=1)
-    main_frame.grid_columnconfigure(0, weight=1)
-    main_frame.grid_columnconfigure(1, weight=0)
-
-    error_frame.grid_rowconfigure(0, weight=1)
-    error_frame.grid_columnconfigure(0, weight=1)
-    #
-    # text_widget_frame.grid_rowconfigure(0, weight=1)
-    # text_widget_frame.grid_columnconfigure(0, weight=1)
-
-    icon_image = PhotoImage(file="err_pic.png")
-    # icon_image = ImageTk.
-    icon_width = icon_image.width()  # Ширина иконки
-    icon_height = icon_image.height()  # Высота иконки
-
-    # toggle_button = ctk.CTkButton(main_frame, image=icon_image, text="", height=icon_height, width=icon_width,
-    #                               fg_color="#1a1a1a", corner_radius=40, border_width=1, border_color="blue", command=lambda: show_context_menu(root))
-    # toggle_button.image = icon_image
-    # toggle_button.grid(row=1, column=2, padx=(5, 0), pady=5, sticky="ne")
-
-    # icon_image2 = PhotoImage(file="err_pic4.png")
-    # toggle_button2 = ctk.CTkButton(main_frame, image= icon_image2,  text="", height=32, width=32,
-    #                               fg_color="#1a1a1a", corner_radius=40, command=lambda: show_context_menu(root))
-    #
-    # toggle_button2.grid(row=3, column=3, padx=(5, 0), pady=5, sticky="ne")
-    #
-    # error_button = ctk.CTkButton(main_frame, height=16, width=16, image=icon_image2, text="", command=lambda: show_context_menu(root))
-    # error_button.grid(row=3, column=1, padx=(5, 0), pady=5, sticky="ne")
-    # text_widget_frame.grid()
-
-    return root, text_widget, error_text_widget, file_label
-
-
 def create_text_window():
 
     ctk.set_appearance_mode("dark")
@@ -360,14 +265,14 @@ def create_text_window():
 
 
     error_frame = ctk.CTkFrame(main_frame)
-    error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
+    error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
 
 
     error_text_widget_frame = ctk.CTkFrame(error_frame)
     error_text_widget_frame.pack(fill="both", expand=True)
 
     error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=80, corner_radius=20, border_width=1, border_color="blue", wrap="word", state="disabled")
-    error_text_widget.pack(fill="both", expand=True, padx=5, pady=5, anchor="s")
+    error_text_widget.pack(fill="both", expand=True, padx=1, pady=1)
 
     # Настройка растягивания для окна и фреймов
     root.grid_rowconfigure(0, weight=1)
@@ -393,12 +298,10 @@ def on_closing():
 
 
 def save_window_size(root):
-    # Получаем коэффициент масштабирования DPI
     user32 = ctypes.windll.user32
     user32.SetProcessDPIAware()
     dpi_scale = user32.GetDpiForWindow(root.winfo_id()) / 96.0
 
-    # Корректируем ширину и высоту с учетом масштаба DPI
     width = int(root.winfo_width() / dpi_scale)
     height = int(root.winfo_height() / dpi_scale)
 
@@ -412,6 +315,20 @@ def save_window_size(root):
 
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
+
+def load_window_size(root):
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        if 'Window' in config:
+            width = config.getint('Window', 'width', fallback=800)
+            height = config.getint('Window', 'height', fallback=600)
+            x = config.getint('Window', 'x', fallback=100)
+            y = config.getint('Window', 'y', fallback=100)
+            root.geometry(f'{width}x{height}+{x}+{y}')
+    else:
+        root.geometry('800x600+100+100')
+
 
 def load_window_size(root):
     config = configparser.ConfigParser()
@@ -443,6 +360,8 @@ def on_quit(icon, item):
     global root
     icon.stop()
     root.quit()
+
+
 
 def show_context_menu(root):
     context_menu = tk.Menu(root, tearoff=0, bg="#f0f0f0", fg="#000000")
@@ -485,23 +404,35 @@ def minimize_to_tray(root):
         icon.stop()
         root.quit()
 
+    save_window_size(root)
+
     menu = (
         pystray.MenuItem('Открыть', on_click),
         pystray.MenuItem('Выход', on_quit)
-
     )
     icon_image = create_image(64, 64, 'black', 'white')
     tray_icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
     root.withdraw()
     tray_icon.run_detached()
 
+
 def restore_window():
-    global tray_icon
+    global root
+    if check_rdp_status():
+        windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
+    else:
+        windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
+
+    load_window_size(root)  # Перечитываем размеры окна из файла конфигурации
     root.deiconify()
     root.lift()
     if tray_icon:
-        tray_icon.stop()
-        tray_icon = None
+        tray_icon.visible = False
+
+
+def check_rdp_status():
+    SM_REMOTESESSION = 0x1000
+    return ctypes.windll.user32.GetSystemMetrics(SM_REMOTESESSION) != 0
 
 def toggle_pin(root, pin_button):
     if root.attributes('-topmost'):
@@ -542,8 +473,6 @@ def monitor_directory(directory, word, error_text_widget, file_label):
 def main():
     global observer
     global root
-
-
     directory = config.get('Settings', 'directory')
     word = config.get('Settings', 'word')
 
