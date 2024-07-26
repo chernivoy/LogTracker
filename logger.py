@@ -215,6 +215,7 @@ def create_text_window():
     # root = ttk.Window(themename="journal")
     root.title("Logs")
     root.attributes('-topmost', True)
+
     root.configure()
     # root.overrideredirect(True)
     load_window_size(root)

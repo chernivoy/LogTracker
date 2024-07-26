@@ -241,7 +241,7 @@ def create_text_window():
     root = ctk.CTk()
 
     root.title("LogTracker")
-
+    root.minsize(353,133)
 
     root.iconbitmap('2.ico')
 
@@ -271,7 +271,7 @@ def create_text_window():
     error_text_widget_frame = ctk.CTkFrame(error_frame)
     error_text_widget_frame.pack(fill="both", expand=True)
 
-    error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=80, corner_radius=20, border_width=1, border_color="blue", wrap="word", state="disabled")
+    error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=10, corner_radius=20, border_width=1, border_color="blue", wrap="word", state="disabled")
     error_text_widget.pack(fill="both", expand=True, padx=1, pady=1)
 
     # Настройка растягивания для окна и фреймов
@@ -329,20 +329,6 @@ def load_window_size(root):
     else:
         root.geometry('800x600+100+100')
 
-
-def load_window_size(root):
-    config = configparser.ConfigParser()
-    if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE)
-        if 'Window' in config:
-            width = config.getint('Window', 'width', fallback=800)
-            height = config.getint('Window', 'height', fallback=600)
-            x = config.getint('Window', 'x', fallback=100)
-            y = config.getint('Window', 'y', fallback=100)
-            root.geometry(f'{width}x{height}+{x}+{y}')
-
-    else:
-        root.geometry('800x600+100+100')
 
 
 def create_image(width, height, color1, color2):
