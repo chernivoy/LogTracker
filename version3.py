@@ -22,6 +22,7 @@ CONFIG_FILE = "window_config.ini"
 
 tray_icon = None
 root = None
+is_window_open = False
 
 # Установка DPI-осведомленности
 windll.shcore.SetProcessDpiAwareness(2)
@@ -159,7 +160,8 @@ class FileChangeHandler(FileSystemEventHandler):
             self.error_text_widget.delete(1.0, tk.END)
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
             self.error_text_widget.configure(state=tk.DISABLED)
-            self.event_queue.put(self.show_window_from_tray)
+            if not is_window_open:  # Проверка состояния окна
+                self.event_queue.put(self.show_window_from_tray)
 
     def can_read_file(self, file_path):
         try:
@@ -208,10 +210,10 @@ class FileChangeHandler(FileSystemEventHandler):
         if file_path in self.file_paths:
             del self.file_paths[file_path]
 
-
-
     def show_window_from_tray(self):
+        global is_window_open
         root.after(0, restore_window)
+        is_window_open = True
 
 
 def toggle_overrideredirect(root):
@@ -365,8 +367,12 @@ def open_file(file_path):
             subprocess.call(('xdg-open', file_path))
     except Exception as e:
         print(f"Не удалось открыть файл {file_path}: {e}")
+
+
 def minimize_to_tray(root):
+    global is_window_open
     global tray_icon
+    is_window_open = False
 
     def create_image(width, height, color1, color2):
         image = Image.new('RGB', (width, height), color1)
@@ -404,6 +410,7 @@ def minimize_to_tray(root):
 
 def restore_window():
     global root
+    global is_window_open
     if check_rdp_status():
         windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
     else:
@@ -411,6 +418,7 @@ def restore_window():
 
     load_window_size(root)  # Перечитываем размеры окна из файла конфигурации
     root.deiconify()
+    is_window_open = True # Обновляем состояние окна
     root.lift()
     if tray_icon:
         tray_icon.visible = False
@@ -505,6 +513,9 @@ def main():
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
+
+def on_window_resize(event):
+    save_window_size(root)
 
 
 if __name__ == "__main__":
