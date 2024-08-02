@@ -284,7 +284,8 @@ class TrayManager:
 
     @staticmethod
     def show_context_menu(root, app):
-        context_menu = tk.Menu(root, tearoff=0, bg="#f0f0f0", fg="#000000")
+        context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
+        # context_menu = tk.Menu(root, tearoff=0, bg="#f0f0f0", fg="#000000")
         context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
         context_menu.add_command(label="Свернуть в трей", command=lambda: TrayManager.minimize_to_tray(root, app))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
