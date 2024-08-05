@@ -186,7 +186,7 @@ class FileChangeHandler(FileSystemEventHandler):
 
             if copied:
                 print(f'Завершено копирование из {directory_A} в {self.directory}.')
-                self.event_queue.put(self.update_text_widget)
+                # self.event_queue.put(self.update_text_widget)
         except Exception as e:
             print(f"Ошибка при копировании файлов из директории A: {e}")
 
@@ -251,7 +251,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if event.src_path in self.file_paths:
             del self.file_paths[event.src_path]
             print(f"Файл {event.src_path} был удален.")
-            self.event_queue.put(self.update_text_widget)
+            #self.event_queue.put(self.update_text_widget)
 
     def stop_tracking(self, file_path):
         if file_path in self.file_paths:
@@ -320,19 +320,16 @@ class TrayManager:
                 fill=color2)
             return image
 
-        def on_click(icon, item):
+        def on_open(icon, item):
             root.after(0, icon.stop)
             TrayManager.restore_window()
 
-        def on_quit(icon, item):
-            TrayManager.on_quit(icon, item)
-
         menu = (
-            pystray.MenuItem('Открыть', on_click),
-            pystray.MenuItem('Выход', on_quit)
+            pystray.MenuItem('Открыть', on_open),
+            pystray.MenuItem('Выход', TrayManager.on_quit)
         )
-        icon_image = create_image(64, 64, 'black', 'white')
-        tray_icon = pystray.Icon("test", icon_image, "Файлы в целевой директории", menu)
+        icon_image = create_image(64, 64, 'black', 'blue')
+        tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
         root.withdraw()
         tray_icon.run_detached()
 
@@ -544,7 +541,7 @@ class LogTrackerApp:
             finally:
                 self.root.destroy()  # Уничтожаем окно только после завершения всех операций
                 print("Application closed.")
-                os._exit(0)
+                os._exit(0)  # Принудительно завершаем процесс
 
         if tray_icon:
             tray_icon.stop()  # Останавливаем иконку в трее
