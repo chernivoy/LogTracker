@@ -298,16 +298,18 @@ class TrayManager:
     def show_context_menu(root, app):
         context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
         context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
-        context_menu.add_command(label="Свернуть в трей", command=lambda: TrayManager.minimize_to_tray(root, app))
+        context_menu.add_command(label="Свернуть в трей", command=lambda: TrayManager.minimize_to_tray(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
         context_menu.add_command(label="Выйти", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
     @staticmethod
-    def minimize_to_tray(root, app):
+    def minimize_to_tray(root):
         global is_window_open
         global tray_icon
         is_window_open = False
+
+        ConfigManager.save_window_size(root)
 
         def create_image(width, height, color1, color2):
             image = Image.new('RGB', (width, height), color1)
@@ -389,65 +391,18 @@ class GUIManager:
         ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0040 | 0x0100)  # SWP_NOSIZE | SWP_NOMOVE
 
     @staticmethod
-    def create_text_window1():
-        ctk.set_appearance_mode("dark")
-        global root
-        root = ctk.CTk()
-
-        root.title("LogTracker")
-        root.minsize(353, 133)
-
-        root.iconbitmap('2.ico')
-
-        root.attributes('-topmost', True)
-        root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
-
-        ConfigManager.load_window_size(root)
-
-        main_frame = ctk.CTkFrame(root)
-        main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
-
-        file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
-        file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-
-        burger_button = ctk.CTkButton(main_frame, text="...", height=20, width=20, fg_color="blue",
-                                      command=lambda: TrayManager.show_context_menu(root, app))  # Обновлено
-
-        burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-
-        error_frame = ctk.CTkFrame(main_frame)
-        error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
-
-        error_text_widget_frame = ctk.CTkFrame(error_frame)
-        error_text_widget_frame.pack(fill="both", expand=True)
-
-        error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=10, corner_radius=20, border_width=1,
-                                           border_color="blue", wrap="word", state="disabled")
-        error_text_widget.pack(fill="both", expand=True, padx=1, pady=1)
-
-        root.grid_rowconfigure(0, weight=1)
-        root.grid_columnconfigure(0, weight=1)
-
-        main_frame.grid_rowconfigure(0, weight=0)
-        main_frame.grid_rowconfigure(1, weight=1)
-        main_frame.grid_rowconfigure(1, weight=1)
-        main_frame.grid_columnconfigure(0, weight=1)
-
-        return root, error_text_widget, file_label
-
-
     def create_text_window():
         ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("green")
         global root
         root = ctk.CTk()
 
         root.title("LogTracker")
         root.minsize(353, 133)
-
-        root.iconbitmap('2.ico')
-
+        root.iconbitmap('src\\Header.ico')
         root.attributes('-topmost', True)
-        root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
+
+        root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root))
 
         ConfigManager.load_window_size(root)
 
@@ -458,7 +413,7 @@ class GUIManager:
         file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
 
         burger_button = ctk.CTkButton(main_frame,
-                                      text="...", height=20, width=20, fg_color="blue",
+                                      text="...", height=20, width=20, fg_color="transparent",
                                       command=lambda: TrayManager.show_context_menu(root, app))
 
         burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
@@ -470,7 +425,7 @@ class GUIManager:
         error_text_widget_frame.pack(fill="both", expand=True)
 
         error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=10, corner_radius=20, border_width=1,
-                                           border_color="blue", wrap="word", state="disabled")
+                                           border_color="blue", fg_color="transparent", wrap="word", state="disabled")
         error_text_widget.pack(fill="both", expand=True, padx=1, pady=1)
 
         root.grid_rowconfigure(0, weight=1)
@@ -502,7 +457,7 @@ class LogTrackerApp:
         self.process_queue()
         self.periodic_sync()
 
-        self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, app))
+        self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root))
         self.root.mainloop()
 
     def process_queue(self):
