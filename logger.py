@@ -473,7 +473,7 @@ class LogTrackerApp:
 
     def periodic_sync(self):
         self.event_handler.copy_files_from_A()
-        self.root.after(5000, self.periodic_sync)
+        self.root.after(2000, self.periodic_sync)
 
     def on_closing(self):
         def _safe_closing():
