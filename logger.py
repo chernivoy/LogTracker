@@ -17,7 +17,7 @@ from tkinter import PhotoImage
 import customtkinter as ctk
 from ctypes import windll
 
-CONFIG_FILE = "window_config.ini"
+CONFIG_FILE_WINDOW = r'C:\ChernivoyPersonaldata\log\src\window_config.ini'
 
 tray_icon = None
 root = None
@@ -26,12 +26,44 @@ is_window_open = False
 # Установка DPI-осведомленности
 windll.shcore.SetProcessDpiAwareness(2)
 
+# Получить абсолютный путь к ресурсу, работает для разработки и для PyInstaller
+def resource_path(relative_path):
+    try:
+        # PyInstaller создает временную папку и сохраняет путь в _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
+config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\config.ini')
+window_config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\window_config.ini')
+
+config = configparser.ConfigParser()
+config.read(config_path)
+
+# settings_option1 = config.get('Settings', 'option1')
+
+
 
 class ConfigManager:
     @staticmethod
-    def load_config(config_file):
+    def load_config_old(config_file):
         config = configparser.ConfigParser()
         config.read(config_file)
+        return config
+
+    def load_config(config_file):
+        config = configparser.ConfigParser()
+        if not os.path.exists(config_file):
+            raise FileNotFoundError(f"Конфигурационный файл не найден: {config_file}")
+
+        config.read(config_file)
+
+        if 'Settings' not in config:
+            raise configparser.NoSectionError('Settings')
+
         return config
 
     @staticmethod
@@ -51,14 +83,14 @@ class ConfigManager:
             'y': root.winfo_y()
         }
 
-        with open(CONFIG_FILE, 'w') as configfile:
+        with open(CONFIG_FILE_WINDOW, 'w') as configfile:
             config.write(configfile)
 
     @staticmethod
     def load_window_size(root):
         config = configparser.ConfigParser()
-        if os.path.exists(CONFIG_FILE):
-            config.read(CONFIG_FILE)
+        if os.path.exists(CONFIG_FILE_WINDOW):
+            config.read(CONFIG_FILE_WINDOW)
             if 'Window' in config:
                 width = config.getint('Window', 'width', fallback=800)
                 height = config.getint('Window', 'height', fallback=600)
@@ -392,14 +424,15 @@ class GUIManager:
 
     @staticmethod
     def create_text_window():
-        ctk.set_appearance_mode("dark")
+        a = ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
         global root
         root = ctk.CTk()
+        root.wm_attributes('-transparentcolor', 'grey')
 
         root.title("LogTracker")
         root.minsize(353, 133)
-        root.iconbitmap('src\\Header.ico')
+        root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
 
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root))
@@ -418,10 +451,10 @@ class GUIManager:
 
         burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-        error_frame = ctk.CTkFrame(main_frame)
+        error_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
 
-        error_text_widget_frame = ctk.CTkFrame(error_frame)
+        error_text_widget_frame = ctk.CTkFrame(error_frame, fg_color="transparent")
         error_text_widget_frame.pack(fill="both", expand=True)
 
         error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=10, corner_radius=20, border_width=1,
@@ -438,9 +471,16 @@ class GUIManager:
         return root, error_text_widget, file_label
 
 
+
+
+
+
+
+
 class LogTrackerApp:
     def __init__(self):
-        self.config = ConfigManager.load_config("config.ini")
+
+        self.config = ConfigManager.load_config(config_path)
         self.directory = self.config.get('Settings', 'directory')
         self.word = self.config.get('Settings', 'word')
         self.observer = None
@@ -448,6 +488,7 @@ class LogTrackerApp:
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self.directory, self.word, self.error_text_widget, self.file_label, self.event_queue, self.config)
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
+        self.root.bind("<Configure>", self.on_window_resize)
 
     def run(self):
         self.observer = Observer()
