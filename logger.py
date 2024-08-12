@@ -424,7 +424,7 @@ class GUIManager:
 
     @staticmethod
     def create_text_window():
-        a = ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
         global root
         root = ctk.CTk()
