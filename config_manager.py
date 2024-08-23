@@ -1,10 +1,22 @@
+import sys
 import configparser
 import os
 import ctypes
 
-CONFIG_FILE_WINDOW = 'src/window_config.ini'
-# CONFIG_FILE_WINDOW = r'C:\ChernivoyPersonaldata\log\src\window_config.ini'
+def resource_path(relative_path):
+    """ Получает путь к ресурсу (файлу), который упакован PyInstaller. """
+    try:
+        # PyInstaller создает временную папку и сохраняет путь в _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
 
+    return os.path.join(base_path, relative_path)
+
+# Указываем путь к файлу конфигурации
+CONFIG_FILE_WINDOW = resource_path('src/window_config.ini')
+
+print(f'Path to config: {CONFIG_FILE_WINDOW}')  # Вывод пути для отладки
 
 class ConfigManager:
     @staticmethod
