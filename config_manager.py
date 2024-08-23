@@ -2,7 +2,8 @@ import configparser
 import os
 import ctypes
 
-CONFIG_FILE_WINDOW = r'C:\ChernivoyPersonaldata\log\src\window_config.ini'
+CONFIG_FILE_WINDOW = 'src/window_config.ini'
+# CONFIG_FILE_WINDOW = r'C:\ChernivoyPersonaldata\log\src\window_config.ini'
 
 
 class ConfigManager:

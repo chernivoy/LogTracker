@@ -390,8 +390,8 @@ class GUIManager:
 
         root.title("LogTracker")
         root.minsize(353, 133)
-        root.iconbitmap('src/Header.ico')
-        # root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
+        # root.iconbitmap('src/Header.ico')
+        root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
 
 
