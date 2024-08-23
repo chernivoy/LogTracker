@@ -38,8 +38,10 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\config.ini')
-window_config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\window_config.ini')
+config_path = resource_path('src/config.ini')
+# config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\config.ini')
+# window_config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\window_config.ini')
+window_config_path = resource_path('src/window_config.ini')
 
 config = configparser.ConfigParser()
 config.read(config_path)
@@ -278,7 +280,7 @@ class TrayManager:
         context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
         context_menu.add_command(label="Path settings", command=app.open_settings_window)  # Добавляем вызов окна настроек
-        context_menu.add_command(label="Close", command=app.on_closing)
+        context_menu.add_command(label="Exit", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
     @staticmethod
@@ -305,8 +307,8 @@ class TrayManager:
             TrayManager.restore_window()
 
         menu = (
-            pystray.MenuItem('Открыть', on_open),
-            pystray.MenuItem('Выход', TrayManager.on_quit)
+            pystray.MenuItem('Open', on_open),
+            pystray.MenuItem('Exit', TrayManager.on_quit)
         )
         icon_image = create_image(64, 64, 'black', 'blue')
         tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
@@ -388,7 +390,8 @@ class GUIManager:
 
         root.title("LogTracker")
         root.minsize(353, 133)
-        root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
+        root.iconbitmap('src/Header.ico')
+        # root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
 
 
@@ -435,6 +438,7 @@ class GUIManager:
         settings_window = ctk.CTkToplevel(app.root)
         settings_window.title("Paths settings")
         settings_window.geometry("400x270")
+        settings_window.minsize(400, 270)
         settings_window.grab_set()  # Окно настроек становится модальным
 
         # Метки
