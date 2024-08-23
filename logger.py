@@ -383,7 +383,7 @@ class GUIManager:
         global root
         root = ctk.CTk()
         GUIManager.remove_maximize_button(root)
-        root.attributes('-alpha', 0.9)
+        # root.attributes('-alpha', 0.9)
 
         # root.attributes('-toolwindow', True)
         root.wm_attributes('-transparentcolor', 'grey')
