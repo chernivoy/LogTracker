@@ -332,6 +332,7 @@ class TrayManager:
         context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
         context_menu.add_command(label="Свернуть в трей", command=lambda: TrayManager.minimize_to_tray(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
+        context_menu.add_command(label="Настройки путей", command=app.open_settings_window)  # Добавляем вызов окна настроек
         context_menu.add_command(label="Выйти", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
@@ -470,6 +471,80 @@ class GUIManager:
 
         return root, error_text_widget, file_label
 
+    @staticmethod
+    def open_settings_window(app):
+        settings_window = ctk.CTkToplevel(app.root)
+        settings_window.title("Path settings")
+        settings_window.geometry("400x270")
+
+        # Вычисление координат для центра окна
+        window_width = 400
+        window_height = 270
+        settings_window.geometry(f"{window_width}x{window_height}")
+
+        # Получение размеров экрана
+        screen_width = settings_window.winfo_screenwidth()
+        screen_height = settings_window.winfo_screenheight()
+
+        # Вычисление координат для центрирования окна
+        center_x = int((screen_width - window_width) / 2)
+        center_y = int((screen_height - window_height) / 2)
+
+        # Установка окна в центр экрана
+        settings_window.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
+        settings_window.grab_set()  # Окно настроек становится модальным
+
+        # Метки
+        label_directory_A = ctk.CTkLabel(settings_window, text="Enter path to directory A:")
+        label_directory_A.pack(pady=10)
+
+        # Текстовые поля
+        entry_directory_A = ctk.CTkEntry(settings_window, width=300)
+        entry_directory_A.insert(0, app.directory_A)
+        entry_directory_A.pack(pady=5)
+
+        label_target_directory = ctk.CTkLabel(settings_window, text="Enter path to destination folder:")
+        label_target_directory.pack(pady=10)
+
+        entry_target_directory = ctk.CTkEntry(settings_window, width=300)
+        entry_target_directory.insert(0, app.directory)
+        entry_target_directory.pack(pady=5)
+
+        # Кнопка "Сохранить"
+        btn_save = ctk.CTkButton(
+            settings_window,
+            text="OK",
+            command=lambda: GUIManager.save_settings(
+                app,
+                settings_window,
+                entry_directory_A.get(),
+                entry_target_directory.get()
+            )
+        )
+        btn_save.pack(pady=10)
+
+        # Кнопка "Отмена"
+        btn_cancel = ctk.CTkButton(
+            settings_window,
+            text="Cancel",
+            command=settings_window.destroy
+        )
+        btn_cancel.pack(pady=5)
+    @staticmethod
+    def save_settings(app, settings_window, directory_A, target_directory):
+        # Сохраняем пути в конфигурационный файл
+        app.config.set('Settings', 'directory_A', directory_A)
+        app.config.set('Settings', 'directory', target_directory)
+
+        with open(config_path, 'w') as configfile:
+            app.config.write(configfile)
+
+        # Обновляем атрибуты в LogTrackerApp
+        app.directory_A = directory_A
+        app.directory = target_directory
+
+        settings_window.destroy()
+
 
 
 
@@ -480,15 +555,28 @@ class GUIManager:
 class LogTrackerApp:
     def __init__(self):
 
+        # Загрузка конфигурации
         self.config = ConfigManager.load_config(config_path)
-        self.directory = self.config.get('Settings', 'directory')
-        self.word = self.config.get('Settings', 'word')
+
+        # Инициализация директорий из конфигурации или установка значений по умолчанию, если их нет
+        self.directory = self.config.get('Settings', 'directory', fallback='')
+        self.directory_A = self.config.get('Settings', 'directory_A', fallback='')
+        self.word = self.config.get('Settings', 'word', fallback='')
+
+        # Инициализация других атрибутов
         self.observer = None
         self.root, self.error_text_widget, self.file_label = GUIManager.create_text_window()
         self.event_queue = queue.Queue()
-        self.event_handler = FileChangeHandler(self.directory, self.word, self.error_text_widget, self.file_label, self.event_queue, self.config)
+        self.event_handler = FileChangeHandler(self.directory, self.word, self.error_text_widget, self.file_label,
+                                               self.event_queue, self.config)
+
+        # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
+
+    def open_settings_window(self):
+        GUIManager.open_settings_window(self)
+
 
     def run(self):
         self.observer = Observer()
