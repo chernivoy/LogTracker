@@ -16,8 +16,9 @@ from PIL import Image, ImageDraw, ImageFont
 from tkinter import PhotoImage
 import customtkinter as ctk
 from ctypes import windll
+from config_manager import ConfigManager
 
-CONFIG_FILE_WINDOW = r'C:\ChernivoyPersonaldata\log\src\window_config.ini'
+
 
 tray_icon = None
 root = None
@@ -43,62 +44,7 @@ window_config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\window_con
 config = configparser.ConfigParser()
 config.read(config_path)
 
-# settings_option1 = config.get('Settings', 'option1')
 
-
-
-class ConfigManager:
-    @staticmethod
-    def load_config_old(config_file):
-        config = configparser.ConfigParser()
-        config.read(config_file)
-        return config
-
-    def load_config(config_file):
-        config = configparser.ConfigParser()
-        if not os.path.exists(config_file):
-            raise FileNotFoundError(f"Конфигурационный файл не найден: {config_file}")
-
-        config.read(config_file)
-
-        if 'Settings' not in config:
-            raise configparser.NoSectionError('Settings')
-
-        return config
-
-    @staticmethod
-    def save_window_size(root):
-        user32 = ctypes.windll.user32
-        user32.SetProcessDPIAware()
-        dpi_scale = user32.GetDpiForWindow(root.winfo_id()) / 96.0
-
-        width = int(root.winfo_width() / dpi_scale)
-        height = int(root.winfo_height() / dpi_scale)
-
-        config = configparser.ConfigParser()
-        config['Window'] = {
-            'width': width,
-            'height': height,
-            'x': root.winfo_x(),
-            'y': root.winfo_y()
-        }
-
-        with open(CONFIG_FILE_WINDOW, 'w') as configfile:
-            config.write(configfile)
-
-    @staticmethod
-    def load_window_size(root):
-        config = configparser.ConfigParser()
-        if os.path.exists(CONFIG_FILE_WINDOW):
-            config.read(CONFIG_FILE_WINDOW)
-            if 'Window' in config:
-                width = config.getint('Window', 'width', fallback=800)
-                height = config.getint('Window', 'height', fallback=600)
-                x = config.getint('Window', 'x', fallback=100)
-                y = config.getint('Window', 'y', fallback=100)
-                root.geometry(f'{width}x{height}+{x}+{y}')
-        else:
-            root.geometry('800x600+100+100')
 
 
 class FileHandler:
@@ -309,7 +255,6 @@ class TrayManager:
             fill=color2)
         return image
 
-
     @staticmethod
     def on_quit(icon, item):
         global root
@@ -330,9 +275,9 @@ class TrayManager:
     def show_context_menu(root, app):
         context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
         context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
-        context_menu.add_command(label="Свернуть в трей", command=lambda: TrayManager.minimize_to_tray(root))
+        context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
-        context_menu.add_command(label="Выйти", command=app.on_closing)
+        context_menu.add_command(label="Close", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
     @staticmethod
@@ -364,6 +309,8 @@ class TrayManager:
         )
         icon_image = create_image(64, 64, 'black', 'blue')
         tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
+
+
         root.withdraw()
         tray_icon.run_detached()
 
@@ -400,14 +347,22 @@ class TrayManager:
                 pin_button.configure(text="Unpin")
 
 
+
+
+
 class GUIManager:
+
+
     @staticmethod
     def toggle_overrideredirect(root):
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
 
     @staticmethod
-    def remove_window_buttons(root):
+    def remove_maximize_button(root):
+        """
+        Убирает кнопку "Развернуть" в окне.
+        """
         # Получаем дескриптор окна
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
 
@@ -428,6 +383,10 @@ class GUIManager:
         ctk.set_default_color_theme("green")
         global root
         root = ctk.CTk()
+        GUIManager.remove_maximize_button(root)
+        root.attributes('-alpha', 0.9)
+
+        # root.attributes('-toolwindow', True)
         root.wm_attributes('-transparentcolor', 'grey')
 
         root.title("LogTracker")
@@ -435,12 +394,16 @@ class GUIManager:
         root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
 
+
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root))
 
         ConfigManager.load_window_size(root)
 
+
+
         main_frame = ctk.CTkFrame(root)
         main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+
 
         file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
         file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
@@ -469,13 +432,6 @@ class GUIManager:
         main_frame.grid_columnconfigure(0, weight=1)
 
         return root, error_text_widget, file_label
-
-
-
-
-
-
-
 
 class LogTrackerApp:
     def __init__(self):
