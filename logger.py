@@ -441,6 +441,19 @@ class GUIManager:
         settings_window.title("Paths settings")
         settings_window.geometry("400x270")
         settings_window.minsize(400, 270)
+
+        # Вычисление координат для центра окна
+        window_width = 400
+        window_height = 270
+        screen_width = settings_window.winfo_screenwidth()
+        screen_height = settings_window.winfo_screenheight()
+
+        center_x = int((screen_width / 2) - (window_width / 2)) - 200
+        center_y = int((screen_height / 2) - (window_height / 2)) - 135
+
+        # Установка положения окна в центре экрана
+        settings_window.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
+
         settings_window.grab_set()  # Окно настроек становится модальным
 
         # Метки
