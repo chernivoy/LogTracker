@@ -19,6 +19,7 @@ CONFIG_FILE_WINDOW = resource_path('src/window_config.ini')
 print(f'Path to config: {CONFIG_FILE_WINDOW}')  # Вывод пути для отладки
 
 class ConfigManager:
+
     @staticmethod
     def load_config(config_file):
         config = configparser.ConfigParser()
@@ -27,13 +28,10 @@ class ConfigManager:
 
         config.read(config_file)
 
-        if 'Settings' not in config:
-            raise configparser.NoSectionError('Settings')
-
         return config
 
     @staticmethod
-    def save_window_size(root):
+    def save_window_size(section, root):
         user32 = ctypes.windll.user32
         user32.SetProcessDPIAware()
         dpi_scale = user32.GetDpiForWindow(root.winfo_id()) / 96.0
@@ -41,27 +39,27 @@ class ConfigManager:
         width = int(root.winfo_width() / dpi_scale)
         height = int(root.winfo_height() / dpi_scale)
 
-        config = configparser.ConfigParser()
-        config['Window'] = {
-            'width': width,
-            'height': height,
-            'x': root.winfo_x(),
-            'y': root.winfo_y()
-        }
+        config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
+
+        if section is not config:
+            config[section] = {}
+
+        config[section]['width'] = str(width)
+        config[section]['height'] = str(height)
+        config[section]['x'] = str(root.winfo_x())
+        config[section]['y'] = str(root.winfo_y())
 
         with open(CONFIG_FILE_WINDOW, 'w') as configfile:
             config.write(configfile)
 
     @staticmethod
-    def load_window_size(root):
-        config = configparser.ConfigParser()
-        if os.path.exists(CONFIG_FILE_WINDOW):
-            config.read(CONFIG_FILE_WINDOW)
-            if 'Window' in config:
-                width = config.getint('Window', 'width', fallback=800)
-                height = config.getint('Window', 'height', fallback=600)
-                x = config.getint('Window', 'x', fallback=100)
-                y = config.getint('Window', 'y', fallback=100)
-                root.geometry(f'{width}x{height}+{x}+{y}')
+    def load_window_size(section, root):
+        config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
+        if section in config:
+            width = config.getint(section, 'width', fallback=800)
+            height = config.getint(section, 'height', fallback=600)
+            x = config.getint(section, 'x', fallback=100)
+            y = config.getint(section, 'y', fallback=100)
+            root.geometry(f'{width}x{height}+{x}+{y}')
         else:
             root.geometry('800x600+100+100')

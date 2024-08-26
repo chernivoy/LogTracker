@@ -291,7 +291,7 @@ class TrayManager:
         global tray_icon
         is_window_open = False
 
-        ConfigManager.save_window_size(root)
+        ConfigManager.save_window_size('Window',root)
 
         def create_image(width, height, color1, color2):
             image = Image.new('RGB', (width, height), color1)
@@ -328,7 +328,7 @@ class TrayManager:
         else:
             windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
 
-        ConfigManager.load_window_size(root)  # Перечитываем размеры окна из файла конфигурации
+        ConfigManager.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
         root.deiconify()
         is_window_open = True  # Обновляем состояние окна
         root.lift()
@@ -399,7 +399,7 @@ class GUIManager:
 
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root))
 
-        ConfigManager.load_window_size(root)
+        ConfigManager.load_window_size('Window', root)
 
 
 
@@ -438,21 +438,10 @@ class GUIManager:
     @staticmethod
     def open_settings_window(app):
         settings_window = ctk.CTkToplevel(app.root)
-        settings_window.title("Paths settings")
-        settings_window.geometry("400x270")
+        settings_window.title("Path settings")
+
+        ConfigManager.load_window_size('Window_path', settings_window)
         settings_window.minsize(400, 270)
-
-        # Вычисление координат для центра окна
-        window_width = 400
-        window_height = 270
-        screen_width = settings_window.winfo_screenwidth()
-        screen_height = settings_window.winfo_screenheight()
-
-        center_x = int((screen_width / 2) - (window_width / 2)) - 200
-        center_y = int((screen_height / 2) - (window_height / 2)) - 135
-
-        # Установка положения окна в центре экрана
-        settings_window.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
 
         settings_window.grab_set()  # Окно настроек становится модальным
 
@@ -481,6 +470,7 @@ class GUIManager:
                 settings_window,
                 entry_directory_A.get(),
                 entry_target_directory.get()
+
             )
         )
         btn_save.pack(pady=10)
@@ -492,6 +482,9 @@ class GUIManager:
             command=settings_window.destroy
         )
         btn_cancel.pack(pady=5)
+
+        settings_window.bind("<Configure>",
+                             lambda event: ConfigManager.save_window_size('Window_path', settings_window))
 
     @staticmethod
     def save_settings(app, settings_window, directory_A, target_directory):
@@ -506,6 +499,7 @@ class GUIManager:
         app.directory_A = directory_A
         app.directory = target_directory
 
+        ConfigManager.save_window_size('Window_path', settings_window)
         settings_window.destroy()
 
 
@@ -529,6 +523,8 @@ class LogTrackerApp:
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
+
+        ConfigManager.load_window_size('Window', self.root)
 
     def open_settings_window(self):
         GUIManager.open_settings_window(self)
@@ -592,7 +588,7 @@ class LogTrackerApp:
             FileHandler.open_file(self.event_handler.last_error_file)
 
     def on_window_resize(self, event):
-        ConfigManager.save_window_size(self.root)
+        ConfigManager.save_window_size('Window', self.root)
 
 
 if __name__ == "__main__":
