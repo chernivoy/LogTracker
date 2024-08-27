@@ -3,6 +3,7 @@ import configparser
 import os
 import ctypes
 
+
 def resource_path(relative_path):
     """ Получает путь к ресурсу (файлу), который упакован PyInstaller. """
     try:
@@ -13,13 +14,14 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+# print(f'Path to config: {CONFIG_FILE_WINDOW}')  # Вывод пути для отладки
+
+
 # Указываем путь к файлу конфигурации
 CONFIG_FILE_WINDOW = resource_path('src/window_config.ini')
 
-print(f'Path to config: {CONFIG_FILE_WINDOW}')  # Вывод пути для отладки
 
 class ConfigManager:
-
     @staticmethod
     def load_config(config_file):
         config = configparser.ConfigParser()
@@ -27,8 +29,8 @@ class ConfigManager:
             raise FileNotFoundError(f"Конфигурационный файл не найден: {config_file}")
 
         config.read(config_file)
-
         return config
+
 
     @staticmethod
     def save_window_size(section, root):

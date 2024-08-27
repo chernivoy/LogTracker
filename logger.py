@@ -446,7 +446,7 @@ class GUIManager:
         settings_window.grab_set()  # Окно настроек становится модальным
 
         # Метки
-        label_directory_A = ctk.CTkLabel(settings_window, text="Path to directory A:")
+        label_directory_A = ctk.CTkLabel(settings_window, text="Path to source directory:")
         label_directory_A.pack(pady=10)
 
         # Текстовые поля
@@ -454,7 +454,7 @@ class GUIManager:
         entry_directory_A.insert(0, app.directory_A)
         entry_directory_A.pack(pady=5)
 
-        label_target_directory = ctk.CTkLabel(settings_window, text="Path to destination directory")
+        label_target_directory = ctk.CTkLabel(settings_window, text="Path to destination directory:")
         label_target_directory.pack(pady=10)
 
         entry_target_directory = ctk.CTkEntry(settings_window, width=300)
