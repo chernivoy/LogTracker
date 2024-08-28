@@ -19,12 +19,12 @@ from ctypes import windll
 
 import config_manager
 from config_manager import ConfigManager
+from tray_manager import TrayManager
 
 
-
-tray_icon = None
-root = None
-is_window_open = False
+# tray_icon = None
+# root = None
+# is_window_open = False
 
 # Установка DPI-осведомленности
 windll.shcore.SetProcessDpiAwareness(2)
@@ -77,13 +77,14 @@ class FileHandler:
 
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, directory, word, error_text_widget, file_label, event_queue, config):
+    def __init__(self, app, directory, word, error_text_widget, file_label, event_queue, config):
+        self.app = app  # Сохраняем экземпляр приложения
         self.directory = directory
         self.word = word
         self.error_text_widget = error_text_widget
         self.file_label = file_label
         self.event_queue = event_queue
-        self.config = config  # Сохраните объект конфигурации
+        self.config = config
         self.file_paths = {}
         self.last_error_file = None
         self.last_error_line = {}
@@ -92,14 +93,14 @@ class FileChangeHandler(FileSystemEventHandler):
         self.create_directory_if_not_exists(directory)
 
     def track_files(self):
-        print("Отслеживание .log файлов в директории:", self.directory)
+        print("Tracking .log files in the directory:", self.directory)
         try:
             for file_name in os.listdir(self.directory):
                 file_path = os.path.join(self.directory, file_name)
                 if file_name.endswith(".log") and self.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
                     self.last_update_time[file_path] = -1
-                    print(f"Файл добавлен для отслеживания: {file_path}")
+                    print(f"File added for tracking: {file_path}")
         except PermissionError as e:
             print(f"Ошибка доступа: {e}")
         except FileNotFoundError as e:
@@ -107,7 +108,8 @@ class FileChangeHandler(FileSystemEventHandler):
         except Exception as e:
             print(f"Ошибка при перечислении файлов в директории: {e}")
 
-    def create_directory_if_not_exists(self, directory):
+    @staticmethod
+    def create_directory_if_not_exists(directory):
         if not os.path.exists(directory):
             try:
                 os.makedirs(directory)
@@ -132,17 +134,17 @@ class FileChangeHandler(FileSystemEventHandler):
         print(f"Файл {file_path} все еще используется после {timeout} секунд.")
         return False
 
-    def copy_files_from_A(self):
+    def copy_files_from_source_dir(self):
 
-        directory_A = self.config.get('Settings', 'directory_A')
+        source_directory = self.config.get('Settings', 'source_directory')
         try:
             self.create_directory_if_not_exists(self.directory)
 
             copied = False
 
-            for filename in os.listdir(directory_A):
+            for filename in os.listdir(source_directory):
                 if filename.endswith('.log'):
-                    source_file = os.path.join(directory_A, filename)
+                    source_file = os.path.join(source_directory, filename)
                     dest_file = os.path.join(self.directory, filename)
                     if self.wait_for_file(source_file):
                         if not os.path.exists(dest_file):
@@ -160,14 +162,14 @@ class FileChangeHandler(FileSystemEventHandler):
             for filename in os.listdir(self.directory):
                 if filename.endswith('.log'):
                     dest_file = os.path.join(self.directory, filename)
-                    source_file = os.path.join(directory_A, filename)
+                    source_file = os.path.join(source_directory, filename)
                     if not os.path.exists(source_file):
                         os.remove(dest_file)
-                        print(f'Удален файл {filename} из {self.directory}, так как он не существует в {directory_A}')
+                        print(f'Удален файл {filename} из {self.directory}, так как он не существует в {source_directory}')
                         copied = True
 
             if copied:
-                print(f'Завершено копирование из {directory_A} в {self.directory}.')
+                print(f'Завершено копирование из {source_directory} в {self.directory}.')
                 # self.event_queue.put(self.update_text_widget)
         except Exception as e:
             print(f"Ошибка при копировании файлов из директории A: {e}")
@@ -189,7 +191,7 @@ class FileChangeHandler(FileSystemEventHandler):
             self.error_text_widget.delete(1.0, tk.END)
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
             self.error_text_widget.configure(state=tk.DISABLED)
-            if not is_window_open:  # Проверка состояния окна
+            if not self.app.is_window_open:  # Используем атрибут из LogTrackerApp
                 self.event_queue.put(self.show_window_from_tray)
 
     def can_read_file(self, file_path):
@@ -240,120 +242,12 @@ class FileChangeHandler(FileSystemEventHandler):
             del self.file_paths[file_path]
 
     def show_window_from_tray(self):
-        global is_window_open
-        if not is_window_open:
-            root.after(0, TrayManager.restore_window)
-            is_window_open = True
-
-
-class TrayManager:
-    @staticmethod
-    def create_image(width, height, color1, color2):
-        image = Image.new('RGB', (width, height), color1)
-        dc = ImageDraw.Draw(image)
-        dc.rectangle(
-            (width // 2, 0, width, height // 2),
-            fill=color2)
-        dc.rectangle(
-            (0, height // 2, width // 2, height),
-            fill=color2)
-        return image
-
-    @staticmethod
-    def on_quit(icon, item):
-        global root
-        print("Quitting application from tray...")
-        if app.observer:
-            print("Stopping observer from tray...")
-            app.observer.stop()
-            app.observer.join(timeout=5)  # Ждем 5 секунд для завершения
-            if app.observer.is_alive():
-                print("Observer is still running. Force stopping from tray...")
-                app.observer = None  # Принудительно освобождаем объект наблюдателя
-            else:
-                print("Observer stopped successfully from tray.")
-        icon.stop()
-        root.after(0, app.on_closing)  # Вызываем on_closing в основном потоке
-
-    @staticmethod
-    def show_context_menu(root, app):
-        context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
-        context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
-        context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root))
-        context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
-        context_menu.add_command(label="Path settings", command=app.open_settings_window)  # Добавляем вызов окна настроек
-        context_menu.add_command(label="Exit", command=app.on_closing)
-        context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
-
-    @staticmethod
-    def minimize_to_tray(root):
-        global is_window_open
-        global tray_icon
-        is_window_open = False
-
-        ConfigManager.save_window_size('Window',root)
-
-        def create_image(width, height, color1, color2):
-            image = Image.new('RGB', (width, height), color1)
-            dc = ImageDraw.Draw(image)
-            dc.rectangle(
-                (width // 2, 0, width, height // 2),
-                fill=color2)
-            dc.rectangle(
-                (0, height // 2, width // 2, height),
-                fill=color2)
-            return image
-
-        def on_open(icon, item):
-            root.after(0, icon.stop)
-            TrayManager.restore_window()
-
-        menu = (
-            pystray.MenuItem('Open', on_open),
-            pystray.MenuItem('Exit', TrayManager.on_quit)
-        )
-        icon_image = create_image(64, 64, 'black', 'blue')
-        tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
-
-
-        root.withdraw()
-        tray_icon.run_detached()
-
-    @staticmethod
-    def restore_window():
-        global root
-        global is_window_open
-        if TrayManager.check_rdp_status():
-            windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
-        else:
-            windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
-
-        ConfigManager.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
-        root.deiconify()
-        is_window_open = True  # Обновляем состояние окна
-        root.lift()
-        if tray_icon:
-            tray_icon.visible = False
-
-    @staticmethod
-    def check_rdp_status():
-        SM_REMOTESESSION = 0x1000
-        return ctypes.windll.user32.GetSystemMetrics(SM_REMOTESESSION) != 0
-
-    @staticmethod
-    def toggle_pin(root, pin_button):
-        if root.attributes('-topmost'):
-            root.attributes('-topmost', False)
-            if pin_button:
-                pin_button.configure(text="Pin")
-        else:
-            root.attributes('-topmost', True)
-            if pin_button:
-                pin_button.configure(text="Unpin")
+        if not self.app.is_window_open:
+            self.app.root.after(0, lambda: TrayManager.restore_window(self.app.root, self.app))
+            self.app.is_window_open = True
 
 
 class GUIManager:
-
     @staticmethod
     def toggle_overrideredirect(root):
         current_state = root.overrideredirect()
@@ -366,6 +260,7 @@ class GUIManager:
         """
         # Получаем дескриптор окна
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+
 
         # Получаем текущие стили окна
         styles = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
@@ -385,6 +280,9 @@ class GUIManager:
         global root
         root = ctk.CTk()
         GUIManager.remove_maximize_button(root)
+
+
+
         # root.attributes('-alpha', 0.9)
 
         # root.attributes('-toolwindow', True)
@@ -396,23 +294,19 @@ class GUIManager:
         root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
 
-
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root))
 
         ConfigManager.load_window_size('Window', root)
 
-
-
         main_frame = ctk.CTkFrame(root)
-        main_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
-
+        main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
         file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
 
         burger_button = ctk.CTkButton(main_frame,
                                       text="...", height=20, width=20, fg_color="transparent",
-                                      command=lambda: TrayManager.show_context_menu(root, app))
+                                      command=lambda: GUIManager.show_context_menu(root, app))
 
         burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
@@ -423,8 +317,9 @@ class GUIManager:
         error_text_widget_frame.pack(fill="both", expand=True)
 
         error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=10, corner_radius=20, border_width=1,
-                                           border_color="blue", fg_color="transparent", wrap="word", state="disabled")
-        error_text_widget.pack(fill="both", expand=True, padx=1, pady=1)
+                                           fg_color="transparent", wrap="word", state="disabled")
+        # border_color="blue"
+        error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
 
         root.grid_rowconfigure(0, weight=1)
         root.grid_columnconfigure(0, weight=1)
@@ -446,13 +341,13 @@ class GUIManager:
         settings_window.grab_set()  # Окно настроек становится модальным
 
         # Метки
-        label_directory_A = ctk.CTkLabel(settings_window, text="Path to source directory:")
-        label_directory_A.pack(pady=10)
+        label_source_directory = ctk.CTkLabel(settings_window, text="Path to source directory:")
+        label_source_directory.pack(pady=10)
 
         # Текстовые поля
-        entry_directory_A = ctk.CTkEntry(settings_window, width=300)
-        entry_directory_A.insert(0, app.directory_A)
-        entry_directory_A.pack(pady=5)
+        entry_source_directory = ctk.CTkEntry(settings_window, width=300)
+        entry_source_directory.insert(0, app.source_directory)
+        entry_source_directory.pack(pady=5)
 
         label_target_directory = ctk.CTkLabel(settings_window, text="Path to destination directory:")
         label_target_directory.pack(pady=10)
@@ -468,7 +363,7 @@ class GUIManager:
             command=lambda: GUIManager.save_settings(
                 app,
                 settings_window,
-                entry_directory_A.get(),
+                entry_source_directory.get(),
                 entry_target_directory.get()
 
             )
@@ -487,20 +382,31 @@ class GUIManager:
                              lambda event: ConfigManager.save_window_size('Window_path', settings_window))
 
     @staticmethod
-    def save_settings(app, settings_window, directory_A, target_directory):
+    def save_settings(app, settings_window, source_directory, target_directory):
         # Сохраняем пути в конфигурационный файл
-        app.config.set('Settings', 'directory_A', directory_A)
+        app.config.set('Settings', 'source_directory', source_directory)
         app.config.set('Settings', 'directory', target_directory)
 
         with open(config_path, 'w') as configfile:
             app.config.write(configfile)
 
         # Обновляем атрибуты в LogTrackerApp
-        app.directory_A = directory_A
+        app.source_directory = source_directory
         app.directory = target_directory
 
         ConfigManager.save_window_size('Window_path', settings_window)
         settings_window.destroy()
+
+    @staticmethod
+    def show_context_menu(root, app):
+        context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
+        context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
+        context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
+        context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
+        context_menu.add_command(label="Path settings",
+                                 command=app.open_settings_window)  # Добавляем вызов окна настроек
+        context_menu.add_command(label="Exit", command=app.on_closing)
+        context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
 
 class LogTrackerApp:
@@ -510,19 +416,21 @@ class LogTrackerApp:
 
         # Инициализация директорий из конфигурации или установка значений по умолчанию, если их нет
         self.directory = self.config.get('Settings', 'directory', fallback='')
-        self.directory_A = self.config.get('Settings', 'directory_A', fallback='')
+        self.source_directory = self.config.get('Settings', 'source_directory', fallback='')
         self.word = self.config.get('Settings', 'word', fallback='')
 
         # Инициализация других атрибутов
         self.observer = None
         self.root, self.error_text_widget, self.file_label = GUIManager.create_text_window()
         self.event_queue = queue.Queue()
-        self.event_handler = FileChangeHandler(self.directory, self.word, self.error_text_widget, self.file_label,
-                                               self.event_queue, self.config)
+        self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
+                                               self.file_label, self.event_queue, self.config)  # Передаем self в FileChangeHandler
 
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
+        self.is_window_open = True
+        self.tray_icon = None
 
         ConfigManager.load_window_size('Window', self.root)
 
@@ -537,7 +445,7 @@ class LogTrackerApp:
         self.process_queue()
         self.periodic_sync()
 
-        self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root))
+        self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self))
         self.root.mainloop()
 
     def process_queue(self):
@@ -552,14 +460,14 @@ class LogTrackerApp:
         self.root.after(100, self.process_queue)
 
     def periodic_sync(self):
-        self.event_handler.copy_files_from_A()
+        self.event_handler.copy_files_from_source_dir()
         self.root.after(2000, self.periodic_sync)
 
     def on_closing(self):
         def _safe_closing():
             try:
                 print("Closing application...")
-                ConfigManager.save_window_size(self.root)
+                ConfigManager.save_window_size('Window', self.root)
                 if self.observer:
                     print("Stopping observer...")
                     self.observer.stop()
@@ -578,8 +486,8 @@ class LogTrackerApp:
                 print("Application closed.")
                 os._exit(0)  # Принудительно завершаем процесс
 
-        if tray_icon:
-            tray_icon.stop()  # Останавливаем иконку в трее
+        if self.tray_icon:
+            self.tray_icon.stop()  # Останавливаем иконку в трее
 
         self.root.after(0, _safe_closing)  # Выполняем _safe_closing в основном потоке
 
