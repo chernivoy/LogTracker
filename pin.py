@@ -5,22 +5,21 @@ from ctypes import wintypes
 class RoundedWindow(ctk.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         # Задаем начальные размеры окна
-        self.geometry("400x300")
+        self.geometry("350x140")
 
         # Убираем стандартный заголовок окна
         self.overrideredirect(True)
 
         # Установка цвета фона для предотвращения артефактов
-        self.config(bg="black")
+        self.config(bg="white")
 
         # Основной фрейм окна
-        self.main_frame = ctk.CTkFrame(self, corner_radius=20)
+        self.main_frame = ctk.CTkFrame(self, corner_radius=20, fg_color='white')
         self.main_frame.pack(fill="both", expand=True)
 
         # Создание пользовательского заголовка окна
-        self.title_bar = ctk.CTkFrame(self.main_frame, height=50, fg_color="black", corner_radius=2)
+        self.title_bar = ctk.CTkFrame(self.main_frame, height=50, fg_color="white", corner_radius=2)
         self.title_bar.pack(fill="x", padx=0, pady=0, side="top")
 
         # Метка для заголовка окна
@@ -39,13 +38,13 @@ class RoundedWindow(ctk.CTkToplevel):
         self.is_pinned = False
 
         # Пример содержимого окна
-        self.content_frame = ctk.CTkFrame(self.main_frame)
-        self.content_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.content_frame = ctk.CTkFrame(self.main_frame, fg_color="White")
+        self.content_frame.pack(fill="both", expand=True, padx=0, pady=0)
         self.example_label = ctk.CTkLabel(self.content_frame, text="Пример содержимого окна")
         self.example_label.pack(pady=10)
 
         # Кнопка для закрытия окна
-        self.close_button = ctk.CTkButton(self.title_bar, text="X", width=30, command=self.destroy)
+        self.close_button = ctk.CTkButton(self.title_bar, text="x", width=10,height=10, command=self.destroy, corner_radius=10)
         self.close_button.pack(side="right", padx=(0, 10))
 
         # Обновляем размеры окна после создания пользовательского заголовка

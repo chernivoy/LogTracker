@@ -19,7 +19,7 @@ class TrayManager:
         return image
 
     @staticmethod
-    def on_quit(icon, item, root, app):
+    def on_exit(icon, item, root, app):
         print("Quitting application from tray...")
         if app.observer:
             print("Stopping observer from tray...")
@@ -45,7 +45,7 @@ class TrayManager:
 
         menu = (
             pystray.MenuItem('Open', on_open),
-            pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_quit(icon, item, root, app))
+            pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(icon, item, root, app))
         )
         icon_image = TrayManager.create_image(64, 64, 'black', 'blue')
         app.tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
@@ -73,12 +73,25 @@ class TrayManager:
         return ctypes.windll.user32.GetSystemMetrics(SM_REMOTESESSION) != 0
 
     @staticmethod
-    def toggle_pin(root, pin_button):
+    def toggle_pin_button(root, pin_button):
         if root.attributes('-topmost'):
             root.attributes('-topmost', False)
+            label = 'Pin'
             if pin_button:
                 pin_button.configure(text="Pin")
         else:
             root.attributes('-topmost', True)
+            label = 'Unpin'
             if pin_button:
                 pin_button.configure(text="Unpin")
+        return label
+
+    @staticmethod
+    def toggle_pin(root):
+        if root.attributes('-topmost'):
+            root.attributes('-topmost', False)
+            label = "UnPin"
+        else:
+            root.attributes('-topmost', True)
+            label = 'Pin'
+        return label

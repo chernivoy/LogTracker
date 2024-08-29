@@ -12,7 +12,7 @@ import subprocess
 import ctypes
 from ctypes import wintypes
 import pystray
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 from tkinter import PhotoImage
 import customtkinter as ctk
 from ctypes import windll
@@ -77,14 +77,14 @@ class FileHandler:
 
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, app, directory, word, error_text_widget, file_label, event_queue, config):
-        self.app = app  # Сохраняем экземпляр приложения
+    def __init__(self, _app, directory, word, error_text_widget, file_label, event_queue, _config):
+        self.app = _app  # Сохраняем экземпляр приложения
         self.directory = directory
         self.word = word
         self.error_text_widget = error_text_widget
         self.file_label = file_label
         self.event_queue = event_queue
-        self.config = config
+        self.config = _config
         self.file_paths = {}
         self.last_error_file = None
         self.last_error_line = {}
@@ -185,7 +185,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if last_error_line:
             self.last_error_file = file_path
             file_name = os.path.basename(file_path)
-            self.event_queue.put(lambda: self.file_label.configure(text=f"File: {file_name}"))
+            self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f"File: {file_name}"))
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.configure(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
@@ -252,6 +252,14 @@ class GUIManager:
     def toggle_overrideredirect(root):
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
+        if not current_state:
+            GUIManager.round_corners(root, 40)
+
+    def round_corners(root, radius=30):
+        """Скругляет углы окна."""
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, root.winfo_width(), root.winfo_height(), radius, radius)
+        ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
 
     @staticmethod
     def remove_maximize_button(root):
@@ -277,32 +285,30 @@ class GUIManager:
     def create_text_window():
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
-        global root
+        # global root
         root = ctk.CTk()
-        GUIManager.remove_maximize_button(root)
 
-
-
-        # root.attributes('-alpha', 0.9)
+        root.attributes('-alpha', 0.95)
 
         # root.attributes('-toolwindow', True)
-        root.wm_attributes('-transparentcolor', 'grey')
+        # root.wm_attributes('-transparentcolor', 'grey')
 
         root.title("LogTracker")
-        root.minsize(353, 133)
+        root.minsize(300, 100)
         # root.iconbitmap('src/Header.ico')
         root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
 
-        root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root))
+        root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
 
         ConfigManager.load_window_size('Window', root)
 
-        main_frame = ctk.CTkFrame(root)
+
+        main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
-        file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w")
-        file_label.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+        file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
+        file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
         burger_button = ctk.CTkButton(main_frame,
                                       text="...", height=20, width=20, fg_color="transparent",
@@ -316,8 +322,21 @@ class GUIManager:
         error_text_widget_frame = ctk.CTkFrame(error_frame, fg_color="transparent")
         error_text_widget_frame.pack(fill="both", expand=True)
 
-        error_text_widget = ctk.CTkTextbox(error_text_widget_frame, height=10, corner_radius=20, border_width=1,
-                                           fg_color="transparent", wrap="word", state="disabled")
+        # Настройка виджета CTkTextbox без скроллбара
+        error_text_widget = ctk.CTkTextbox(
+            error_text_widget_frame,
+            height=20,  # Устанавливаем достаточную высоту, чтобы избежать появления скроллбара
+            corner_radius=1,
+            border_width=0,
+            fg_color="transparent",
+            wrap="word",
+            state="disabled",  # Блокируем виджет для предотвращения появления скроллбара
+            text_color="#b4b361",
+            font=("Inter", 13),
+            yscrollcommand=lambda *args: None  # Отключаем вертикальный скроллбар
+        )
+
+
         # border_color="blue"
         error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
 
@@ -328,7 +347,10 @@ class GUIManager:
         main_frame.grid_rowconfigure(1, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
+        GUIManager.remove_maximize_button(root)
+
         return root, error_text_widget, file_label
+
 
     @staticmethod
     def open_settings_window(app):
@@ -400,8 +422,8 @@ class GUIManager:
     @staticmethod
     def show_context_menu(root, app):
         context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
-        context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root, None))
         context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
+        context_menu.add_command(label=f"Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
         context_menu.add_command(label="Path settings",
                                  command=app.open_settings_window)  # Добавляем вызов окна настроек
