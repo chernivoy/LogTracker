@@ -90,8 +90,6 @@ class TrayManager:
     def toggle_pin(root):
         if root.attributes('-topmost'):
             root.attributes('-topmost', False)
-            label = "UnPin"
         else:
             root.attributes('-topmost', True)
-            label = 'Pin'
-        return label
+

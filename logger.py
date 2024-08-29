@@ -253,7 +253,7 @@ class GUIManager:
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
         if not current_state:
-            GUIManager.round_corners(root, 40)
+            GUIManager.round_corners(root, 30)
 
     def round_corners(root, radius=30):
         """Скругляет углы окна."""
@@ -302,6 +302,7 @@ class GUIManager:
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
 
         ConfigManager.load_window_size('Window', root)
+        GUIManager.toggle_overrideredirect(root)
 
 
         main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
@@ -310,11 +311,24 @@ class GUIManager:
         file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
+
+        # close
+        to_tray_button = ctk.CTkButton(main_frame,
+                                      text="x", height=20, width=20,
+                                       fg_color="transparent",
+                                       text_color="#ce885f",
+                                      command=lambda: TrayManager.minimize_to_tray(root, app))
+
+        to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+
+
         burger_button = ctk.CTkButton(main_frame,
-                                      text="...", height=20, width=20, fg_color="transparent",
+                                      text="...", height=20, width=20,
+                                      fg_color="transparent",
+                                      text_color="#ce885f",
                                       command=lambda: GUIManager.show_context_menu(root, app))
 
-        burger_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+        burger_button.grid(row=0, column=1, padx=30, pady=5, sticky="ne")
 
         error_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
@@ -349,7 +363,24 @@ class GUIManager:
 
         GUIManager.remove_maximize_button(root)
 
+        # Привязка событий для перемещения окна
+        file_label.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
+        file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
+
         return root, error_text_widget, file_label
+
+    @staticmethod
+    def start_move(event, root):
+        """Запоминаем начальные координаты курсора и окна."""
+        root.start_x = event.x
+        root.start_y = event.y
+
+    @staticmethod
+    def do_move(event, root):
+        """Перемещаем окно в зависимости от движения курсора."""
+        x = root.winfo_x() + event.x - root.start_x
+        y = root.winfo_y() + event.y - root.start_y
+        root.geometry(f"+{x}+{y}")
 
 
     @staticmethod
@@ -453,6 +484,8 @@ class LogTrackerApp:
         self.root.bind("<Configure>", self.on_window_resize)
         self.is_window_open = True
         self.tray_icon = None
+
+
 
         ConfigManager.load_window_size('Window', self.root)
 
