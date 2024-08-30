@@ -291,7 +291,7 @@ class GUIManager:
         root.attributes('-alpha', 0.95)
 
         # root.attributes('-toolwindow', True)
-        # root.wm_attributes('-transparentcolor', 'grey')
+        root.wm_attributes('-transparentcolor', 'grey')
 
         root.title("LogTracker")
         root.minsize(300, 100)
