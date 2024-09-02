@@ -248,38 +248,6 @@ class FileChangeHandler(FileSystemEventHandler):
 
 
 class GUIManager:
-    @staticmethod
-    def toggle_overrideredirect(root):
-        current_state = root.overrideredirect()
-        root.overrideredirect(not current_state)
-        if not current_state:
-            GUIManager.round_corners(root, 30)
-
-    def round_corners(root, radius=30):
-        """Скругляет углы окна."""
-        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, root.winfo_width(), root.winfo_height(), radius, radius)
-        ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
-
-    @staticmethod
-    def remove_maximize_button(root):
-        """
-        Убирает кнопку "Развернуть" в окне.
-        """
-        # Получаем дескриптор окна
-        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-
-
-        # Получаем текущие стили окна
-        styles = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
-
-        # Убираем стили для кнопок Minimize и Maximize
-        styles &= ~0x00020000  # WS_MINIMIZEBOX
-        styles &= ~0x00010000  # WS_MAXIMIZEBOX
-
-        # Применяем измененные стили
-        ctypes.windll.user32.SetWindowLongW(hwnd, -16, styles)
-        ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0040 | 0x0100)  # SWP_NOSIZE | SWP_NOMOVE
 
     @staticmethod
     def create_text_window():
@@ -304,23 +272,20 @@ class GUIManager:
         ConfigManager.load_window_size('Window', root)
         GUIManager.toggle_overrideredirect(root)
 
-
         main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
-        file_label = ctk.CTkLabel(main_frame, text="File: ", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
+        file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
-
-        # close
+        # close button
         to_tray_button = ctk.CTkButton(main_frame,
                                       text="x", height=20, width=20,
-                                       fg_color="transparent",
-                                       text_color="#ce885f",
+                                      fg_color="transparent",
+                                      text_color="#ce885f",
                                       command=lambda: TrayManager.minimize_to_tray(root, app))
 
         to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
-
 
         burger_button = ctk.CTkButton(main_frame,
                                       text="...", height=20, width=20,
@@ -368,6 +333,41 @@ class GUIManager:
         file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
 
         return root, error_text_widget, file_label
+
+    @staticmethod
+    def toggle_overrideredirect(root):
+        current_state = root.overrideredirect()
+        root.overrideredirect(not current_state)
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("green")
+        if not current_state:
+            GUIManager.round_corners(root, 30)
+
+    def round_corners(root, radius=30):
+        """Скругляет углы окна."""
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, root.winfo_width(), root.winfo_height(), radius, radius)
+        ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
+
+    @staticmethod
+    def remove_maximize_button(root):
+        """
+        Убирает кнопку "Развернуть" в окне.
+        """
+        # Получаем дескриптор окна
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+
+
+        # Получаем текущие стили окна
+        styles = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
+
+        # Убираем стили для кнопок Minimize и Maximize
+        styles &= ~0x00020000  # WS_MINIMIZEBOX
+        styles &= ~0x00010000  # WS_MAXIMIZEBOX
+
+        # Применяем измененные стили
+        ctypes.windll.user32.SetWindowLongW(hwnd, -16, styles)
+        ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0040 | 0x0100)  # SWP_NOSIZE | SWP_NOMOVE
 
     @staticmethod
     def start_move(event, root):
@@ -452,7 +452,7 @@ class GUIManager:
 
     @staticmethod
     def show_context_menu(root, app):
-        context_menu = tk.Menu(root, tearoff=0, bg="#2b2b2b", fg="#dde3ee")
+        context_menu = tk.Menu(root, tearoff=0, bg="#2a2d30", fg="#e2e0e6", activebackground="#2d436e")
         context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
         context_menu.add_command(label=f"Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
