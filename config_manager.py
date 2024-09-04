@@ -31,7 +31,6 @@ class ConfigManager:
         config.read(config_file)
         return config
 
-
     @staticmethod
     def save_window_size(section, root):
         user32 = ctypes.windll.user32

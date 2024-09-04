@@ -249,6 +249,8 @@ class FileChangeHandler(FileSystemEventHandler):
 
 class GUIManager:
 
+
+
     @staticmethod
     def create_text_window():
         ctk.set_appearance_mode("dark")
@@ -275,7 +277,7 @@ class GUIManager:
         main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
-        file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
+        file_label = ctk.CTkLabel(main_frame, text="", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
         # close button
@@ -329,19 +331,41 @@ class GUIManager:
         GUIManager.remove_maximize_button(root)
 
         # Привязка событий для перемещения окна
+        main_frame.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
+        main_frame.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
+
+        # Привязка событий для перемещения окна
         file_label.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
         file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
 
+        # Привязка события нажатия правой кнопкой мыши для вызова контекстного меню
+        main_frame.bind("<Button-3>", lambda event: GUIManager.show_context_menu_exit(event, root))
+
+
         return root, error_text_widget, file_label
+
+
+
+
+
+    # Функция для создания контекстного меню
+    def show_context_menu_exit(event, root):
+        context_menu = tk.Menu(root, tearoff=0, bg="#2a2d30", fg="#e2e0e6", activebackground="#2d436e")
+
+        # Добавляем пункт "Exit"
+        context_menu.add_command(label="Exit", command=app.on_closing)
+        # Показать контекстное меню на позиции курсора
+        context_menu.tk_popup(event.x_root, event.y_root)
 
     @staticmethod
     def toggle_overrideredirect(root):
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
-        ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("green")
+
         if not current_state:
             GUIManager.round_corners(root, 30)
+
+        ConfigManager.save_window_size('Window', root)
 
     def round_corners(root, radius=30):
         """Скругляет углы окна."""
@@ -381,7 +405,7 @@ class GUIManager:
         x = root.winfo_x() + event.x - root.start_x
         y = root.winfo_y() + event.y - root.start_y
         root.geometry(f"+{x}+{y}")
-
+        ConfigManager.save_window_size('Window', root)
 
     @staticmethod
     def open_settings_window(app):

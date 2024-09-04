@@ -1,0 +1,33 @@
+{
+  "CTk": {
+    "color_scale": {
+      "primary": "#1e1e1e",
+      "secondary": "#2a2a2a",
+      "accent": "#ff5733"
+    },
+    "text": {
+      "default": "#ffffff",
+      "secondary": "#cccccc"
+    },
+    "fg_color": {
+      "frame": "#333333",
+      "button": "#444444",
+      "button_hover": "#555555",
+      "button_active": "#666666"
+    },
+    "border": {
+      "color": "#444444",
+      "width": 2
+    },
+    "padding": {
+      "button": {
+        "horizontal": 10,
+        "vertical": 5
+      },
+      "frame": {
+        "horizontal": 15,
+        "vertical": 10
+      }
+    }
+  }
+}
