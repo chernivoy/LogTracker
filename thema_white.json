@@ -2,7 +2,7 @@
     "appearance_mode": "dark",
     "color_theme": "green",
     "button_style": {
-        "fg_color": "#2e7d32",
+        "fg_color": "white",
         "text_color": "#ffffff",
         "hover_color": "#1b5e20",
         "corner_radius": 8,

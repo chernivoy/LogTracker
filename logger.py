@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 from tkinter import PhotoImage
 import customtkinter as ctk
 from ctypes import windll
+import json
 
 import config_manager
 from config_manager import ConfigManager
@@ -248,11 +249,11 @@ class FileChangeHandler(FileSystemEventHandler):
 
 
 class GUIManager:
-
-
-
     @staticmethod
-    def create_text_window():
+    def create_main_window(app, theme_path='thema.json'):
+        # Загрузка темы
+        theme = JsonThema.load_theme_from_json(theme_path)
+
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
         # global root
@@ -272,10 +273,12 @@ class GUIManager:
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
 
         ConfigManager.load_window_size('Window', root)
-        GUIManager.toggle_overrideredirect(root)
+        # GUIManager.toggle_overrideredirect(root)
 
         main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+
 
         file_label = ctk.CTkLabel(main_frame, text="", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
@@ -286,6 +289,7 @@ class GUIManager:
                                       fg_color="transparent",
                                       text_color="#ce885f",
                                       command=lambda: TrayManager.minimize_to_tray(root, app))
+        JsonThema.apply_widget_styles(to_tray_button, theme)
 
         to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
@@ -301,6 +305,7 @@ class GUIManager:
         error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
 
         error_text_widget_frame = ctk.CTkFrame(error_frame, fg_color="transparent")
+
         error_text_widget_frame.pack(fill="both", expand=True)
 
         # Настройка виджета CTkTextbox без скроллбара
@@ -316,7 +321,7 @@ class GUIManager:
             font=("Inter", 13),
             yscrollcommand=lambda *args: None  # Отключаем вертикальный скроллбар
         )
-
+        JsonThema.apply_widget_styles(error_text_widget, theme)
 
         # border_color="blue"
         error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
@@ -343,9 +348,6 @@ class GUIManager:
 
 
         return root, error_text_widget, file_label
-
-
-
 
 
     # Функция для создания контекстного меню
@@ -482,14 +484,70 @@ class GUIManager:
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
         context_menu.add_command(label="Path settings",
                                  command=app.open_settings_window)  # Добавляем вызов окна настроек
+
+        # Добавляем пункт "Set another Theme" в контекстное меню
+        context_menu.add_command(label="Set another Theme", command=lambda: app.switch_theme('thema_white.json'))
         context_menu.add_command(label="Exit", command=app.on_closing)
+
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
+
+
+class JsonThema:
+    @staticmethod
+    def load_theme_from_json(json_path):
+        with open(json_path, 'r') as file:
+            theme = json.load(file)
+
+        ctk.set_appearance_mode(theme.get("appearance_mode", "dark"))
+        ctk.set_default_color_theme(theme.get("color_theme", "green"))
+
+        return theme
+
+    @staticmethod
+    def apply_widget_styles(widget, theme):
+        if isinstance(widget, ctk.CTkButton) and "button_style" in theme:
+            button_style = theme["button_style"]
+            widget.configure(
+                fg_color=button_style.get("fg_color"),
+                text_color=button_style.get("text_color"),
+                hover_color=button_style.get("hover_color"),
+                corner_radius=button_style.get("corner_radius"),
+                border_width=button_style.get("border_width"),
+                border_color=button_style.get("border_color")
+            )
+
+        if isinstance(widget, ctk.CTkEntry) and "entry_style" in theme:
+            entry_style = theme["entry_style"]
+            widget.configure(
+                fg_color=entry_style.get("fg_color"),
+                text_color=entry_style.get("text_color"),
+                corner_radius=entry_style.get("corner_radius"),
+                border_width=entry_style.get("border_width"),
+                border_color=entry_style.get("border_color"),
+                placeholder_text_color=entry_style.get("placeholder_text_color")
+            )
+
+        if isinstance(widget, ctk.CTkTextbox) and "textbox_style" in theme:
+            textbox_style = theme["textbox_style"]
+            widget.configure(
+                fg_color=textbox_style.get("fg_color"),
+                text_color=textbox_style.get("text_color"),
+                corner_radius=textbox_style.get("corner_radius"),
+                border_width=textbox_style.get("border_width"),
+                border_color=textbox_style.get("border_color")
+            )
+            font = (textbox_style.get("font_family"), textbox_style.get("font_size"), textbox_style.get("font_weight"))
+            widget.configure(font=font)
+
 
 
 class LogTrackerApp:
     def __init__(self):
+        # Список для хранения идентификаторов запланированных задач
+        self.scheduled_tasks = []
         # Загрузка конфигурации
         self.config = ConfigManager.load_config(config_path)
+
 
         # Инициализация директорий из конфигурации или установка значений по умолчанию, если их нет
         self.directory = self.config.get('Settings', 'directory', fallback='')
@@ -498,7 +556,8 @@ class LogTrackerApp:
 
         # Инициализация других атрибутов
         self.observer = None
-        self.root, self.error_text_widget, self.file_label = GUIManager.create_text_window()
+        self.theme_path = 'thema.json'  # Изначальная тема
+        self.root, self.error_text_widget, self.file_label = GUIManager.create_main_window(self, 'thema.json')
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
                                                self.file_label, self.event_queue, self.config)  # Передаем self в FileChangeHandler
@@ -512,6 +571,17 @@ class LogTrackerApp:
 
 
         ConfigManager.load_window_size('Window', self.root)
+
+    def switch_theme(self, new_theme_path):
+        self.theme_path = new_theme_path
+        ConfigManager.save_window_size('Window', self.root)
+        # Пересоздаем главное окно с новой темой
+        self.root.destroy()
+
+        self.root, self.error_text_widget, self.file_label = GUIManager.create_main_window(self, self.theme_path)
+        ConfigManager.load_window_size('Window', self.root)
+        self.root.update()
+
 
     def open_settings_window(self):
         GUIManager.open_settings_window(self)
@@ -536,16 +606,26 @@ class LogTrackerApp:
             pass
         except Exception as e:
             print(f"Exception in process_queue: {e}")
-        self.root.after(100, self.process_queue)
+
+        # Запланировать следующую итерацию process_queue
+        task_id = self.root.after(100, self.process_queue)
+        self.scheduled_tasks.append(task_id)
+
 
     def periodic_sync(self):
         self.event_handler.copy_files_from_source_dir()
-        self.root.after(2000, self.periodic_sync)
+        # Запланировать следующую итерацию periodic_sync
+        task_id = self.root.after(2000, self.periodic_sync)
+        self.scheduled_tasks.append(task_id)
 
     def on_closing(self):
         def _safe_closing():
             try:
                 print("Closing application...")
+                # Отмена всех запланированных задач
+                for task_id in self.scheduled_tasks:
+                    self.root.after_cancel(task_id)
+
                 ConfigManager.save_window_size('Window', self.root)
                 if self.observer:
                     print("Stopping observer...")
