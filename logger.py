@@ -457,7 +457,7 @@ class GUIManager:
         context_menu.add_command(label=f"Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
         context_menu.add_command(label="Path settings",
-                                 command=app.open_settings_window)  # Добавляем вызов окна настроек
+                                 command=app.open_settings_window)  # Добавляем вызов окна настроек1
         context_menu.add_command(label="Exit", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
