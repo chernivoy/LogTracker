@@ -177,7 +177,6 @@ class GUIManager:
         context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
         context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
         context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
-        # context_menu.add_command(label="Path settings", command=app.open_settings_window)
         context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
         context_menu.add_command(label="Exit", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())

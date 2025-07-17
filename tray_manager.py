@@ -4,6 +4,8 @@ import pystray
 from PIL import Image, ImageDraw
 from ctypes import windll
 from config_manager import ConfigManager
+from utils.rdp import check_rdp_status
+
 
 class TrayManager:
     @staticmethod
@@ -55,7 +57,7 @@ class TrayManager:
 
     @staticmethod
     def restore_window(root, app):
-        if TrayManager.check_rdp_status():
+        if check_rdp_status():
             windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
         else:
             windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
@@ -68,28 +70,8 @@ class TrayManager:
             app.tray_icon.visible = False
 
     @staticmethod
-    def check_rdp_status():
-        SM_REMOTESESSION = 0x1000
-        return ctypes.windll.user32.GetSystemMetrics(SM_REMOTESESSION) != 0
-
-    @staticmethod
-    def toggle_pin_button(root, pin_button):
-        if root.attributes('-topmost'):
-            root.attributes('-topmost', False)
-            label = 'Pin'
-            if pin_button:
-                pin_button.configure(text="Pin")
-        else:
-            root.attributes('-topmost', True)
-            label = 'Unpin'
-            if pin_button:
-                pin_button.configure(text="Unpin")
-        return label
-
-    @staticmethod
     def toggle_pin(root):
         if root.attributes('-topmost'):
             root.attributes('-topmost', False)
         else:
             root.attributes('-topmost', True)
-
