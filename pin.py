@@ -2,6 +2,7 @@ import customtkinter as ctk
 import ctypes
 from ctypes import wintypes
 
+
 class RoundedWindow(ctk.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,7 +45,8 @@ class RoundedWindow(ctk.CTkToplevel):
         self.example_label.pack(pady=10)
 
         # Кнопка для закрытия окна
-        self.close_button = ctk.CTkButton(self.title_bar, text="x", width=10,height=10, command=self.destroy, corner_radius=10)
+        self.close_button = ctk.CTkButton(self.title_bar, text="x", width=10, height=10, command=self.destroy,
+                                          corner_radius=10)
         self.close_button.pack(side="right", padx=(0, 10))
 
         # Обновляем размеры окна после создания пользовательского заголовка
@@ -73,6 +75,7 @@ class RoundedWindow(ctk.CTkToplevel):
         hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
         region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, self.winfo_width(), self.winfo_height(), radius, radius)
         ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
+
 
 # Пример использования
 if __name__ == "__main__":

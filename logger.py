@@ -2,32 +2,21 @@ import os
 import time
 import shutil
 import queue
-import threading
 import tkinter as tk
-from tkinter import messagebox
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import configparser
 import subprocess
 import ctypes
-from ctypes import wintypes
-import pystray
-from PIL import Image, ImageDraw, ImageFont, ImageTk
-from tkinter import PhotoImage
 import customtkinter as ctk
 from ctypes import windll
 
-import config_manager
 from config_manager import ConfigManager
 from tray_manager import TrayManager
 
-
-# tray_icon = None
-# root = None
-# is_window_open = False
-
 # Установка DPI-осведомленности
 windll.shcore.SetProcessDpiAwareness(2)
+
 
 # Получить абсолютный путь к ресурсу, работает для разработки и для PyInstaller
 def resource_path(relative_path):
@@ -165,7 +154,8 @@ class FileChangeHandler(FileSystemEventHandler):
                     source_file = os.path.join(source_directory, filename)
                     if not os.path.exists(source_file):
                         os.remove(dest_file)
-                        print(f'Удален файл {filename} из {self.directory}, так как он не существует в {source_directory}')
+                        print(
+                            f'Удален файл {filename} из {self.directory}, так как он не существует в {source_directory}')
                         copied = True
 
             if copied:
@@ -235,7 +225,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if event.src_path in self.file_paths:
             del self.file_paths[event.src_path]
             print(f"Файл {event.src_path} был удален.")
-            #self.event_queue.put(self.update_text_widget)
+            # self.event_queue.put(self.update_text_widget)
 
     def stop_tracking(self, file_path):
         if file_path in self.file_paths:
@@ -280,10 +270,10 @@ class GUIManager:
 
         # close button
         to_tray_button = ctk.CTkButton(main_frame,
-                                      text="x", height=20, width=20,
-                                      fg_color="transparent",
-                                      text_color="#ce885f",
-                                      command=lambda: TrayManager.minimize_to_tray(root, app))
+                                       text="x", height=20, width=20,
+                                       fg_color="transparent",
+                                       text_color="#ce885f",
+                                       command=lambda: TrayManager.minimize_to_tray(root, app))
 
         to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
@@ -314,7 +304,6 @@ class GUIManager:
             font=("Inter", 13),
             yscrollcommand=lambda *args: None  # Отключаем вертикальный скроллбар
         )
-
 
         # border_color="blue"
         error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
@@ -357,7 +346,6 @@ class GUIManager:
         # Получаем дескриптор окна
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
 
-
         # Получаем текущие стили окна
         styles = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
 
@@ -381,7 +369,6 @@ class GUIManager:
         x = root.winfo_x() + event.x - root.start_x
         y = root.winfo_y() + event.y - root.start_y
         root.geometry(f"+{x}+{y}")
-
 
     @staticmethod
     def open_settings_window(app):
@@ -477,15 +464,14 @@ class LogTrackerApp:
         self.root, self.error_text_widget, self.file_label = GUIManager.create_text_window()
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
-                                               self.file_label, self.event_queue, self.config)  # Передаем self в FileChangeHandler
+                                               self.file_label, self.event_queue,
+                                               self.config)  # Передаем self в FileChangeHandler
 
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
         self.is_window_open = True
         self.tray_icon = None
-
-
 
         ConfigManager.load_window_size('Window', self.root)
 
