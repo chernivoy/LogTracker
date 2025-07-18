@@ -252,27 +252,39 @@ class GUIManager:
         new_x = root._start_win_x
         new_y = root._start_win_y
 
+        # РОЗТЯГУВАННЯ ПРАВО
         if "e" in dir:
             new_width = max(root._start_width + dx, min_width)
 
+        # РОЗТЯГУВАННЯ НИЗ
         if "s" in dir:
             new_height = max(root._start_height + dy, min_height)
 
+        # РОЗТЯГУВАННЯ ЛІВОРУЧ
         if "w" in dir:
-            new_width = max(root._start_width - dx, min_width)
-            if new_width > min_width:
+            potential_width = root._start_width - dx
+            if potential_width >= min_width:
+                new_width = potential_width
                 new_x = root._start_win_x + dx
+            else:
+                new_width = min_width
+                new_x = root._start_win_x + (root._start_width - min_width)
 
+        # РОЗТЯГУВАННЯ ВВЕРХ
         if "n" in dir:
-            new_height = max(root._start_height - dy, min_height)
-            if new_height > min_height:
+            potential_height = root._start_height - dy
+            if potential_height >= min_height:
+                new_height = potential_height
                 new_y = root._start_win_y + dy
+            else:
+                new_height = min_height
+                new_y = root._start_win_y + (root._start_height - min_height)
 
         root.geometry(f"{int(new_width)}x{int(new_height)}+{int(new_x)}+{int(new_y)}")
 
         if hasattr(GUIManager, "round_corners"):
             GUIManager.round_corners(root, 30)
-        # GUIManager.round_corners(root, 30)  # Якщо використовуєш згладжені кути
+
 
     @staticmethod
     def stop_resize(event):
