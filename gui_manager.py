@@ -8,6 +8,7 @@ from tray_manager import TrayManager
 
 
 class GUIManager:
+    RESIZE_BORDER_WIDTH = 10
 
     @staticmethod
     def create_error_window(app):
@@ -22,6 +23,8 @@ class GUIManager:
         root.iconbitmap(r'C:\ChernivoyPersonaldata\log\src\Header.ico')
         root.attributes('-topmost', True)
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
+
+        GUIManager.bind_resize_events(root)
 
         ConfigManager.load_window_size('Window', root)
         GUIManager.toggle_overrideredirect(root)
@@ -84,8 +87,8 @@ class GUIManager:
         root.overrideredirect(not current_state)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
-        if not current_state:
-            GUIManager.round_corners(root, 30)
+        # if not current_state:
+        #     GUIManager.round_corners(root, 30)
 
     def round_corners(root: ctk, radius=30):
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
@@ -180,3 +183,109 @@ class GUIManager:
         context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
         context_menu.add_command(label="Exit", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
+
+    @staticmethod
+    def change_cursor(event):
+        root = event.widget.winfo_toplevel()
+        x, y = event.x_root - root.winfo_rootx(), event.y_root - root.winfo_rooty()
+        width = root.winfo_width()
+        height = root.winfo_height()
+        border = GUIManager.RESIZE_BORDER_WIDTH
+
+        cursor = ""
+        if x <= border and y <= border:
+            cursor = "top_left_corner"
+            root._resize_dir = "nw"
+        elif x >= width - border and y <= border:
+            cursor = "top_right_corner"
+            root._resize_dir = "ne"
+        elif x <= border and y >= height - border:
+            cursor = "bottom_left_corner"
+            root._resize_dir = "sw"
+        elif x >= width - border and y >= height - border:
+            cursor = "bottom_right_corner"
+            root._resize_dir = "se"
+        elif x <= border:
+            cursor = "left_side"
+            root._resize_dir = "w"
+        elif x >= width - border:
+            cursor = "right_side"
+            root._resize_dir = "e"
+        elif y <= border:
+            cursor = "top_side"
+            root._resize_dir = "n"
+        elif y >= height - border:
+            cursor = "bottom_side"
+            root._resize_dir = "s"
+        else:
+            cursor = ""
+            root._resize_dir = None
+
+        root.configure(cursor=cursor or "")
+
+    @staticmethod
+    def start_resize(event):
+        root = event.widget.winfo_toplevel()
+        root._start_x = event.x_root
+        root._start_y = event.y_root
+        root._start_width = root.winfo_width()
+        root._start_height = root.winfo_height()
+        root._start_win_x = root.winfo_x()
+        root._start_win_y = root.winfo_y()
+
+    @staticmethod
+    def do_resize(event):
+        root = event.widget.winfo_toplevel()
+        if not hasattr(root, "_resize_dir") or not root._resize_dir:
+            return
+
+        dx = event.x_root - root._start_x
+        dy = event.y_root - root._start_y
+
+        dir = root._resize_dir
+        min_width = 300
+        min_height = 100
+
+        new_width = root._start_width
+        new_height = root._start_height
+        new_x = root._start_win_x
+        new_y = root._start_win_y
+
+        if "e" in dir:
+            new_width = max(root._start_width + dx, min_width)
+        if "s" in dir:
+            new_height = max(root._start_height + dy, min_height)
+        if "w" in dir:
+            new_width = max(root._start_width - dx, min_width)
+            new_x += dx
+        if "n" in dir:
+            new_height = max(root._start_height - dy, min_height)
+            new_y += dy
+
+        root.geometry(f"{int(new_width)}x{int(new_height)}+{int(new_x)}+{int(new_y)}")
+
+        GUIManager.round_corners(root, 30)
+
+    @staticmethod
+    def stop_resize(event):
+        root = event.widget.winfo_toplevel()
+        root._resize_dir = None
+        root.configure(cursor="")
+
+    @staticmethod
+    def bind_resize_events(root):
+        handlers = [
+            ("<Motion>", GUIManager.change_cursor),
+            ("<ButtonPress-1>", GUIManager.start_resize),
+            ("<B1-Motion>", GUIManager.do_resize),
+            ("<ButtonRelease-1>", GUIManager.stop_resize),
+        ]
+
+        widgets = [root]
+        for child in root.winfo_children():
+            widgets.append(child)
+            widgets.extend(child.winfo_children())
+
+        for widget in widgets:
+            for event, handler in handlers:
+                widget.bind(event, handler)
