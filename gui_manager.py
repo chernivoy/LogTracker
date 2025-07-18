@@ -91,6 +91,7 @@ class GUIManager:
         #     GUIManager.round_corners(root, 30)
 
     def round_corners(root: ctk, radius=30):
+        root.update_idletasks()
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, root.winfo_width(), root.winfo_height(), radius, radius)
         ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
@@ -253,18 +254,25 @@ class GUIManager:
 
         if "e" in dir:
             new_width = max(root._start_width + dx, min_width)
+
         if "s" in dir:
             new_height = max(root._start_height + dy, min_height)
+
         if "w" in dir:
             new_width = max(root._start_width - dx, min_width)
-            new_x += dx
+            if new_width > min_width:
+                new_x = root._start_win_x + dx
+
         if "n" in dir:
             new_height = max(root._start_height - dy, min_height)
-            new_y += dy
+            if new_height > min_height:
+                new_y = root._start_win_y + dy
 
         root.geometry(f"{int(new_width)}x{int(new_height)}+{int(new_x)}+{int(new_y)}")
 
-        GUIManager.round_corners(root, 30)
+        if hasattr(GUIManager, "round_corners"):
+            GUIManager.round_corners(root, 30)
+        # GUIManager.round_corners(root, 30)  # Якщо використовуєш згладжені кути
 
     @staticmethod
     def stop_resize(event):
