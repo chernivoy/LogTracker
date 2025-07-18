@@ -23,8 +23,8 @@ class FileChangeHandler(FileSystemEventHandler):
         self.last_error_file = None
         self.last_error_line = {}
         self.last_update_time = {}
-        self.track_files()
         self.create_directory_if_not_exists(directory)
+        self.track_files()
 
     def track_files(self):
         print("Tracking .log files in the directory:", self.directory)
@@ -75,6 +75,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 if filename.endswith('.log'):
                     source_file = os.path.join(source_directory, filename)
                     dest_file = os.path.join(self.directory, filename)
+
                     if FileChangeHandler.wait_for_file(source_file):
                         if not os.path.exists(dest_file):
                             FileHandler.copy_file_without_waiting(source_file, dest_file)
@@ -82,6 +83,7 @@ class FileChangeHandler(FileSystemEventHandler):
                             copied = True
                             self.check_new_errors(dest_file)
                         else:
+
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
                                 FileHandler.copy_file_without_waiting(source_file, dest_file)
                                 print(f'Обновлен файл {filename} в {self.directory}')

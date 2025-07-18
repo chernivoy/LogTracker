@@ -23,12 +23,6 @@ windll.shcore.SetProcessDpiAwareness(2)
 
 config_path = resource_path('src/config.ini')
 
-# config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\config.ini')
-# window_config_path = resource_path(r'C:\ChernivoyPersonaldata\log\src\window_config.ini')
-# window_config_path = resource_path('src/window_config.ini')
-
-# window_config_path = config_manager.CONFIG_FILE_WINDOW
-
 config = configparser.ConfigParser()
 config.read(config_path)
 

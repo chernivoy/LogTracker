@@ -69,9 +69,14 @@ class TrayManager:
         if app.tray_icon:
             app.tray_icon.visible = False
 
+    # @staticmethod
+    # def toggle_pin(root):
+    #     if root.attributes('-topmost'):
+    #         root.attributes('-topmost', False)
+    #     else:
+    #         root.attributes('-topmost', True)
+
     @staticmethod
     def toggle_pin(root):
-        if root.attributes('-topmost'):
-            root.attributes('-topmost', False)
-        else:
-            root.attributes('-topmost', True)
+        current = root.attributes('-topmost')
+        root.attributes('-topmost', not current)

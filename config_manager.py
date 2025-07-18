@@ -2,20 +2,7 @@ import sys
 import configparser
 import os
 import ctypes
-
-
-def resource_path(relative_path):
-    """ Получает путь к ресурсу (файлу), который упакован PyInstaller. """
-    try:
-        # PyInstaller создает временную папку и сохраняет путь в _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-
-# print(f'Path to config: {CONFIG_FILE_WINDOW}')  # Вывод пути для отладки
-
+from path_utils import resource_path
 
 # Указываем путь к файлу конфигурации
 CONFIG_FILE_WINDOW = resource_path('src/window_config.ini')
@@ -30,7 +17,6 @@ class ConfigManager:
 
         config.read(config_file)
         return config
-
 
     @staticmethod
     def save_window_size(section, root):
