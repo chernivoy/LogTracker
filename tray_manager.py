@@ -58,9 +58,11 @@ class TrayManager:
     @staticmethod
     def restore_window(root, app):
         if check_rdp_status():
-            windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
+            print("2")
+            # windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
         else:
-            windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
+            print("1")
+            # windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
 
         ConfigManager.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
         root.deiconify()

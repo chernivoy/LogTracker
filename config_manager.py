@@ -13,29 +13,40 @@ class ConfigManager:
     def load_config(config_file):
         config = configparser.ConfigParser()
         if not os.path.exists(config_file):
-            raise FileNotFoundError(f"Конфигурационный файл не найден: {config_file}")
+            # Якщо файл не знайдено, створюємо його з дефолтними значеннями
+            # Дефолтні X і Y тут мають бути ЛОГІЧНИМИ для початку,
+            # оскільки root.geometry() їх компенсує
+            config['Window'] = {'width': '800', 'height': '600', 'x': '100', 'y': '100'}
+            with open(config_file, 'w') as configfile:
+                config.write(configfile)
+            return config
 
         config.read(config_file)
         return config
 
     @staticmethod
     def save_window_size(section, root):
-        user32 = ctypes.windll.user32
-        user32.SetProcessDPIAware()
-        dpi_scale = user32.GetDpiForWindow(root.winfo_id()) / 96.0
+        # Отримуємо DPI Scale (для інформування, але не для використання з winfo_x/y)
+        # hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        # dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
+        # dpi_scale = dpi / 96.0
 
-        width = int(root.winfo_width() / dpi_scale)
-        height = int(root.winfo_height() / dpi_scale)
+        # winfo_width(), winfo_height(), winfo_x(), winfo_y() ПОВИННІ повертати ЛОГІЧНІ пікселі,
+        # якщо Tkinter/CustomTkinter коректно працює з DPI-обізнаністю (Per-Monitor v2).
+        width = root.winfo_width()
+        height = root.winfo_height()
+        x = root.winfo_x()
+        y = root.winfo_y()
 
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
 
-        if section is not config:
+        if section not in config:
             config[section] = {}
 
         config[section]['width'] = str(width)
         config[section]['height'] = str(height)
-        config[section]['x'] = str(root.winfo_x())
-        config[section]['y'] = str(root.winfo_y())
+        config[section]['x'] = str(x)  # Зберігаємо ЛОГІЧНІ X
+        config[section]['y'] = str(y)  # Зберігаємо ЛОГІЧНІ Y
 
         with open(CONFIG_FILE_WINDOW, 'w') as configfile:
             config.write(configfile)
@@ -43,11 +54,31 @@ class ConfigManager:
     @staticmethod
     def load_window_size(section, root):
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
+
+        try:
+            hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+            dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
+            dpi_scale = dpi / 96.0
+        except Exception as e:
+            print(f"Попередження: Не вдалося отримати DPI Scale в load_window_size: {e}. Використовуємо 2.0 за замовчуванням.")
+            dpi_scale = 2.0
+
         if section in config:
+            # Зчитуємо ШИРИНУ, ВИСОТУ, X, Y з INI (всі вони тепер ЛОГІЧНІ)
             width = config.getint(section, 'width', fallback=800)
             height = config.getint(section, 'height', fallback=600)
             x = config.getint(section, 'x', fallback=100)
             y = config.getint(section, 'y', fallback=100)
-            root.geometry(f'{width}x{height}+{x}+{y}')
+
+            # Розміри: ділимо логічні розміри на dpi_scale для geometry()
+            width_for_geometry = int(width / dpi_scale)
+            height_for_geometry = int(height / dpi_scale)
+
+            # ✅ КЛЮЧОВА ЗМІНА: Позиція X та Y: передаємо ЛОГІЧНІ значення без додаткового ділення.
+            # geometry() сам скомпенсує їх з урахуванням DPI.
+            x_for_geometry = x
+            y_for_geometry = y
+
+            return f'{width_for_geometry}x{height_for_geometry}+{x_for_geometry}+{y_for_geometry}'
         else:
-            root.geometry('800x600+100+100')
+            return None

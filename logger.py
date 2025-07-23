@@ -19,7 +19,6 @@ from path_utils import resource_path
 from gui_manager import GUIManager
 
 # Установка DPI-осведомленности
-windll.shcore.SetProcessDpiAwareness(2)
 
 config_path = resource_path('src/config.ini')
 
