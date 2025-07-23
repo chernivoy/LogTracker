@@ -1,10 +1,23 @@
 import os
+import sys
 import tkinter as tk
+from ctypes.wintypes import POINT
+
 import customtkinter as ctk
 import ctypes
 
 from config_manager import ConfigManager
 from tray_manager import TrayManager
+
+
+# ✅ ЦЕ МІСЦЕ ДЛЯ ВСТАНОВЛЕННЯ DPI-AWARE
+if sys.platform == "win32":
+    try:
+        import ctypes
+        awareness = ctypes.c_int()
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # 2 = Per-Monitor DPI Aware
+    except Exception as e:
+        print(f"Не вдалося встановити DPI Awareness: {e}")
 
 
 class GUIManager:
@@ -227,21 +240,40 @@ class GUIManager:
     @staticmethod
     def start_resize(event):
         root = event.widget.winfo_toplevel()
-        root._start_x = event.x_root
-        root._start_y = event.y_root
-        root._start_width = root.winfo_width()
-        root._start_height = root.winfo_height()
-        root._start_win_x = root.winfo_x()
-        root._start_win_y = root.winfo_y()
+
+        # Зберігаємо координати курсора
+        pt = POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+
+        dpi = ctypes.windll.user32.GetDpiForWindow(root.winfo_id())
+        dpi_scale = dpi / 96.0
+
+        root._start_x = pt.x  # 🟢 додаємо це
+        root._start_y = pt.y  # 🟢 і це
+
+        root._start_width = root.winfo_width() / dpi_scale
+        root._start_height = root.winfo_height() / dpi_scale
+        root._start_win_x = root.winfo_x() / dpi_scale
+        root._start_win_y = root.winfo_y() / dpi_scale
+
+        root._dpi_scale = dpi_scale  # Щоб не рахувати кожен раз
 
     @staticmethod
     def do_resize(event):
         root = event.widget.winfo_toplevel()
+
         if not hasattr(root, "_resize_dir") or not root._resize_dir:
             return
 
-        dx = event.x_root - root._start_x
-        dy = event.y_root - root._start_y
+        # Отримуємо реальну позицію курсора (raw), бо event.x_root/y_root не завжди точні при масштабуванні
+        pt = POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+
+        dx_raw = pt.x - root._start_x
+        dy_raw = pt.y - root._start_y
+
+        dx = dx_raw / root._dpi_scale
+        dy = dy_raw / root._dpi_scale
 
         dir = root._resize_dir
         min_width = 300
@@ -252,15 +284,15 @@ class GUIManager:
         new_x = root._start_win_x
         new_y = root._start_win_y
 
-        # РОЗТЯГУВАННЯ ПРАВО
+        # ➡️ Розтягуємо праворуч
         if "e" in dir:
             new_width = max(root._start_width + dx, min_width)
 
-        # РОЗТЯГУВАННЯ НИЗ
+        # ⬇️ Розтягуємо вниз
         if "s" in dir:
             new_height = max(root._start_height + dy, min_height)
 
-        # РОЗТЯГУВАННЯ ЛІВОРУЧ
+        # ⬅️ Розтягуємо ліворуч
         if "w" in dir:
             potential_width = root._start_width - dx
             if potential_width >= min_width:
@@ -270,7 +302,7 @@ class GUIManager:
                 new_width = min_width
                 new_x = root._start_win_x + (root._start_width - min_width)
 
-        # РОЗТЯГУВАННЯ ВВЕРХ
+        # ⬆️ Розтягуємо вверх
         if "n" in dir:
             potential_height = root._start_height - dy
             if potential_height >= min_height:
@@ -280,8 +312,10 @@ class GUIManager:
                 new_height = min_height
                 new_y = root._start_win_y + (root._start_height - min_height)
 
+        # Встановлюємо нову геометрію вікна
         root.geometry(f"{int(new_width)}x{int(new_height)}+{int(new_x)}+{int(new_y)}")
 
+        # Повторно згладжуємо кути після зміни розміру
         if hasattr(GUIManager, "round_corners"):
             GUIManager.round_corners(root, 30)
 
