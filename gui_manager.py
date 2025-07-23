@@ -21,7 +21,27 @@ class GUIManager:
         ctk.set_default_color_theme("green")
 
         root = ctk.CTk()
-        root.attributes('-alpha', 0.95)
+        # ✅ ЗМІНА: Використовуємо -transparentcolor з "фуксією"
+        # Цей колір буде зроблений прозорим на рівні вікна Windows.
+        # Його потрібно встановити як bg/fg_color для root, щоб CustomTkinter його намалював
+        # і він став прозорим.
+        TRANSPARENT_COLOR = "#FF00FF"  # Спеціальний колір, який буде прозорим
+        root.wm_attributes("-transparentcolor", TRANSPARENT_COLOR)
+
+        # ✅ ЗМІНА: Встановлюємо bg_color (або fg_color для CTk) кореневого вікна на прозорий колір.
+        # CustomTkinter використовує fg_color для фону вікна, якщо немає CTkFrame.
+        # Або, якщо він є, встановлює фон для нього.
+        # У нас є main_frame, тому, можливо, тут потрібно set_default_color_theme.
+        # Краще встановлювати bg для самого Tkinter root, а не CTk.
+        root.configure(bg=TRANSPARENT_COLOR)  # Це для Tkinter
+
+        # root.attributes('-alpha', 0.95) # Залишаємо цю лінію для загальної прозорості вікна
+        # Але її ефект може бути непередбачуваним у поєднанні з -transparentcolor.
+        # Давайте спробуємо спочатку без неї, або з дуже високим значенням, як 1.0 (повністю непрозорий)
+        # Або взагалі приберемо, якщо нам потрібна повна прозорість фону.
+        root.attributes('-alpha', 1.0)  # Для початку зробимо повністю непрозорим, щоб бачити ефект.
+        # Можете повернути 0.95, якщо потрібно після тестування.
+
         root.title("LogTracker")
         root.minsize(300, 100)  # Мінімальний логічний розмір
 
@@ -36,22 +56,19 @@ class GUIManager:
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
 
         # Завантажуємо та застосовуємо попередню геометрію вікна
-        # Функція load_window_size тепер поверне рядок геометрії, вже скомпенсований для Tkinter.
         geometry_string = ConfigManager.load_window_size('Window', root)
         if geometry_string:
             root.geometry(geometry_string)
         else:
-            # Значення за замовчуванням (логічні), якщо конфіг не знайдено або порожній.
-            # Tkinter автоматично скомпенсує їх для поточного DPI.
-            root.geometry('400x200+100+100')
+            root.geometry('400x200+100+100')  # Значення за замовчуванням
 
         # Перемикаємо overrideredirect (видалення/додавання рамки)
-        # ЦЕ ПОВИННО БУТИ ПІСЛЯ ВСТАНОВЛЕННЯ ПОЧАТКОВОГО РОЗМІРУ,
-        # оскільки округлення кутів залежить від актуального розміру вікна.
         GUIManager.toggle_overrideredirect(root)
 
         # Створення основної рамки та віджетів
-        main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
+        # ✅ main_frame має бути встановлений так, щоб він займав ВЕСЬ простір root
+        # і мав заокруглені кути та бажаний колір фону.
+        main_frame = ctk.CTkFrame(root, fg_color="#2a2d30", corner_radius=30)
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
@@ -91,60 +108,59 @@ class GUIManager:
         )
         error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Конфігурація розширення сітки
         root.grid_rowconfigure(0, weight=1)
         root.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(0, weight=0)
         main_frame.grid_rowconfigure(1, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        # Прив'язка подій для переміщення та ресайзу
         GUIManager.bind_resize_events(root)
 
         return root, error_text_widget, file_label
 
     @staticmethod
     def toggle_overrideredirect(root: ctk.CTk):
-        """
-        Перемикає стан overrideredirect (рамка/без рамки) вікна.
-        Приховує рамку і округлює кути, або повертає рамку.
-        """
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
 
         if not current_state:  # Якщо переходимо у режим overrideredirect (без рамки)
-            GUIManager.round_corners(root, 30)
+            # ✅ РАДІУС: Експериментуйте з цим значенням (28, 29, 30, 31, 32)
+            # щоб воно ідеально співпадало з corner_radius=30 на main_frame
+            GUIManager.round_corners(root, 28)
+            root.update_idletasks()  # Забезпечуємо оновлення внутрішніх віджетів
+            root.update()  # Примусово перемальовуємо вікно
         else:  # Якщо повертаємо рамку, скидаємо регіон вікна
             hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-            # Скидаємо регіон вікна до прямокутного за замовчуванням
             ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
 
     @staticmethod
     def round_corners(root: ctk.CTk, radius=30):
-        """
-        Округлює кути вікна за допомогою WinAPI.
-        Ця функція повинна викликатися після кожного зміни розміру вікна
-        у режимі overrideredirect.
-        """
-        root.update_idletasks()  # Оновлюємо вікно, щоб отримати актуальні розміри
+        root.update_idletasks()
         if not root.winfo_exists():
             return
 
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
-        # Отримуємо фактичний DPI-масштаб вікна.
-        # winfo_width/height повертають логічні пікселі, але WinAPI очікує фізичні.
         dpi_scale = dpi / 96.0
 
-        # Масштабуємо логічні розміри вікна до фізичних пікселів для WinAPI
-        scaled_width = int(root.winfo_width() * dpi_scale)
-        scaled_height = int(root.winfo_height() * dpi_scale)
+        width_logical = root.winfo_width()
+        height_logical = root.winfo_height()
 
-        # Створюємо регіон із заокругленими кутами
+        scaled_width = int(width_logical * dpi_scale)
+        scaled_height = int(height_logical * dpi_scale)
+
+        print(
+            f"Rounding corners: Logical WxH = {width_logical}x{height_logical}, DPI Scale = {dpi_scale}, Scaled WxH = {scaled_width}x{scaled_height}")
+
         region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, scaled_width, scaled_height, radius, radius)
-        # Встановлюємо регіон для вікна
         ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
-        # Звільняємо ресурси GDI
+
+        # Примусове перемальовування вікна.
+        ctypes.windll.user32.InvalidateRect(hwnd, None, True)
+        ctypes.windll.user32.UpdateWindow(hwnd)
+
+        ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0004 | 0x0020)
+
         ctypes.windll.gdi32.DeleteObject(region)
 
     @staticmethod
@@ -168,9 +184,6 @@ class GUIManager:
         Зберігає початкову позицію курсора відносно вікна
         для подальшого переміщення.
         """
-        # event.x_root, event.y_root - координати курсора на екрані (логічні пікселі).
-        # root.winfo_x(), root.winfo_y() - координати вікна на екрані (логічні пікселі).
-        # Різниця дає зсув курсора відносно верхнього лівого кута вікна.
         root._start_move_x = event.x_root - root.winfo_x()
         root._start_move_y = event.y_root - root.winfo_y()
 
@@ -179,19 +192,12 @@ class GUIManager:
         """
         Переміщує вікно відповідно до руху курсора.
         """
-        # Перевірка, чи вікно в режимі overrideredirect (без рамки)
         if not root.overrideredirect():
             return
 
-        # current_x, current_y - це бажані ЛОГІЧНІ координати вікна на екрані.
-        # event.x_root та event.y_root вже логічні.
-        # root._start_move_x та root._start_move_y - це логічні зміщення.
         new_x_logical = event.x_root - root._start_move_x
         new_y_logical = event.y_root - root._start_move_y
 
-        # ✅ КЛЮЧОВА ЗМІНА ДЛЯ ПЕРЕМІЩЕННЯ:
-        # Передаємо ЛОГІЧНІ значення X та Y безпосередньо в geometry().
-        # Tkinter/CustomTkinter автоматично скомпенсує їх для поточного DPI.
         root.geometry(f"+{new_x_logical}+{new_y_logical}")
 
     @staticmethod
@@ -415,7 +421,6 @@ class GUIManager:
         # Кінець логіки зміни розміру
 
         # Отримуємо поточний DPI Scale для вікна.
-        # Це потрібно, бо geometry() очікує значення, які вона потім "подвоїть" на високому DPI.
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
         dpi_scale_for_geometry = dpi / 96.0
@@ -424,11 +429,9 @@ class GUIManager:
         final_width_for_geometry = int(new_width_logical / dpi_scale_for_geometry)
         final_height_for_geometry = int(new_height_logical / dpi_scale_for_geometry)
 
-        # ✅ КЛЮЧОВА ЗМІНА:
         # Для позиції X та Y передаємо ЛОГІЧНІ значення без додаткового ділення.
-        # Це виходить з припущення, що geometry() самостійно їх "компенсує" (масштабує).
-        final_x_for_geometry = new_x_logical  # Залишаємо логічне значення як є
-        final_y_for_geometry = new_y_logical  # Залишаємо логічне значення як є
+        final_x_for_geometry = new_x_logical
+        final_y_for_geometry = new_y_logical
 
         print(f"DO RESIZE: Dir='{dir}'")
         print(f"  Cursor (Logical/Screen): X={current_cursor_x_logical}, Y={current_cursor_y_logical}")
@@ -444,7 +447,8 @@ class GUIManager:
 
         # Оновлюємо округлені кути, якщо вікно без рамки
         if root.overrideredirect():
-            GUIManager.round_corners(root, 50)
+            # ✅ РАДІУС: Має бути те саме значення, що і в toggle_overrideredirect.
+            GUIManager.round_corners(root, 28)
 
     @staticmethod
     def stop_resize(event: tk.Event):
@@ -477,26 +481,14 @@ class GUIManager:
         ]
 
         # Прив'язуємо події ресайзу безпосередньо до кореневого вікна.
-        # Це дозволяє їм працювати по всій площі вікна, крім віджетів,
-        # які мають власні прив'язки або перехоплюють події.
         for event_type, handler_func in resize_handlers:
             root.bind(event_type, handler_func)
 
         # Окремі прив'язки для переміщення вікна (заголовок/file_label).
-        # Це необхідно, тому що file_label є дочірнім віджетом, і ми хочемо,
-        # щоб перетягування працювало саме за його "заголовок".
-        # Використовуємо .nametowidget() для отримання посилання на file_label.
         try:
-            # Спробуємо отримати file_label, припускаючи його шлях.
-            # Зверніть увагу: !ctkframe.!ctklabel може змінюватись в залежності від
-            # внутрішньої структури віджетів CustomTkinter.
-            # Якщо виникнуть помилки, перевірте шлях за допомогою print(root.winfo_children())
             file_label = root.nametowidget(".!ctkframe.!ctklabel")
             file_label.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
             file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
         except KeyError:
-            print("Помилка: Не вдалося знайти віджет 'file_label' для прив'язки переміщення.")
-            # Якщо віджет не знайдено, можна прив'язати переміщення до всього root,
-            # але це може конфліктувати з ресайзом.
-            # root.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
-            # root.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
+            print(
+                "Помилка: Не вдалося знайти віджет 'file_label' для прив'язки переміщення. Переміщення буде недоступне.")
