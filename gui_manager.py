@@ -14,80 +14,66 @@ class GUIManager:
 
     @staticmethod
     def create_error_window(app):
-        """
-        Створює та налаштовує головне вікно додатку.
-        """
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
+        # TRANSPARENT_COLOR = "#FF00FF"
+        TRANSPARENT_COLOR = "white"
+
         root = ctk.CTk()
-        # ✅ ЗМІНА: Використовуємо -transparentcolor з "фуксією"
-        # Цей колір буде зроблений прозорим на рівні вікна Windows.
-        # Його потрібно встановити як bg/fg_color для root, щоб CustomTkinter його намалював
-        # і він став прозорим.
-        TRANSPARENT_COLOR = "#FF00FF"  # Спеціальний колір, який буде прозорим
-        root.wm_attributes("-transparentcolor", TRANSPARENT_COLOR)
-
-        # ✅ ЗМІНА: Встановлюємо bg_color (або fg_color для CTk) кореневого вікна на прозорий колір.
-        # CustomTkinter використовує fg_color для фону вікна, якщо немає CTkFrame.
-        # Або, якщо він є, встановлює фон для нього.
-        # У нас є main_frame, тому, можливо, тут потрібно set_default_color_theme.
-        # Краще встановлювати bg для самого Tkinter root, а не CTk.
-        root.configure(bg=TRANSPARENT_COLOR)  # Це для Tkinter
-
-        # root.attributes('-alpha', 0.95) # Залишаємо цю лінію для загальної прозорості вікна
-        # Але її ефект може бути непередбачуваним у поєднанні з -transparentcolor.
-        # Давайте спробуємо спочатку без неї, або з дуже високим значенням, як 1.0 (повністю непрозорий)
-        # Або взагалі приберемо, якщо нам потрібна повна прозорість фону.
-        root.attributes('-alpha', 1.0)  # Для початку зробимо повністю непрозорим, щоб бачити ефект.
-        # Можете повернути 0.95, якщо потрібно після тестування.
+        root.overrideredirect(True)  # УВАГА: ДО geometry
+        root.configure(bg=TRANSPARENT_COLOR)
+        root.wm_attributes('-transparentcolor', TRANSPARENT_COLOR)
+        root.attributes('-alpha', 0.9)  # повністю непрозорий
 
         root.title("LogTracker")
-        root.minsize(300, 100)  # Мінімальний логічний розмір
+        root.minsize(300, 100)
 
-        # Перевірка та встановлення іконки вікна
+        # Завантаження геометрії ДО .update()
+        geometry_string = ConfigManager.load_window_size('Window', root)
+        if geometry_string:
+            root.geometry(geometry_string)
+        else:
+            root.geometry('400x200+100+100')
+
+        # Іконка
         icon_path = r'C:\ChernivoyPersonaldata\log\src\Header.ico'
         if os.path.exists(icon_path):
             root.iconbitmap(icon_path)
         else:
             print(f"Помилка: Файл іконки не знайдено за шляхом: {icon_path}")
 
-        root.attributes('-topmost', True)  # Завжди поверх інших вікон
+        root.attributes('-topmost', True)
+
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
 
-        # Завантажуємо та застосовуємо попередню геометрію вікна
-        geometry_string = ConfigManager.load_window_size('Window', root)
-        if geometry_string:
-            root.geometry(geometry_string)
-        else:
-            root.geometry('400x200+100+100')  # Значення за замовчуванням
+        root.update_idletasks()
+        root.update()
 
-        # Перемикаємо overrideredirect (видалення/додавання рамки)
-        GUIManager.toggle_overrideredirect(root)
+        # Після повного оновлення - округлення
+        GUIManager.round_corners(root, 30)
 
-        # Створення основної рамки та віджетів
-        # ✅ main_frame має бути встановлений так, щоб він займав ВЕСЬ простір root
-        # і мав заокруглені кути та бажаний колір фону.
-        main_frame = ctk.CTkFrame(root, fg_color="#2a2d30", corner_radius=30)
-        main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+        # Основна рамка
+        # main_frame = ctk.CTkFrame(root, fg_color="#2a2d30", corner_radius=30)
+        main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
+        main_frame.grid(row=0, column=0, padx=1, pady=1, sticky="nsew")
 
-        file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w", text_color="#5f8dfc", font=("Inter", 13))
+        # Заголовок
+        file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w",
+                                  text_color="#5f8dfc", font=("Inter", 13))
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
-        to_tray_button = ctk.CTkButton(main_frame,
-                                       text="x", height=20, width=20,
-                                       fg_color="transparent",
-                                       text_color="#ce885f",
+        to_tray_button = ctk.CTkButton(main_frame, text="x", height=20, width=20,
+                                       fg_color="transparent", text_color="#ce885f",
                                        command=lambda: TrayManager.minimize_to_tray(root, app))
         to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-        burger_button = ctk.CTkButton(main_frame,
-                                      text="...", height=20, width=20,
-                                      fg_color="transparent",
-                                      text_color="#ce885f",
+        burger_button = ctk.CTkButton(main_frame, text="...", height=20, width=20,
+                                      fg_color="transparent", text_color="#ce885f",
                                       command=lambda: GUIManager.show_context_menu(root, app))
         burger_button.grid(row=0, column=1, padx=30, pady=5, sticky="ne")
 
+        # Поле логів
         error_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
 
@@ -108,13 +94,17 @@ class GUIManager:
         )
         error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
 
+        # Grid конфігурація
         root.grid_rowconfigure(0, weight=1)
         root.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(0, weight=0)
         main_frame.grid_rowconfigure(1, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
+        # Resize + переміщення
         GUIManager.bind_resize_events(root)
+        file_label.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
+        file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
 
         return root, error_text_widget, file_label
 
@@ -126,7 +116,7 @@ class GUIManager:
         if not current_state:  # Якщо переходимо у режим overrideredirect (без рамки)
             # ✅ РАДІУС: Експериментуйте з цим значенням (28, 29, 30, 31, 32)
             # щоб воно ідеально співпадало з corner_radius=30 на main_frame
-            GUIManager.round_corners(root, 28)
+            # GUIManager.round_corners(root, 20)
             root.update_idletasks()  # Забезпечуємо оновлення внутрішніх віджетів
             root.update()  # Примусово перемальовуємо вікно
         else:  # Якщо повертаємо рамку, скидаємо регіон вікна
@@ -152,7 +142,7 @@ class GUIManager:
         print(
             f"Rounding corners: Logical WxH = {width_logical}x{height_logical}, DPI Scale = {dpi_scale}, Scaled WxH = {scaled_width}x{scaled_height}")
 
-        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, scaled_width, scaled_height, radius, radius)
+        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, scaled_width + 1, scaled_height + 1, radius, radius)
         ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
 
         # Примусове перемальовування вікна.
@@ -446,9 +436,8 @@ class GUIManager:
             f"{final_width_for_geometry}x{final_height_for_geometry}+{final_x_for_geometry}+{final_y_for_geometry}")
 
         # Оновлюємо округлені кути, якщо вікно без рамки
-        if root.overrideredirect():
-            # ✅ РАДІУС: Має бути те саме значення, що і в toggle_overrideredirect.
-            GUIManager.round_corners(root, 28)
+        # if root.overrideredirect():
+        # GUIManager.round_corners(root, 28)
 
     @staticmethod
     def stop_resize(event: tk.Event):
