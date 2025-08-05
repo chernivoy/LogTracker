@@ -10,7 +10,7 @@ from tray_manager import TrayManager
 
 
 class GUIManager:
-    RESIZE_BORDER_WIDTH = 10
+    RESIZE_BORDER_WIDTH = 20
 
     @staticmethod
     def create_error_window(app):
@@ -54,9 +54,9 @@ class GUIManager:
         GUIManager.round_corners(root, 30)
 
         # Основна рамка
-        # main_frame = ctk.CTkFrame(root, fg_color="#2a2d30", corner_radius=30)
-        main_frame = ctk.CTkFrame(root, fg_color="#2a2d30")
-        main_frame.grid(row=0, column=0, padx=1, pady=1, sticky="nsew")
+        # main_frame = ctk.CTkFrame(root, fg_color="#2a2d30", corner_radius=30) #383b40
+        main_frame = ctk.CTkFrame(root, fg_color="#383b40")
+        main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         # Заголовок
         file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w",
@@ -123,35 +123,68 @@ class GUIManager:
             hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
             ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
 
+    # @staticmethod
+    # def round_corners(window, radius):
+    #     hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+    #
+    #     dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
+    #     scale = dpi / 96.0
+    #
+    #     width = int(window.winfo_width() * scale)
+    #     height = int(window.winfo_height() * scale)
+    #     radius_scaled = int(radius * scale)
+    #
+    #     print(f"[round_corners] width={width}, height={height}, radius={radius_scaled}")
+    #
+    #     hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
+    #         0, 0, width, height, radius_scaled, radius_scaled
+    #     )
+    #
+    #     result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
+    #     if result == 0:
+    #         print("[round_corners] ⚠️ SetWindowRgn failed")
+    #     else:
+    #         print("[round_corners] ✅ SetWindowRgn applied successfully")
+
+    # @staticmethod м2
+    # def round_corners(window, radius):
+    #     hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+    #
+    #     width = window.winfo_width()
+    #     height = window.winfo_height()
+    #
+    #     print(f"[round_corners] width={width}, height={height}, radius={radius}")
+    #
+    #     hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
+    #         0, 0, width, height, radius, radius
+    #     )
+    #
+    #     result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
+    #     if result == 0:
+    #         print("[round_corners] ⚠️ SetWindowRgn failed")
+    #     else:
+    #         print("[round_corners] ✅ SetWindowRgn applied successfully")
+
     @staticmethod
-    def round_corners(root: ctk.CTk, radius=30):
-        root.update_idletasks()
-        if not root.winfo_exists():
-            return
+    def round_corners(window, radius):
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
 
-        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-        dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
-        dpi_scale = dpi / 96.0
+        # Використовуємо розміри вікна напряму, без ручного масштабування
+        width = window.winfo_width()
+        height = window.winfo_height()
 
-        width_logical = root.winfo_width()
-        height_logical = root.winfo_height()
+        # Примітка: для ідеально круглих кутів, деякі джерела рекомендують
+        # використовувати 2 * radius для останніх двох параметрів.
+        # Але якщо передача 'radius, radius' працює, то її можна залишити.
+        hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
+            0, 0, width, height, radius, radius
+        )
 
-        scaled_width = int(width_logical * dpi_scale)
-        scaled_height = int(height_logical * dpi_scale)
-
-        print(
-            f"Rounding corners: Logical WxH = {width_logical}x{height_logical}, DPI Scale = {dpi_scale}, Scaled WxH = {scaled_width}x{scaled_height}")
-
-        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, scaled_width + 1, scaled_height + 1, radius, radius)
-        ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
-
-        # Примусове перемальовування вікна.
-        ctypes.windll.user32.InvalidateRect(hwnd, None, True)
-        ctypes.windll.user32.UpdateWindow(hwnd)
-
-        ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0004 | 0x0020)
-
-        ctypes.windll.gdi32.DeleteObject(region)
+        result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
+        if result == 0:
+            print("[round_corners] ⚠️ SetWindowRgn failed")
+        else:
+            print("[round_corners] ✅ SetWindowRgn applied successfully")
 
     @staticmethod
     def remove_maximize_button(root: ctk.CTk):
@@ -329,34 +362,78 @@ class GUIManager:
 
         root.configure(cursor=cursor or "")
 
+    # @staticmethod м1
+    # def start_resize(event: tk.Event):
+    #     root = event.widget.winfo_toplevel()
+    #     if not hasattr(root, "_resize_dir") or not root._resize_dir:
+    #         return
+    #     if not root.overrideredirect():
+    #         return
+    #
+    #     # Тимчасово скасовуємо округлення (щоб не обрізало кути під час ресайзу)
+    #     hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+    #     ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
+    #
+    #     root._start_cursor_x_logical = event.x_root
+    #     root._start_cursor_y_logical = event.y_root
+    #     root._start_width_logical = root.winfo_width()
+    #     root._start_height_logical = root.winfo_height()
+    #     root._start_win_x_logical = root.winfo_x()
+    #     root._start_win_y_logical = root.winfo_y()
+    #
+    #     print("--- START RESIZE LOG ---")
+    #     print(f"Timestamp: {ctypes.windll.kernel32.GetTickCount64()}")
+    #     print(f"Initial Cursor (Logical/Screen): X={root._start_cursor_x_logical}, Y={root._start_cursor_y_logical}")
+    #     print(
+    #         f"Initial Window (Log): X={root._start_win_x_logical}, Y={root._start_win_y_logical}, W={root._start_width_logical}, H={root._start_height_logical}")
+    #     print("------------------------")
+
     @staticmethod
     def start_resize(event: tk.Event):
-        """
-        Ініціалізує процес зміни розміру вікна, зберігаючи початкові
-        координати курсора та розміри/позицію вікна.
-        """
         root = event.widget.winfo_toplevel()
-        if not hasattr(root, "_resize_dir") or not root._resize_dir:
-            return
-        if not root.overrideredirect():
-            return
 
-        # event.x_root та event.y_root повертають ЛОГІЧНІ пікселі
+        # --- НОВА ЛОГІКА ДЛЯ ФІКСАЦІЇ НАПРЯМКУ ---
+        x_logical = event.x_root - root.winfo_rootx()
+        y_logical = event.y_root - root.winfo_rooty()
+        width_logical = root.winfo_width()
+        height_logical = root.winfo_height()
+        border = GUIManager.RESIZE_BORDER_WIDTH
+
+        # Визначаємо напрямок ресайзу на основі позиції курсора в момент кліка
+        root._resize_dir = None
+        if x_logical <= border and y_logical <= border:
+            root._resize_dir = "nw"
+        elif x_logical >= width_logical - border and y_logical <= border:
+            root._resize_dir = "ne"
+        elif x_logical <= border and y_logical >= height_logical - border:
+            root._resize_dir = "sw"
+        elif x_logical >= width_logical - border and y_logical >= height_logical - border:
+            root._resize_dir = "se"
+        elif x_logical <= border:
+            root._resize_dir = "w"
+        elif x_logical >= width_logical - border:
+            root._resize_dir = "e"
+        elif y_logical <= border:
+            root._resize_dir = "n"
+        elif y_logical >= height_logical - border:
+            root._resize_dir = "s"
+
+        # Якщо ми не в зоні ресайзу, виходимо
+        if not root.overrideredirect() or not root._resize_dir:
+            root._resize_dir = None  # Впевнюємося, що напрямок скинуто
+            return
+        # --- КІНЕЦЬ НОВОЇ ЛОГІКИ ---
+
+        # Тимчасово скасовуємо округлення (щоб не обрізало кути під час ресайзу)
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
+
         root._start_cursor_x_logical = event.x_root
         root._start_cursor_y_logical = event.y_root
-
-        # winfo_width/height/x/y повертають ЛОГІЧНІ пікселі
         root._start_width_logical = root.winfo_width()
         root._start_height_logical = root.winfo_height()
         root._start_win_x_logical = root.winfo_x()
         root._start_win_y_logical = root.winfo_y()
-
-        print("--- START RESIZE LOG ---")
-        print(f"Timestamp: {ctypes.windll.kernel32.GetTickCount64()}")
-        print(f"Initial Cursor (Logical/Screen): X={root._start_cursor_x_logical}, Y={root._start_cursor_y_logical}")
-        print(
-            f"Initial Window (Log): X={root._start_win_x_logical}, Y={root._start_win_y_logical}, W={root._start_width_logical}, H={root._start_height_logical}")
-        print("------------------------")
 
     @staticmethod
     def do_resize(event: tk.Event):
@@ -441,20 +518,20 @@ class GUIManager:
 
     @staticmethod
     def stop_resize(event: tk.Event):
-        """
-        Завершує процес зміни розміру, зберігає поточні розміри та позицію.
-        """
         root = event.widget.winfo_toplevel()
-        # Зберігаємо поточні логічні розміри та позицію вікна в конфігурації
+
         ConfigManager.save_window_size('Window', root)
         root._resize_dir = None
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
 
-        # Лог остаточних значень (вони вже в логічних пікселях)
         print("--- STOP RESIZE LOG ---")
         print(
             f"Final Window (Log): X={root.winfo_x()}, Y={root.winfo_y()}, W={root.winfo_width()}, H={root.winfo_height()}")
         print("-----------------------")
+
+        # Повертаємо округлення після завершення ресайзу
+        if root.overrideredirect():
+            GUIManager.round_corners(root, 30)
 
     @staticmethod
     def bind_resize_events(root: ctk.CTk):
