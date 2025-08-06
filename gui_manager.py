@@ -3,6 +3,7 @@ import sys
 import tkinter as tk
 import customtkinter as ctk
 import ctypes
+from PIL import Image, ImageTk
 
 # Імпортуємо ваші менеджери
 from config_manager import ConfigManager
@@ -13,7 +14,38 @@ class GUIManager:
     RESIZE_BORDER_WIDTH = 20
 
     @staticmethod
+    def resource_path(relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+
+    @staticmethod
+    def load_ctk_image(path: str, size: tuple) -> ctk.CTkImage | None:
+        """
+        Завантажує зображення з файлу і створює об'єкт CTkImage.
+        Повертає CTkImage, або None, якщо файл не знайдено.
+        """
+        # Використовуємо допоміжну функцію для визначення правильного шляху
+        full_path = GUIManager.resource_path(path)
+
+        try:
+            image = Image.open(full_path)
+            ctk_image = ctk.CTkImage(light_image=image,
+                                     dark_image=image,
+                                     size=size)
+            return ctk_image
+        except FileNotFoundError:
+            print(f"Помилка: Файл іконки не знайдено за шляхом: {full_path}")
+            return None
+
+    @staticmethod
     def create_error_window(app):
+
+        header_icon_path = os.path.join("src", "Header.ico")
+        bug_icon_path = os.path.join("src", "bug.png")
+
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
@@ -36,12 +68,15 @@ class GUIManager:
         else:
             root.geometry('400x200+100+100')
 
-        # Іконка
-        icon_path = r'C:\ChernivoyPersonaldata\log\src\Header.ico'
-        if os.path.exists(icon_path):
-            root.iconbitmap(icon_path)
+
+        header_icon = GUIManager.resource_path(header_icon_path)
+
+        app_icon = GUIManager.load_ctk_image(path=bug_icon_path, size=(16, 16))
+
+        if os.path.exists(header_icon):
+            root.iconbitmap(header_icon)
         else:
-            print(f"Помилка: Файл іконки не знайдено за шляхом: {icon_path}")
+            print(f"Error: The icon file is not found by: {header_icon}")
 
         root.attributes('-topmost', True)
 
@@ -59,8 +94,14 @@ class GUIManager:
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         # Заголовок
-        file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w",
-                                  text_color="#5f8dfc", font=("Inter", 13))
+        # file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w",
+        #                           text_color="#5f8dfc", font=("Inter", 13))
+        file_label = ctk.CTkLabel(main_frame, text=" LogTracker", anchor="w",
+                                  text_color="#e56cff", font=("Inter", 13),
+                                  image=app_icon,
+                                  # Додаємо об'єкт іконки
+                                  compound="left")
+
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
         to_tray_button = ctk.CTkButton(main_frame, text="x", height=20, width=20,
@@ -307,7 +348,7 @@ class GUIManager:
         context_menu = tk.Menu(root, tearoff=0, bg="#2a2d30", fg="#e2e0e6", activebackground="#2d436e")
         context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
         context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
-        context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
+        # context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
         context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
         context_menu.add_command(label="Exit", command=app.on_closing)
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())

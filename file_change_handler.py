@@ -114,7 +114,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if last_error_line:
             self.last_error_file = file_path
             file_name = os.path.basename(file_path)
-            self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f"File: {file_name}"))
+            self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}"))
             print(f"Новая строка с ошибкой: {last_error_line}")
             self.error_text_widget.configure(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
