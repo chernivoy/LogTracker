@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 from ctypes import windll
 from config_manager import ConfigManager
 from utils.rdp import check_rdp_status
+from utils.path import PathUtils
 
 
 class TrayManager:
@@ -49,7 +50,14 @@ class TrayManager:
             pystray.MenuItem('Open', on_open),
             pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(icon, item, root, app))
         )
-        icon_image = TrayManager.create_image(64, 64, 'black', 'blue')
+
+        icon_file_path = PathUtils.resource_path(os.path.join("src", "bug2.png"))
+        try:
+            icon_image = Image.open(icon_file_path)
+        except FileNotFoundError:
+            print(f"Помилка: Файл іконки не знайдено за шляхом: {icon_file_path}. Використовуємо стандартну іконку.")
+            icon_image = TrayManager.create_image(64, 64, 'black', 'blue')
+
         app.tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
 
         root.withdraw()
@@ -57,12 +65,6 @@ class TrayManager:
 
     @staticmethod
     def restore_window(root, app):
-        if check_rdp_status():
-            print("2")
-            # windll.shcore.SetProcessDpiAwareness(2)  # Установите DPI-осведомленность при восстановлении окна
-        else:
-            print("1")
-            # windll.shcore.SetProcessDpiAwareness(1)  # Установите DPI-осведомленность по умолчанию
 
         ConfigManager.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
         root.deiconify()
@@ -70,13 +72,6 @@ class TrayManager:
         root.lift()
         if app.tray_icon:
             app.tray_icon.visible = False
-
-    # @staticmethod
-    # def toggle_pin(root):
-    #     if root.attributes('-topmost'):
-    #         root.attributes('-topmost', False)
-    #     else:
-    #         root.attributes('-topmost', True)
 
     @staticmethod
     def toggle_pin(root):

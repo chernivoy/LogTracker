@@ -2,10 +2,10 @@ import sys
 import configparser
 import os
 import ctypes
-from path_utils import resource_path
+from utils.path import PathUtils
 
 # Указываем путь к файлу конфигурации
-CONFIG_FILE_WINDOW = resource_path('src/window_config.ini')
+CONFIG_FILE_WINDOW = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
 
 
 class ConfigManager:
@@ -26,13 +26,6 @@ class ConfigManager:
 
     @staticmethod
     def save_window_size(section, root):
-        # Отримуємо DPI Scale (для інформування, але не для використання з winfo_x/y)
-        # hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-        # dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
-        # dpi_scale = dpi / 96.0
-
-        # winfo_width(), winfo_height(), winfo_x(), winfo_y() ПОВИННІ повертати ЛОГІЧНІ пікселі,
-        # якщо Tkinter/CustomTkinter коректно працює з DPI-обізнаністю (Per-Monitor v2).
         width = root.winfo_width()
         height = root.winfo_height()
         x = root.winfo_x()
@@ -60,7 +53,8 @@ class ConfigManager:
             dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
             dpi_scale = dpi / 96.0
         except Exception as e:
-            print(f"Попередження: Не вдалося отримати DPI Scale в load_window_size: {e}. Використовуємо 2.0 за замовчуванням.")
+            print(
+                f"Попередження: Не вдалося отримати DPI Scale в load_window_size: {e}. Використовуємо 2.0 за замовчуванням.")
             dpi_scale = 2.0
 
         if section in config:

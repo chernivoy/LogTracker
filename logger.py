@@ -15,12 +15,13 @@ from config_manager import ConfigManager
 from tray_manager import TrayManager
 from file_handler import FileHandler
 from file_change_handler import FileChangeHandler
-from path_utils import resource_path
+
+from utils.path import PathUtils
 from gui_manager import GUIManager
 
 # Установка DPI-осведомленности
 
-config_path = resource_path('src/config.ini')
+config_path = PathUtils.resource_path(os.path.join("src", "config.ini"))
 
 config = configparser.ConfigParser()
 config.read(config_path)

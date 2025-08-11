@@ -1,13 +1,14 @@
 import os
 import sys
 import tkinter as tk
+from tkinter import font as tkFont
 import customtkinter as ctk
 import ctypes
 from PIL import Image, ImageTk
 
-# Імпортуємо ваші менеджери
 from config_manager import ConfigManager
 from tray_manager import TrayManager
+from utils import rdp
 
 
 class GUIManager:
@@ -41,16 +42,43 @@ class GUIManager:
             return None
 
     @staticmethod
+    def load_tk_photo_image(path: str, base_size: tuple, dpi_scale_factor: float) -> tk.PhotoImage | None:
+        """
+        Завантажує зображення, масштабує його відповідно до DPI
+        і повертає об'єкт tk.PhotoImage для використання в нативних Tkinter віджетах (наприклад, Menu).
+        """
+        full_path = GUIManager.resource_path(path)
+        try:
+            pil_image = Image.open(full_path)
+            scaled_width = int(base_size[0] * dpi_scale_factor)
+            scaled_height = int(base_size[1] * dpi_scale_factor)
+
+            # Перевірка, щоб розміри не були нульовими або від'ємними
+            if scaled_width <= 0: scaled_width = 1
+            if scaled_height <= 0: scaled_height = 1
+
+            resized_image = pil_image.resize((scaled_width, scaled_height), Image.LANCZOS)
+            tk_photo = ImageTk.PhotoImage(resized_image)
+            return tk_photo
+        except FileNotFoundError:
+            print(f"Помилка: Файл іконки Tkinter PhotoImage не знайдено за шляхом: {full_path}")
+            return None
+        except Exception as e:
+            print(f"Помилка завантаження tk.PhotoImage з {full_path}: {e}")
+            return None
+
+    @staticmethod
     def create_error_window(app):
 
         header_icon_path = os.path.join("src", "Header.ico")
-        bug_icon_path = os.path.join("src", "bug.png")
+        bug_icon_path = os.path.join("src", "bug2.png")
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("green")
 
         # TRANSPARENT_COLOR = "#FF00FF"
-        TRANSPARENT_COLOR = "white"
+        # TRANSPARENT_COLOR = "white"
+        TRANSPARENT_COLOR = "#000001"
 
         root = ctk.CTk()
         root.overrideredirect(True)  # УВАГА: ДО geometry
@@ -67,7 +95,6 @@ class GUIManager:
             root.geometry(geometry_string)
         else:
             root.geometry('400x200+100+100')
-
 
         header_icon = GUIManager.resource_path(header_icon_path)
 
@@ -97,7 +124,7 @@ class GUIManager:
         # file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w",
         #                           text_color="#5f8dfc", font=("Inter", 13))
         file_label = ctk.CTkLabel(main_frame, text=" LogTracker", anchor="w",
-                                  text_color="#e56cff", font=("Inter", 13),
+                                  text_color="#5f8dfc", font=("Inter", 13),
                                   image=app_icon,
                                   # Додаємо об'єкт іконки
                                   compound="left")
@@ -154,57 +181,12 @@ class GUIManager:
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
 
-        if not current_state:  # Якщо переходимо у режим overrideredirect (без рамки)
-            # ✅ РАДІУС: Експериментуйте з цим значенням (28, 29, 30, 31, 32)
-            # щоб воно ідеально співпадало з corner_radius=30 на main_frame
-            # GUIManager.round_corners(root, 20)
+        if not current_state:
             root.update_idletasks()  # Забезпечуємо оновлення внутрішніх віджетів
             root.update()  # Примусово перемальовуємо вікно
         else:  # Якщо повертаємо рамку, скидаємо регіон вікна
             hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
             ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
-
-    # @staticmethod
-    # def round_corners(window, radius):
-    #     hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-    #
-    #     dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
-    #     scale = dpi / 96.0
-    #
-    #     width = int(window.winfo_width() * scale)
-    #     height = int(window.winfo_height() * scale)
-    #     radius_scaled = int(radius * scale)
-    #
-    #     print(f"[round_corners] width={width}, height={height}, radius={radius_scaled}")
-    #
-    #     hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
-    #         0, 0, width, height, radius_scaled, radius_scaled
-    #     )
-    #
-    #     result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
-    #     if result == 0:
-    #         print("[round_corners] ⚠️ SetWindowRgn failed")
-    #     else:
-    #         print("[round_corners] ✅ SetWindowRgn applied successfully")
-
-    # @staticmethod м2
-    # def round_corners(window, radius):
-    #     hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-    #
-    #     width = window.winfo_width()
-    #     height = window.winfo_height()
-    #
-    #     print(f"[round_corners] width={width}, height={height}, radius={radius}")
-    #
-    #     hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
-    #         0, 0, width, height, radius, radius
-    #     )
-    #
-    #     result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
-    #     if result == 0:
-    #         print("[round_corners] ⚠️ SetWindowRgn failed")
-    #     else:
-    #         print("[round_corners] ✅ SetWindowRgn applied successfully")
 
     @staticmethod
     def round_corners(window, radius):
@@ -214,9 +196,6 @@ class GUIManager:
         width = window.winfo_width()
         height = window.winfo_height()
 
-        # Примітка: для ідеально круглих кутів, деякі джерела рекомендують
-        # використовувати 2 * radius для останніх двох параметрів.
-        # Але якщо передача 'radius, radius' працює, то її можна залишити.
         hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
             0, 0, width, height, radius, radius
         )
@@ -345,12 +324,54 @@ class GUIManager:
         """
         Відображає контекстне меню для вікна.
         """
-        context_menu = tk.Menu(root, tearoff=0, bg="#2a2d30", fg="#e2e0e6", activebackground="#2d436e")
-        context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
-        context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
+
+        base_font_size = 10
+        dpi_scale_factor = rdp.get_windows_dpi_scale(root)
+        scaled_font_size = int(base_font_size * dpi_scale_factor)
+        menu_font = tkFont.Font(family="Inter", size=scaled_font_size)
+
+        if hasattr(root, '_context_menu'):
+            root._context_menu.delete(0, 'end')
+        else:
+            # #383b40
+            root._context_menu = tk.Menu(root, tearoff=0,
+                                         bg="#383b40", fg="#e2e0e6",
+                                         activebackground="#2d436e",
+                                         activeforeground="#e2e0e6",
+                                         font=menu_font,
+                                         borderwidth=0,
+                                         relief="flat")
+
+        context_menu = root._context_menu
+
+        exit_icon_path = os.path.join("src", "exit_icon.png")
+        exit_icon_base_size = (12, 12)
+
+        settings_icon_path = os.path.join("src", "settings_icon.png")
+        settings_icon_base_size = (12, 12)
+
+        # Важливо: зберігати посилання на PhotoImage, інакше воно буде видалено з пам'яті
+        root._settings_icon_photo = GUIManager.load_tk_photo_image(settings_icon_path, settings_icon_base_size,
+                                                                   dpi_scale_factor)
+        root._exit_icon_photo = GUIManager.load_tk_photo_image(exit_icon_path, exit_icon_base_size, dpi_scale_factor)
+        # context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
+        # context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
         # context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
-        context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
-        context_menu.add_command(label="Exit", command=app.on_closing)
+        # context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
+        # context_menu.add_command(label="Exit", command=app.on_closing)
+
+        if root._exit_icon_photo and root._settings_icon_photo:
+            context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app),
+                                     image=root._settings_icon_photo, compound="left")
+            context_menu.add_separator()
+            context_menu.add_command(label="Exit", command=app.on_closing,
+                                     image=root._exit_icon_photo, compound="left")
+
+        else:
+            context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
+            context_menu.add_separator()
+            context_menu.add_command(label="Exit", command=app.on_closing)  # Без іконки, якщо не завантажилась
+            # Без іконки, якщо не завантажилась
         context_menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
 
     @staticmethod
