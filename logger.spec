@@ -9,8 +9,8 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        ('C:\\ChernivoyPersonaldata\\log\\config.ini', '.'),
-        ('C:\\ChernivoyPersonaldata\\log\\window_config.ini', '.'),
+    ('src\\config.ini', 'src'),
+    ('src\\window_config.ini', 'src'),
     ],
     hiddenimports=[],
     hookspath=[],
