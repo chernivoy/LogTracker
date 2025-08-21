@@ -9,18 +9,11 @@ from PIL import Image, ImageTk
 from config_manager import ConfigManager
 from tray_manager import TrayManager
 from utils import rdp
+from utils import path as Path
 
 
 class GUIManager:
     RESIZE_BORDER_WIDTH = 20
-
-    @staticmethod
-    def resource_path(relative_path):
-        try:
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath(".")
-        return os.path.join(base_path, relative_path)
 
     @staticmethod
     def load_ctk_image(path: str, size: tuple) -> ctk.CTkImage | None:
@@ -29,7 +22,7 @@ class GUIManager:
         Повертає CTkImage, або None, якщо файл не знайдено.
         """
         # Використовуємо допоміжну функцію для визначення правильного шляху
-        full_path = GUIManager.resource_path(path)
+        full_path = Path.PathUtils.resource_path(path)
 
         try:
             image = Image.open(full_path)
@@ -47,7 +40,7 @@ class GUIManager:
         Завантажує зображення, масштабує його відповідно до DPI
         і повертає об'єкт tk.PhotoImage для використання в нативних Tkinter віджетах (наприклад, Menu).
         """
-        full_path = GUIManager.resource_path(path)
+        full_path = Path.PathUtils.resource_path(path)
         try:
             pil_image = Image.open(full_path)
             scaled_width = int(base_size[0] * dpi_scale_factor)
@@ -96,7 +89,7 @@ class GUIManager:
         else:
             root.geometry('400x200+100+100')
 
-        header_icon = GUIManager.resource_path(header_icon_path)
+        header_icon = Path.PathUtils.resource_path(header_icon_path)
 
         app_icon = GUIManager.load_ctk_image(path=bug_icon_path, size=(16, 16))
 
@@ -175,19 +168,6 @@ class GUIManager:
         file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
 
         return root, error_text_widget, file_label
-
-    @staticmethod
-    def toggle_overrideredirect(root: ctk.CTk):
-        current_state = root.overrideredirect()
-        root.overrideredirect(not current_state)
-
-
-        if not current_state:
-            root.update_idletasks()  # Забезпечуємо оновлення внутрішніх віджетів
-            root.update()  # Примусово перемальовуємо вікно
-        else:  # Якщо повертаємо рамку, скидаємо регіон вікна
-            hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-            ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
 
     @staticmethod
     def update_widgets_theme(app):
@@ -412,24 +392,20 @@ class GUIManager:
 
         # Додаємо елементи в підменю
         theme_menu.add_command(
-            label="Темна",
+            label="Dark",
             command=lambda: app.toggle_theme("dark"),
             image=root._dark_theme_icon_photo, compound="left"
         )
+
         theme_menu.add_command(
-            label="Світла",
+            label="Light",
             command=lambda: app.toggle_theme("light"),
             image=root._light_theme_icon_photo, compound="left"
         )
 
         # Додаємо підменю в головне меню
-        context_menu.add_cascade(label="Тема", menu=theme_menu)
+        context_menu.add_cascade(label="Theme", menu=theme_menu)
         context_menu.add_separator()
-        # context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
-        # context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
-        # context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
-        # context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
-        # context_menu.add_command(label="Exit", command=app.on_closing)
 
         if root._exit_icon_photo and root._settings_icon_photo:
             context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app),
