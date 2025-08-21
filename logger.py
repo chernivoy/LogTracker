@@ -41,7 +41,7 @@ class LogTrackerApp:
 
         # Инициализация других атрибутов
         self.observer = None
-        self.root, self.error_text_widget, self.file_label = GUIManager.create_error_window(self)
+        self.root, self.error_text_widget, self.file_label, self.widgets_to_update = GUIManager.create_error_window(self)
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
                                                self.file_label, self.event_queue,
@@ -118,7 +118,11 @@ class LogTrackerApp:
 
     def toggle_theme(self, theme_name: str):
         self.theme_manager.load_theme(theme_name)
-        GUIManager.update_widgets_theme(self)
+
+        current_theme = self.theme_manager.current_theme_data
+        ctk.set_default_color_theme(current_theme["default_color_theme"])
+
+        GUIManager.update_widgets_theme(self, self.widgets_to_update)
         ConfigManager.save_config_value("Theme", "current", theme_name)
 
 
