@@ -76,3 +76,15 @@ class ConfigManager:
             return f'{width_for_geometry}x{height_for_geometry}+{x_for_geometry}+{y_for_geometry}'
         else:
             return None
+
+    @staticmethod
+    def save_config_value(section, key, value, config_file=CONFIG_FILE_WINDOW):
+        config = ConfigManager.load_config(config_file)
+
+        if section not in config:
+            config[section] = {}
+
+        config[section][key] = str(value)
+
+        with open(config_file, 'w') as configfile:
+            config.write(configfile)

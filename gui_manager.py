@@ -181,12 +181,38 @@ class GUIManager:
         current_state = root.overrideredirect()
         root.overrideredirect(not current_state)
 
+
         if not current_state:
             root.update_idletasks()  # Забезпечуємо оновлення внутрішніх віджетів
             root.update()  # Примусово перемальовуємо вікно
         else:  # Якщо повертаємо рамку, скидаємо регіон вікна
             hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
             ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
+
+    @staticmethod
+    def update_widgets_theme(app):
+        """
+        Оновлює кольори всіх віджетів відповідно до поточної теми.
+        Це потрібно викликати після зміни теми.
+        """
+        root = app.root
+        theme_data = app.theme_manager.current_theme_data
+
+        # Оновлення кольорів для всіх віджетів
+        for widget in root.winfo_children():
+            if isinstance(widget, ctk.CTkFrame) and widget.winfo_name() == "!ctkframe":
+                widget.configure(fg_color=theme_data["main_frame_fg_color"])
+
+            for child in widget.winfo_children():
+                # Оновлення CTkLabel
+                if isinstance(child, ctk.CTkLabel):
+                    child.configure(text_color=theme_data["header_label_text_color"])
+                # Оновлення CTkButton
+                elif isinstance(child, ctk.CTkButton):
+                    child.configure(text_color=theme_data["button_text_color"])
+                # Оновлення CTkTextbox
+                elif isinstance(child, ctk.CTkTextbox):
+                    child.configure(text_color=theme_data["error_text_color"])
 
     @staticmethod
     def round_corners(window, radius):
@@ -324,6 +350,8 @@ class GUIManager:
         """
         Відображає контекстне меню для вікна.
         """
+        theme_manager = app.theme_manager
+        current_theme = theme_manager.current_theme_data
 
         base_font_size = 10
         dpi_scale_factor = rdp.get_windows_dpi_scale(root)
@@ -332,15 +360,25 @@ class GUIManager:
 
         if hasattr(root, '_context_menu'):
             root._context_menu.delete(0, 'end')
+
+            root._context_menu.configure(
+                bg=current_theme["context_menu_bg"],
+                fg=current_theme["context_menu_fg"],
+                activebackground=current_theme["context_menu_active_bg"],
+                activeforeground=current_theme["context_menu_active_fg"]
+            )
         else:
-            # #383b40
-            root._context_menu = tk.Menu(root, tearoff=0,
-                                         bg="#383b40", fg="#e2e0e6",
-                                         activebackground="#2d436e",
-                                         activeforeground="#e2e0e6",
-                                         font=menu_font,
-                                         borderwidth=0,
-                                         relief="flat")
+            root._context_menu = tk.Menu(
+                root,
+                tearoff=0,
+                bg=current_theme["context_menu_bg"],
+                fg=current_theme["context_menu_fg"],
+                activebackground=current_theme["context_menu_active_bg"],
+                activeforeground=current_theme["context_menu_active_fg"],
+                font=menu_font,
+                borderwidth=0,
+                relief="flat"
+            )
 
         context_menu = root._context_menu
 
@@ -350,10 +388,43 @@ class GUIManager:
         settings_icon_path = os.path.join("src", "settings_icon.png")
         settings_icon_base_size = (12, 12)
 
+        dark_theme_icon_path = os.path.join("src", "settings_icon.png")
+        settings_dark_icon_base_size = (12, 12)
+
+        light_theme_icon_path = os.path.join("src", "settings_icon.png")
+        settings_light_icon_base_size = (12, 12)
+
         # Важливо: зберігати посилання на PhotoImage, інакше воно буде видалено з пам'яті
         root._settings_icon_photo = GUIManager.load_tk_photo_image(settings_icon_path, settings_icon_base_size,
                                                                    dpi_scale_factor)
         root._exit_icon_photo = GUIManager.load_tk_photo_image(exit_icon_path, exit_icon_base_size, dpi_scale_factor)
+        root._dark_theme_icon_photo = GUIManager.load_tk_photo_image(dark_theme_icon_path, settings_dark_icon_base_size,
+                                                                     dpi_scale_factor)
+        root._light_theme_icon_photo = GUIManager.load_tk_photo_image(light_theme_icon_path,
+                                                                      settings_light_icon_base_size, dpi_scale_factor)
+
+        # Створюємо підменю "Тема"
+        theme_menu = tk.Menu(context_menu, tearoff=0,
+                             bg=current_theme["context_menu_bg"], fg=current_theme["context_menu_fg"],
+                             activebackground=current_theme["context_menu_active_bg"],
+                             activeforeground=current_theme["context_menu_active_fg"],
+                             font=menu_font, borderwidth=0, relief="flat")
+
+        # Додаємо елементи в підменю
+        theme_menu.add_command(
+            label="Темна",
+            command=lambda: app.toggle_theme("dark"),
+            image=root._dark_theme_icon_photo, compound="left"
+        )
+        theme_menu.add_command(
+            label="Світла",
+            command=lambda: app.toggle_theme("light"),
+            image=root._light_theme_icon_photo, compound="left"
+        )
+
+        # Додаємо підменю в головне меню
+        context_menu.add_cascade(label="Тема", menu=theme_menu)
+        context_menu.add_separator()
         # context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
         # context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
         # context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
