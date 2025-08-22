@@ -10,58 +10,14 @@ from config_manager import ConfigManager
 from tray_manager import TrayManager
 from utils import rdp
 from utils import path as Path
+from ui.image_manager import ImageManager
 
 
 class GUIManager:
     RESIZE_BORDER_WIDTH = 20
 
     @staticmethod
-    def load_ctk_image(path: str, size: tuple) -> ctk.CTkImage | None:
-        """
-        Завантажує зображення з файлу і створює об'єкт CTkImage.
-        Повертає CTkImage, або None, якщо файл не знайдено.
-        """
-        # Використовуємо допоміжну функцію для визначення правильного шляху
-        full_path = Path.PathUtils.resource_path(path)
-
-        try:
-            image = Image.open(full_path)
-            ctk_image = ctk.CTkImage(light_image=image,
-                                     dark_image=image,
-                                     size=size)
-            return ctk_image
-        except FileNotFoundError:
-            print(f"Помилка: Файл іконки не знайдено за шляхом: {full_path}")
-            return None
-
-    @staticmethod
-    def load_tk_photo_image(path: str, base_size: tuple, dpi_scale_factor: float) -> tk.PhotoImage | None:
-        """
-        Завантажує зображення, масштабує його відповідно до DPI
-        і повертає об'єкт tk.PhotoImage для використання в нативних Tkinter віджетах (наприклад, Menu).
-        """
-        full_path = Path.PathUtils.resource_path(path)
-        try:
-            pil_image = Image.open(full_path)
-            scaled_width = int(base_size[0] * dpi_scale_factor)
-            scaled_height = int(base_size[1] * dpi_scale_factor)
-
-            # Перевірка, щоб розміри не були нульовими або від'ємними
-            if scaled_width <= 0: scaled_width = 1
-            if scaled_height <= 0: scaled_height = 1
-
-            resized_image = pil_image.resize((scaled_width, scaled_height), Image.LANCZOS)
-            tk_photo = ImageTk.PhotoImage(resized_image)
-            return tk_photo
-        except FileNotFoundError:
-            print(f"Помилка: Файл іконки Tkinter PhotoImage не знайдено за шляхом: {full_path}")
-            return None
-        except Exception as e:
-            print(f"Помилка завантаження tk.PhotoImage з {full_path}: {e}")
-            return None
-
-    @staticmethod
-    def create_error_window(app):
+    def create_error_window(root: ctk.CTk, app, image_manager: ImageManager):
 
         theme_manager = app.theme_manager
         current_theme = theme_manager.current_theme_data
@@ -76,7 +32,7 @@ class GUIManager:
 
         TRANSPARENT_COLOR = "#000001"
 
-        root = ctk.CTk()
+        # root = ctk.CTk()
         root.overrideredirect(True)
         root.configure(bg=TRANSPARENT_COLOR)
         root.wm_attributes('-transparentcolor', TRANSPARENT_COLOR)
@@ -93,7 +49,8 @@ class GUIManager:
             root.geometry('400x200+100+100')
 
         header_icon = Path.PathUtils.resource_path(header_icon_path)
-        app_icon = GUIManager.load_ctk_image(path=bug_icon_path, size=(16, 16))
+
+        app.app_icon = image_manager.get_ctk_image(path=bug_icon_path, size=(16, 16))
 
         if os.path.exists(header_icon):
             root.iconbitmap(header_icon)
@@ -115,7 +72,7 @@ class GUIManager:
             anchor="w",
             text_color=current_theme["header_label_text_color"],
             font=current_theme["header_label_font"],
-            image=app_icon,
+            image=app.app_icon,
             compound="left"
         )
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
@@ -142,7 +99,7 @@ class GUIManager:
             text_color=current_theme["burger_button_text_color"],
             font=current_theme["burger_button_font"],
             hover_color=current_theme["burger_button_hover_color"],
-            command=lambda: GUIManager.show_context_menu(root, app)
+            command=lambda: GUIManager.show_context_menu(root, app, image_manager)
         )
         burger_button.grid(row=0, column=1, padx=30, pady=5, sticky="ne")
 
@@ -365,7 +322,7 @@ class GUIManager:
         settings_window.destroy()
 
     @staticmethod
-    def show_context_menu(root: ctk.CTk, app):
+    def show_context_menu(root: ctk.CTk, app, image_manager: ImageManager):
         """
         Відображає контекстне меню для вікна.
         """
@@ -402,25 +359,21 @@ class GUIManager:
         context_menu = root._context_menu
 
         exit_icon_path = os.path.join("src", "exit_icon.png")
-        exit_icon_base_size = (12, 12)
 
         settings_icon_path = os.path.join("src", "settings_icon.png")
-        settings_icon_base_size = (12, 12)
 
         dark_theme_icon_path = os.path.join("src", "settings_icon.png")
-        settings_dark_icon_base_size = (12, 12)
 
         light_theme_icon_path = os.path.join("src", "settings_icon.png")
-        settings_light_icon_base_size = (12, 12)
 
         # Важливо: зберігати посилання на PhotoImage, інакше воно буде видалено з пам'яті
-        root._settings_icon_photo = GUIManager.load_tk_photo_image(settings_icon_path, settings_icon_base_size,
-                                                                   dpi_scale_factor)
-        root._exit_icon_photo = GUIManager.load_tk_photo_image(exit_icon_path, exit_icon_base_size, dpi_scale_factor)
-        root._dark_theme_icon_photo = GUIManager.load_tk_photo_image(dark_theme_icon_path, settings_dark_icon_base_size,
-                                                                     dpi_scale_factor)
-        root._light_theme_icon_photo = GUIManager.load_tk_photo_image(light_theme_icon_path,
-                                                                      settings_light_icon_base_size, dpi_scale_factor)
+        root._settings_icon_photo = image_manager.get_tk_photo_image(settings_icon_path, (12, 12))
+        root._exit_icon_photo = image_manager.get_tk_photo_image(exit_icon_path, (12, 12))
+
+        root._dark_theme_icon_photo = image_manager.get_tk_photo_image(dark_theme_icon_path,
+                                                                       (12, 12))
+        root._light_theme_icon_photo = image_manager.get_tk_photo_image(light_theme_icon_path,
+                                                                        (12, 12))
 
         # Створюємо підменю "Тема"
         theme_menu = tk.Menu(context_menu, tearoff=0,

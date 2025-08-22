@@ -19,6 +19,7 @@ from theme_manager import ThemeManager
 
 from utils.path import PathUtils
 from gui_manager import GUIManager
+from ui.image_manager import ImageManager
 
 # Установка DPI-осведомленности
 
@@ -34,6 +35,12 @@ class LogTrackerApp:
         self.theme_manager = ThemeManager()
         self.config = ConfigManager.load_config(config_path)
 
+        # 1. Спочатку створюємо головне вікно
+        self.root = ctk.CTk()
+
+        # 2. Потім створюємо ImageManager, передаючи йому root
+        self.image_manager = ImageManager(self.root)
+
         # Инициализация директорий из конфигурации или установка значений по умолчанию, если их нет
         self.directory = self.config.get('Settings', 'directory', fallback='')
         self.source_directory = self.config.get('Settings', 'source_directory', fallback='')
@@ -41,7 +48,7 @@ class LogTrackerApp:
 
         # Инициализация других атрибутов
         self.observer = None
-        self.root, self.error_text_widget, self.file_label, self.widgets_to_update = GUIManager.create_error_window(self)
+        self.root, self.error_text_widget, self.file_label, self.widgets_to_update = GUIManager.create_error_window(self.root, self,  self.image_manager)
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
                                                self.file_label, self.event_queue,
