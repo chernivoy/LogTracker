@@ -15,6 +15,7 @@ from config_manager import ConfigManager
 from tray_manager import TrayManager
 from file_handler import FileHandler
 from file_change_handler import FileChangeHandler
+from theme_manager import ThemeManager
 
 from utils.path import PathUtils
 from gui_manager import GUIManager
@@ -30,6 +31,7 @@ config.read(config_path)
 class LogTrackerApp:
     def __init__(self):
         # Загрузка конфигурации
+        self.theme_manager = ThemeManager()
         self.config = ConfigManager.load_config(config_path)
 
         # Инициализация директорий из конфигурации или установка значений по умолчанию, если их нет
@@ -39,7 +41,7 @@ class LogTrackerApp:
 
         # Инициализация других атрибутов
         self.observer = None
-        self.root, self.error_text_widget, self.file_label = GUIManager.create_error_window(self)
+        self.root, self.error_text_widget, self.file_label, self.widgets_to_update = GUIManager.create_error_window(self)
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
                                                self.file_label, self.event_queue,
@@ -113,6 +115,15 @@ class LogTrackerApp:
 
     def on_window_resize(self, event):
         ConfigManager.save_window_size('Window', self.root)
+
+    def toggle_theme(self, theme_name: str):
+        self.theme_manager.load_theme(theme_name)
+
+        current_theme = self.theme_manager.current_theme_data
+        ctk.set_default_color_theme(current_theme["default_color_theme"])
+
+        GUIManager.update_widgets_theme(self, self.widgets_to_update)
+        ConfigManager.save_config_value("Theme", "current", theme_name)
 
 
 if __name__ == "__main__":

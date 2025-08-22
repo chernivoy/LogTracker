@@ -9,18 +9,11 @@ from PIL import Image, ImageTk
 from config_manager import ConfigManager
 from tray_manager import TrayManager
 from utils import rdp
+from utils import path as Path
 
 
 class GUIManager:
     RESIZE_BORDER_WIDTH = 20
-
-    @staticmethod
-    def resource_path(relative_path):
-        try:
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath(".")
-        return os.path.join(base_path, relative_path)
 
     @staticmethod
     def load_ctk_image(path: str, size: tuple) -> ctk.CTkImage | None:
@@ -29,7 +22,7 @@ class GUIManager:
         Повертає CTkImage, або None, якщо файл не знайдено.
         """
         # Використовуємо допоміжну функцію для визначення правильного шляху
-        full_path = GUIManager.resource_path(path)
+        full_path = Path.PathUtils.resource_path(path)
 
         try:
             image = Image.open(full_path)
@@ -47,7 +40,7 @@ class GUIManager:
         Завантажує зображення, масштабує його відповідно до DPI
         і повертає об'єкт tk.PhotoImage для використання в нативних Tkinter віджетах (наприклад, Menu).
         """
-        full_path = GUIManager.resource_path(path)
+        full_path = Path.PathUtils.resource_path(path)
         try:
             pil_image = Image.open(full_path)
             scaled_width = int(base_size[0] * dpi_scale_factor)
@@ -70,34 +63,36 @@ class GUIManager:
     @staticmethod
     def create_error_window(app):
 
+        theme_manager = app.theme_manager
+        current_theme = theme_manager.current_theme_data
+
+        # Шляхи до іконок
         header_icon_path = os.path.join("src", "Header.ico")
         bug_icon_path = os.path.join("src", "bug2.png")
 
-        ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("green")
+        # Встановлення теми CTk
+        ctk.set_appearance_mode(current_theme["ctk_appearance_mode"])
+        ctk.set_default_color_theme(current_theme["default_color_theme"])
 
-        # TRANSPARENT_COLOR = "#FF00FF"
-        # TRANSPARENT_COLOR = "white"
         TRANSPARENT_COLOR = "#000001"
 
         root = ctk.CTk()
-        root.overrideredirect(True)  # УВАГА: ДО geometry
+        root.overrideredirect(True)
         root.configure(bg=TRANSPARENT_COLOR)
         root.wm_attributes('-transparentcolor', TRANSPARENT_COLOR)
-        root.attributes('-alpha', 0.9)  # повністю непрозорий
+        root.attributes('-alpha', 0.9)
 
         root.title("LogTracker")
         root.minsize(300, 100)
 
-        # Завантаження геометрії ДО .update()
+        # Завантаження та встановлення геометрії
         geometry_string = ConfigManager.load_window_size('Window', root)
         if geometry_string:
             root.geometry(geometry_string)
         else:
             root.geometry('400x200+100+100')
 
-        header_icon = GUIManager.resource_path(header_icon_path)
-
+        header_icon = Path.PathUtils.resource_path(header_icon_path)
         app_icon = GUIManager.load_ctk_image(path=bug_icon_path, size=(16, 16))
 
         if os.path.exists(header_icon):
@@ -106,43 +101,57 @@ class GUIManager:
             print(f"Error: The icon file is not found by: {header_icon}")
 
         root.attributes('-topmost', True)
-
         root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(root, app))
-
         root.update_idletasks()
         root.update()
-
-        # Після повного оновлення - округлення
         GUIManager.round_corners(root, 30)
 
-        # Основна рамка
-        # main_frame = ctk.CTkFrame(root, fg_color="#2a2d30", corner_radius=30) #383b40
-        main_frame = ctk.CTkFrame(root, fg_color="#383b40")
+        main_frame = ctk.CTkFrame(root, fg_color=current_theme["main_frame_fg_color"])
         main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
-        # Заголовок
-        # file_label = ctk.CTkLabel(main_frame, text="LogTracker", anchor="w",
-        #                           text_color="#5f8dfc", font=("Inter", 13))
-        file_label = ctk.CTkLabel(main_frame, text=" LogTracker", anchor="w",
-                                  text_color="#5f8dfc", font=("Inter", 13),
-                                  image=app_icon,
-                                  # Додаємо об'єкт іконки
-                                  compound="left")
-
+        file_label = ctk.CTkLabel(
+            main_frame,
+            text=" LogTracker",
+            anchor="w",
+            text_color=current_theme["header_label_text_color"],
+            font=current_theme["header_label_font"],
+            image=app_icon,
+            compound="left"
+        )
         file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
-        to_tray_button = ctk.CTkButton(main_frame, text="x", height=20, width=20,
-                                       fg_color="transparent", text_color="#ce885f",
-                                       command=lambda: TrayManager.minimize_to_tray(root, app))
+        to_tray_button = ctk.CTkButton(
+            main_frame,
+            text="x",
+            height=20,
+            width=20,
+            fg_color=current_theme["to_tray_button_fg_color"],
+            text_color=current_theme["to_tray_button_text_color"],
+            font=current_theme["to_tray_button_font"],
+            hover_color=current_theme["to_tray_button_hover_color"],
+            command=lambda: TrayManager.minimize_to_tray(root, app)
+        )
         to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-        burger_button = ctk.CTkButton(main_frame, text="...", height=20, width=20,
-                                      fg_color="transparent", text_color="#ce885f",
-                                      command=lambda: GUIManager.show_context_menu(root, app))
+        burger_button = ctk.CTkButton(
+            main_frame,
+            text="...",
+            height=20,
+            width=20,
+            fg_color=current_theme["burger_button_fg_color"],
+            text_color=current_theme["burger_button_text_color"],
+            font=current_theme["burger_button_font"],
+            hover_color=current_theme["burger_button_hover_color"],
+            command=lambda: GUIManager.show_context_menu(root, app)
+        )
         burger_button.grid(row=0, column=1, padx=30, pady=5, sticky="ne")
 
-        # Поле логів
-        error_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        error_frame = ctk.CTkFrame(
+            main_frame,
+            fg_color=current_theme["error_frame_fg_color"],
+            border_color=current_theme["error_frame_border_color"],
+            border_width=current_theme["error_frame_border_width"]
+        )
         error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
 
         error_text_widget_frame = ctk.CTkFrame(error_frame, fg_color="transparent")
@@ -151,13 +160,13 @@ class GUIManager:
         error_text_widget = ctk.CTkTextbox(
             error_text_widget_frame,
             height=20,
-            corner_radius=1,
-            border_width=0,
-            fg_color="transparent",
+            corner_radius=current_theme["error_textbox_corner_radius"],
+            border_width=current_theme["error_textbox_border_width"],
+            fg_color=current_theme["error_textbox_fg_color"],
             wrap="word",
             state="disabled",
-            text_color="#b4b361",
-            font=("Inter", 13),
+            text_color=current_theme["error_textbox_text_color"],
+            font=current_theme["error_textbox_font"],
             yscrollcommand=lambda *args: None
         )
         error_text_widget.pack(fill="both", expand=True, padx=5, pady=5)
@@ -174,19 +183,70 @@ class GUIManager:
         file_label.bind("<ButtonPress-1>", lambda event: GUIManager.start_move(event, root))
         file_label.bind("<B1-Motion>", lambda event: GUIManager.do_move(event, root))
 
-        return root, error_text_widget, file_label
+        # ЗБЕРІГАЄМО ВІДЖЕТИ, ЯКІ ПОТРІБНО ОНОВЛЮВАТИ, У СЛОВНИК
+        # Це ключовий крок для надійної зміни теми
+        widgets_to_update = {
+            "main_frame": main_frame,
+            "file_label": file_label,
+            "to_tray_button": to_tray_button,
+            "burger_button": burger_button,
+            "error_frame": error_frame,
+            "error_text_widget_frame": error_text_widget_frame,
+            "error_text_widget": error_text_widget
+        }
+
+        return root, error_text_widget, file_label, widgets_to_update
 
     @staticmethod
-    def toggle_overrideredirect(root: ctk.CTk):
-        current_state = root.overrideredirect()
-        root.overrideredirect(not current_state)
+    def update_widgets_theme(app, widgets_to_update):
+        """
+        Оновлює кольори та шрифти всіх віджетів відповідно до поточної теми.
+        Використовує словник віджетів для прямого оновлення.
+        """
+        theme_data = app.theme_manager.current_theme_data
 
-        if not current_state:
-            root.update_idletasks()  # Забезпечуємо оновлення внутрішніх віджетів
-            root.update()  # Примусово перемальовуємо вікно
-        else:  # Якщо повертаємо рамку, скидаємо регіон вікна
-            hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-            ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
+        # Встановлюємо кольорову схему CTk
+        ctk.set_default_color_theme(theme_data["default_color_theme"])
+
+        # ПРЯМЕ ОНОВЛЕННЯ СТИЛІВ ДЛЯ КОЖНОГО ВІДЖЕТА ЗІ СЛОВНИКА
+        widgets_to_update["main_frame"].configure(fg_color=theme_data["main_frame_fg_color"])
+
+        widgets_to_update["file_label"].configure(
+            text_color=theme_data["header_label_text_color"],
+            font=theme_data["header_label_font"]
+        )
+
+        widgets_to_update["to_tray_button"].configure(
+            text_color=theme_data["to_tray_button_text_color"],
+            font=theme_data["to_tray_button_font"],
+            fg_color=theme_data["to_tray_button_fg_color"],
+            hover_color=theme_data["to_tray_button_hover_color"]
+        )
+
+        widgets_to_update["burger_button"].configure(
+            text_color=theme_data["burger_button_text_color"],
+            font=theme_data["burger_button_font"],
+            fg_color=theme_data["burger_button_fg_color"],
+            hover_color=theme_data["burger_button_hover_color"]
+        )
+
+        widgets_to_update["error_frame"].configure(
+            fg_color=theme_data["error_frame_fg_color"],
+            border_color=theme_data["error_frame_border_color"],
+            border_width=theme_data["error_frame_border_width"]
+        )
+
+        widgets_to_update["error_text_widget"].configure(
+            fg_color=theme_data["error_textbox_fg_color"],
+            text_color=theme_data["error_textbox_text_color"],
+            font=theme_data["error_textbox_font"],
+            border_width=theme_data["error_textbox_border_width"],
+            corner_radius=theme_data["error_textbox_corner_radius"]
+        )
+
+        # Після оновлення всіх стилів викличте метод update_idletasks()
+        # Це гарантує, що зміни будуть застосовані негайно
+        app.root.update_idletasks()
 
     @staticmethod
     def round_corners(window, radius):
@@ -202,24 +262,9 @@ class GUIManager:
 
         result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
         if result == 0:
-            print("[round_corners] ⚠️ SetWindowRgn failed")
+            print("[round_corners] SetWindowRgn failed")
         else:
-            print("[round_corners] ✅ SetWindowRgn applied successfully")
-
-    @staticmethod
-    def remove_maximize_button(root: ctk.CTk):
-        """
-        Видаляє кнопки мінімізації та максимізації з системного меню вікна.
-        (Актуально, якщо overrideredirect(False))
-        """
-        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-        styles = ctypes.windll.user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
-        styles &= ~0x00020000  # WS_MINIMIZEBOX
-        styles &= ~0x00010000  # WS_MAXIMIZEBOX
-        ctypes.windll.user32.SetWindowLongW(hwnd, -16, styles)
-        # Оновлюємо вікно, щоб зміни набули чинності
-        ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
-                                          0x0040 | 0x0100)  # SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER
+            print("[round_corners] SetWindowRgn applied successfully")
 
     @staticmethod
     def start_move(event: tk.Event, root: ctk.CTk):
@@ -324,6 +369,8 @@ class GUIManager:
         """
         Відображає контекстне меню для вікна.
         """
+        theme_manager = app.theme_manager
+        current_theme = theme_manager.current_theme_data
 
         base_font_size = 10
         dpi_scale_factor = rdp.get_windows_dpi_scale(root)
@@ -332,15 +379,25 @@ class GUIManager:
 
         if hasattr(root, '_context_menu'):
             root._context_menu.delete(0, 'end')
+
+            root._context_menu.configure(
+                bg=current_theme["context_menu_bg"],
+                fg=current_theme["context_menu_fg"],
+                activebackground=current_theme["context_menu_active_bg"],
+                activeforeground=current_theme["context_menu_active_fg"]
+            )
         else:
-            # #383b40
-            root._context_menu = tk.Menu(root, tearoff=0,
-                                         bg="#383b40", fg="#e2e0e6",
-                                         activebackground="#2d436e",
-                                         activeforeground="#e2e0e6",
-                                         font=menu_font,
-                                         borderwidth=0,
-                                         relief="flat")
+            root._context_menu = tk.Menu(
+                root,
+                tearoff=0,
+                bg=current_theme["context_menu_bg"],
+                fg=current_theme["context_menu_fg"],
+                activebackground=current_theme["context_menu_active_bg"],
+                activeforeground=current_theme["context_menu_active_fg"],
+                font=menu_font,
+                borderwidth=0,
+                relief="flat"
+            )
 
         context_menu = root._context_menu
 
@@ -350,15 +407,44 @@ class GUIManager:
         settings_icon_path = os.path.join("src", "settings_icon.png")
         settings_icon_base_size = (12, 12)
 
+        dark_theme_icon_path = os.path.join("src", "settings_icon.png")
+        settings_dark_icon_base_size = (12, 12)
+
+        light_theme_icon_path = os.path.join("src", "settings_icon.png")
+        settings_light_icon_base_size = (12, 12)
+
         # Важливо: зберігати посилання на PhotoImage, інакше воно буде видалено з пам'яті
         root._settings_icon_photo = GUIManager.load_tk_photo_image(settings_icon_path, settings_icon_base_size,
                                                                    dpi_scale_factor)
         root._exit_icon_photo = GUIManager.load_tk_photo_image(exit_icon_path, exit_icon_base_size, dpi_scale_factor)
-        # context_menu.add_command(label="To tray", command=lambda: TrayManager.minimize_to_tray(root, app))
-        # context_menu.add_command(label="Pin/Unpin", command=lambda: TrayManager.toggle_pin(root))
-        # context_menu.add_command(label="Window border", command=lambda: GUIManager.toggle_overrideredirect(root))
-        # context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app))
-        # context_menu.add_command(label="Exit", command=app.on_closing)
+        root._dark_theme_icon_photo = GUIManager.load_tk_photo_image(dark_theme_icon_path, settings_dark_icon_base_size,
+                                                                     dpi_scale_factor)
+        root._light_theme_icon_photo = GUIManager.load_tk_photo_image(light_theme_icon_path,
+                                                                      settings_light_icon_base_size, dpi_scale_factor)
+
+        # Створюємо підменю "Тема"
+        theme_menu = tk.Menu(context_menu, tearoff=0,
+                             bg=current_theme["context_menu_bg"], fg=current_theme["context_menu_fg"],
+                             activebackground=current_theme["context_menu_active_bg"],
+                             activeforeground=current_theme["context_menu_active_fg"],
+                             font=menu_font, borderwidth=0, relief="flat")
+
+        # Додаємо елементи в підменю
+        theme_menu.add_command(
+            label="Dark",
+            command=lambda: app.toggle_theme("dark"),
+            image=root._dark_theme_icon_photo, compound="left"
+        )
+
+        theme_menu.add_command(
+            label="Light",
+            command=lambda: app.toggle_theme("light"),
+            image=root._light_theme_icon_photo, compound="left"
+        )
+
+        # Додаємо підменю в головне меню
+        context_menu.add_cascade(label="Theme", menu=theme_menu)
+        context_menu.add_separator()
 
         if root._exit_icon_photo and root._settings_icon_photo:
             context_menu.add_command(label="Path settings", command=lambda: GUIManager.open_settings_window(app),
@@ -424,37 +510,10 @@ class GUIManager:
 
         root.configure(cursor=cursor or "")
 
-    # @staticmethod м1
-    # def start_resize(event: tk.Event):
-    #     root = event.widget.winfo_toplevel()
-    #     if not hasattr(root, "_resize_dir") or not root._resize_dir:
-    #         return
-    #     if not root.overrideredirect():
-    #         return
-    #
-    #     # Тимчасово скасовуємо округлення (щоб не обрізало кути під час ресайзу)
-    #     hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-    #     ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
-    #
-    #     root._start_cursor_x_logical = event.x_root
-    #     root._start_cursor_y_logical = event.y_root
-    #     root._start_width_logical = root.winfo_width()
-    #     root._start_height_logical = root.winfo_height()
-    #     root._start_win_x_logical = root.winfo_x()
-    #     root._start_win_y_logical = root.winfo_y()
-    #
-    #     print("--- START RESIZE LOG ---")
-    #     print(f"Timestamp: {ctypes.windll.kernel32.GetTickCount64()}")
-    #     print(f"Initial Cursor (Logical/Screen): X={root._start_cursor_x_logical}, Y={root._start_cursor_y_logical}")
-    #     print(
-    #         f"Initial Window (Log): X={root._start_win_x_logical}, Y={root._start_win_y_logical}, W={root._start_width_logical}, H={root._start_height_logical}")
-    #     print("------------------------")
-
     @staticmethod
     def start_resize(event: tk.Event):
         root = event.widget.winfo_toplevel()
 
-        # --- НОВА ЛОГІКА ДЛЯ ФІКСАЦІЇ НАПРЯМКУ ---
         x_logical = event.x_root - root.winfo_rootx()
         y_logical = event.y_root - root.winfo_rooty()
         width_logical = root.winfo_width()
