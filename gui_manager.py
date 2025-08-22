@@ -32,7 +32,6 @@ class GUIManager:
 
         TRANSPARENT_COLOR = "#000001"
 
-        # root = ctk.CTk()
         root.overrideredirect(True)
         root.configure(bg=TRANSPARENT_COLOR)
         root.wm_attributes('-transparentcolor', TRANSPARENT_COLOR)
