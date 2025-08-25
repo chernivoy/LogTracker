@@ -7,8 +7,8 @@ import configparser
 
 config_path = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
 
-config = configparser.ConfigParser()
-config.read(config_path)
+# config = configparser.ConfigParser()
+# config.read(config_path)
 
 
 class ThemeManager:
@@ -38,8 +38,55 @@ class ThemeManager:
         except KeyError as e:
             print(f"Помилка: Відсутній ключ '{e}' в налаштуваннях теми.")
 
-    def get_color(self, key: str, default: str = "#000000") -> str:
+    @staticmethod
+    def update_widgets_theme(app, widgets_to_update):
         """
-        Повертає колір за ключем з поточної теми.
+        Оновлює кольори та шрифти всіх віджетів відповідно до поточної теми.
+        Використовує словник віджетів для прямого оновлення.
         """
-        return self.current_theme_data.get(key, default)
+        theme_data = app.theme_manager.current_theme_data
+
+        # Встановлюємо кольорову схему CTk
+        ctk.set_default_color_theme(theme_data["default_color_theme"])
+
+        # ПРЯМЕ ОНОВЛЕННЯ СТИЛІВ ДЛЯ КОЖНОГО ВІДЖЕТА ЗІ СЛОВНИКА
+        widgets_to_update["main_frame"].configure(fg_color=theme_data["main_frame_fg_color"])
+
+        widgets_to_update["file_label"].configure(
+            text_color=theme_data["header_label_text_color"],
+            font=theme_data["header_label_font"]
+        )
+
+        widgets_to_update["to_tray_button"].configure(
+            text_color=theme_data["to_tray_button_text_color"],
+            font=theme_data["to_tray_button_font"],
+            fg_color=theme_data["to_tray_button_fg_color"],
+            hover_color=theme_data["to_tray_button_hover_color"]
+        )
+
+        widgets_to_update["burger_button"].configure(
+            text_color=theme_data["burger_button_text_color"],
+            font=theme_data["burger_button_font"],
+            fg_color=theme_data["burger_button_fg_color"],
+            hover_color=theme_data["burger_button_hover_color"]
+        )
+
+        widgets_to_update["error_frame"].configure(
+            fg_color=theme_data["error_frame_fg_color"],
+            border_color=theme_data["error_frame_border_color"],
+            border_width=theme_data["error_frame_border_width"]
+        )
+
+        widgets_to_update["error_text_widget"].configure(
+            fg_color=theme_data["error_textbox_fg_color"],
+            text_color=theme_data["error_textbox_text_color"],
+            font=theme_data["error_textbox_font"],
+            border_width=theme_data["error_textbox_border_width"],
+            corner_radius=theme_data["error_textbox_corner_radius"]
+        )
+
+        # Після оновлення всіх стилів викличте метод update_idletasks()
+        # Це гарантує, що зміни будуть застосовані негайно
+        app.root.update_idletasks()
+
+
