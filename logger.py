@@ -20,6 +20,7 @@ from theme_manager import ThemeManager
 from utils.path import PathUtils
 from gui_manager import GUIManager
 from ui.image_manager import ImageManager
+from ui.window_handler import WindowHandler
 
 # Установка DPI-осведомленности
 
@@ -60,7 +61,7 @@ class LogTrackerApp:
         self.is_window_open = True
         self.tray_icon = None
 
-        ConfigManager.load_window_size('Window', self.root)
+        WindowHandler.load_window_size('Window', self.root)
 
     def run(self):
         self.observer = Observer()
@@ -92,7 +93,7 @@ class LogTrackerApp:
         def _safe_closing():
             try:
                 print("Closing application...")
-                ConfigManager.save_window_size('Window', self.root)
+                WindowHandler.save_window_size('Window', self.root)
                 if self.observer:
                     print("Stopping observer...")
                     self.observer.stop()
@@ -121,7 +122,7 @@ class LogTrackerApp:
             FileHandler.open_file(self.event_handler.last_error_file)
 
     def on_window_resize(self, event):
-        ConfigManager.save_window_size('Window', self.root)
+        WindowHandler.save_window_size('Window', self.root)
 
     def toggle_theme(self, theme_name: str):
         self.theme_manager.load_theme(theme_name)
@@ -130,7 +131,7 @@ class LogTrackerApp:
         ctk.set_default_color_theme(current_theme["default_color_theme"])
 
         GUIManager.update_widgets_theme(self, self.widgets_to_update)
-        ConfigManager.save_config_value("Theme", "current", theme_name)
+        ConfigManager.save_config("Theme", "current", theme_name)
 
 
 if __name__ == "__main__":

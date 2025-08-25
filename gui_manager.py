@@ -41,7 +41,7 @@ class GUIManager:
         root.minsize(300, 100)
 
         # Завантаження та встановлення геометрії
-        geometry_string = ConfigManager.load_window_size('Window', root)
+        geometry_string = WindowHandler.load_window_size('Window', root)
         if geometry_string:
             root.geometry(geometry_string)
         else:
@@ -214,7 +214,7 @@ class GUIManager:
         settings_window.title("Path settings")
 
         # Завантаження та застосування геометрії для підвікна
-        geometry_string = ConfigManager.load_window_size('Window_path', settings_window)
+        geometry_string = WindowHandler.load_window_size('Window_path', settings_window)
         if geometry_string:
             settings_window.geometry(geometry_string)
         else:
@@ -260,7 +260,7 @@ class GUIManager:
 
         # Зберігання позиції вікна налаштувань при його зміні
         settings_window.bind("<Configure>",
-                             lambda event: ConfigManager.save_window_size('Window_path', settings_window))
+                             lambda event: WindowHandler.save_window_size('Window_path', settings_window))
 
     @staticmethod
     def save_settings(app, settings_window, source_directory, target_directory):
@@ -278,7 +278,7 @@ class GUIManager:
         app.source_directory = source_directory
         app.directory = target_directory
 
-        ConfigManager.save_window_size('Window_path', settings_window)
+        WindowHandler.save_window_size('Window_path', settings_window)
         settings_window.destroy()
 
     @staticmethod

@@ -6,6 +6,7 @@ from ctypes import windll
 from config_manager import ConfigManager
 from utils.rdp import check_rdp_status
 from utils.path import PathUtils
+from ui.window_handler import WindowHandler
 
 
 class TrayManager:
@@ -40,7 +41,7 @@ class TrayManager:
     def minimize_to_tray(root, app):
         app.is_window_open = False
 
-        ConfigManager.save_window_size('Window', root)
+        WindowHandler.save_window_size('Window', root)
 
         def on_open(icon, item):
             root.after(0, icon.stop)
@@ -66,7 +67,7 @@ class TrayManager:
     @staticmethod
     def restore_window(root, app):
 
-        ConfigManager.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
+        WindowHandler.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
         root.deiconify()
         app.is_window_open = True  # Обновляем состояние окна
         root.lift()
