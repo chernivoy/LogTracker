@@ -31,7 +31,7 @@ class ThemeManager:
             self.current_theme_name = theme_name
             self.current_theme_data = theme_module.THEME_SETTINGS
             # Застосовуємо CTkAppearanceMode
-            # ctk.set_appearance_mode(self.current_theme_data["ctk_appearance_mode"])
+            ctk.set_appearance_mode(self.current_theme_data["ctk_appearance_mode"])
             print(f"Theme changed to: {self.current_theme_name}")
         except ModuleNotFoundError:
             print(f"Помилка: Файл теми для '{theme_name}' не знайдено.")

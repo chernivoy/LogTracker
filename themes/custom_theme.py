@@ -1,10 +1,10 @@
 # themes/dark_theme.py
-# Налаштування для темної теми
+# Налаштування для кастомної
 THEME_SETTINGS = {
     "name": "dark",
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
-    "main_frame_fg_color": "transparent",
+    "main_frame_fg_color": "#383b40",
     # Window Transparency
     "window_alpha": 0.9,
     "header_label_text_color": "#5f8dfc",
@@ -32,7 +32,7 @@ THEME_SETTINGS = {
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
     "error_text_color": "#b4b361",
-    "context_menu_bg": "black",
+    "context_menu_bg": "#383b40",
     "context_menu_fg": "#e2e0e6",
     "context_menu_active_bg": "#2d436e",
     "context_menu_active_fg": "#e2e0e6",

@@ -4,7 +4,7 @@ from utils import rdp
 from tkinter import font as tkFont
 import tkinter as tk
 import os
-
+import ui.ui_assets
 from ui.settings_window import SettingsWindow
 
 
@@ -46,22 +46,19 @@ class ContextMenu:
 
         context_menu = root._context_menu
 
-        exit_icon_path = os.path.join("src", "exit_icon.png")
-
-        settings_icon_path = os.path.join("src", "settings_icon.png")
-
-        dark_theme_icon_path = os.path.join("src", "settings_icon.png")
-
-        light_theme_icon_path = os.path.join("src", "settings_icon.png")
-
         # Важливо: зберігати посилання на PhotoImage, інакше воно буде видалено з пам'яті
-        root._settings_icon_photo = image_manager.get_tk_photo_image(settings_icon_path, (12, 12))
-        root._exit_icon_photo = image_manager.get_tk_photo_image(exit_icon_path, (12, 12))
-
-        root._dark_theme_icon_photo = image_manager.get_tk_photo_image(dark_theme_icon_path,
-                                                                       (12, 12))
-        root._light_theme_icon_photo = image_manager.get_tk_photo_image(light_theme_icon_path,
-                                                                        (12, 12))
+        root._settings_icon_photo = image_manager.get_tk_photo_image(ui.ui_assets.SETTINGS_ICON_PATH,
+                                                                     (16, 16))
+        root._exit_icon_photo = image_manager.get_tk_photo_image(ui.ui_assets.EXIT_ICON_PATH,
+                                                                 (16, 16))
+        root._theme_icon_photo = image_manager.get_tk_photo_image(ui.ui_assets.THEME_ICON_PATH,
+                                                                  (16, 16))
+        root._dark_theme_icon_photo = image_manager.get_tk_photo_image(ui.ui_assets.DARK_THEME_ICON_PATH,
+                                                                       (16, 16))
+        root._light_theme_icon_photo = image_manager.get_tk_photo_image(ui.ui_assets.LIGHT_THEME_ICON_PATH,
+                                                                        (16, 16))
+        root._custom_theme_icon_photo = image_manager.get_tk_photo_image(ui.ui_assets.CUSTOM_THEME_ICON_PATH,
+                                                                         (16, 16))
 
         # Створюємо підменю "Тема"
         theme_menu = tk.Menu(context_menu, tearoff=0,
@@ -83,8 +80,18 @@ class ContextMenu:
             image=root._light_theme_icon_photo, compound="left"
         )
 
+        theme_menu.add_command(
+            label="Custom",
+            command=lambda: app.toggle_theme("custom"),
+            image=root._custom_theme_icon_photo, compound="left"
+        )
+
         # Додаємо підменю в головне меню
-        context_menu.add_cascade(label="Theme", menu=theme_menu)
+        context_menu.add_cascade(
+            label="Theme",
+            menu=theme_menu,
+            image=root._theme_icon_photo,
+            compound="left")
         context_menu.add_separator()
 
         if root._exit_icon_photo and root._settings_icon_photo:

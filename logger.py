@@ -22,7 +22,6 @@ from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
 from ui.error_window import ErrorWindow
 
-# Установка DPI-осведомленности
 
 config_path = PathUtils.resource_path(os.path.join("src", "config.ini"))
 
@@ -49,7 +48,14 @@ class LogTrackerApp:
 
         # Инициализация других атрибутов
         self.observer = None
-        self.root, self.error_text_widget, self.file_label, self.widgets_to_update = ErrorWindow.create_error_window(self.root, self,  self.image_manager)
+        self.error_window = ErrorWindow(self, self.root, self.image_manager)
+
+        self.error_text_widget = self.error_window.error_text_widget
+        self.file_label = self.error_window.file_label
+        self.widgets_to_update = self.error_window.widgets_to_update
+
+        # self.root, self.error_text_widget, self.file_label, self.widgets_to_update = ErrorWindow.create_error_window(
+        #     self.root, self, self.image_manager)
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
                                                self.file_label, self.event_queue,
@@ -129,6 +135,7 @@ class LogTrackerApp:
 
         current_theme = self.theme_manager.current_theme_data
         ctk.set_default_color_theme(current_theme["default_color_theme"])
+        self.root.attributes('-alpha', current_theme["window_alpha"])
 
         ThemeManager.update_widgets_theme(self, self.widgets_to_update)
         ConfigManager.save_config("Theme", "current", theme_name)
