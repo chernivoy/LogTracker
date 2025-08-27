@@ -6,6 +6,7 @@ THEME_SETTINGS = {
     "default_color_theme": "blue",
     "main_frame_fg_color": "white",
     # Window Transparency
+    "transparent_color": "#000001",
     "window_alpha": 1,
     #Стиль для header_label
     "header_label_text_color": "#1c3c6f",

@@ -6,6 +6,7 @@ THEME_SETTINGS = {
     "default_color_theme": "blue",
     "main_frame_fg_color": "#383b40",
     # Window Transparency
+    "transparent_color": "#000001",
     "window_alpha": 0.9,
     "header_label_text_color": "#5f8dfc",
     "header_label_font": ("Inter", 13),

@@ -54,8 +54,6 @@ class LogTrackerApp:
         self.file_label = self.error_window.file_label
         self.widgets_to_update = self.error_window.widgets_to_update
 
-        # self.root, self.error_text_widget, self.file_label, self.widgets_to_update = ErrorWindow.create_error_window(
-        #     self.root, self, self.image_manager)
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
                                                self.file_label, self.event_queue,

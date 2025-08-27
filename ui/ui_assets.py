@@ -3,6 +3,8 @@
 import os
 
 # Шляхи до іконок
+HEADER_ICON_PATH = os.path.join("src", "Header.ico")
+BUG_ICON_PATH = os.path.join("src", "bug2.png")
 EXIT_ICON_PATH = os.path.join("src", "exit_icon.png")
 SETTINGS_ICON_PATH = os.path.join("src", "settings_icon.png")
 DARK_THEME_ICON_PATH = os.path.join("src", "moon2.png")
