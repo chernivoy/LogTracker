@@ -89,8 +89,10 @@ class ContextMenu:
         if self._has_icons:
             theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"),
                                    image=self._dark_theme_icon, compound="left")
+            theme_menu.add_separator()
             theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"),
                                    image=self._light_theme_icon, compound="left")
+            theme_menu.add_separator()
             theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"),
                                    image=self._custom_theme_icon, compound="left")
         else:
