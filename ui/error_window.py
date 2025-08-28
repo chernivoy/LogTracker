@@ -6,7 +6,7 @@ from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
 from tray_manager import TrayManager
 from ui.context_menu import ContextMenu
-from ui.ui_assets import BUG_ICON_PATH
+from ui.ui_assets import BUG_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH
 
 
 class ErrorWindow:
@@ -42,6 +42,8 @@ class ErrorWindow:
         self._load_window_geometry()
 
         self.app.app_icon = self.image_manager.get_ctk_image(path=BUG_ICON_PATH, size=(16, 16))
+        self.app.close_icon = self.image_manager.get_ctk_image(path=CLOSE_ICON_PATH, size=(11, 11))
+        self.app.burger_menu_icon = self.image_manager.get_ctk_image(path=BURGER_MENU_ICON_PATH, size=(11, 11))
 
         self.root.attributes('-topmost', True)
 
@@ -90,24 +92,28 @@ class ErrorWindow:
 
         self.to_tray_button = ctk.CTkButton(
             self.main_frame,
-            text="x",
+            text="",
             height=20, width=20,
             fg_color=current_theme["to_tray_button_fg_color"],
             text_color=current_theme["to_tray_button_text_color"],
             font=current_theme["to_tray_button_font"],
             hover_color=current_theme["to_tray_button_hover_color"],
+            image=self.app.close_icon,
+            compound="right",
             command=lambda: TrayManager.minimize_to_tray(self.root, self.app)
         )
         self.to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
         self.burger_button = ctk.CTkButton(
             self.main_frame,
-            text="...",
+            text="",
             height=20, width=20,
             fg_color=current_theme["burger_button_fg_color"],
             text_color=current_theme["burger_button_text_color"],
             font=current_theme["burger_button_font"],
             hover_color=current_theme["burger_button_hover_color"],
+            image=self.app.burger_menu_icon,
+            compound="left",
             command=lambda: self.context_menu.show_menu(self.burger_button)
         )
         self.burger_button.grid(row=0, column=1, padx=30, pady=5, sticky="ne")
