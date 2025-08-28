@@ -165,6 +165,7 @@ class ErrorWindow:
         # У майбутньому, цей метод буде більш повним
         self.file_label.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.file_label.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
+        self.file_label.bind("<Double-Button-1>", lambda event: TrayManager.minimize_to_tray(self.root, self.app))
 
         self.main_frame.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.main_frame.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
