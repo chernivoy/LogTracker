@@ -23,7 +23,8 @@ class FileChangeHandler(FileSystemEventHandler):
         self.last_error_file = None
         self.last_error_line = {}
         self.last_update_time = {}
-        self.create_directory_if_not_exists(directory)
+        # self.create_directory_if_not_exists(directory)
+        FileHandler().create_directory_if_not_exists(self.directory)
         self.track_files()
 
     def track_files(self):
@@ -31,52 +32,24 @@ class FileChangeHandler(FileSystemEventHandler):
         try:
             for file_name in os.listdir(self.directory):
                 file_path = os.path.join(self.directory, file_name)
-                if file_name.endswith(".log") and FileChangeHandler.can_read_file(file_path):
+                if file_name.endswith(".log") and FileHandler.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
                     self.last_update_time[file_path] = -1
                     print(f"File added for tracking: {file_path}")
         except Exception as e:
             print(f"Ошибка при перечислении файлов в директории: {e}")
 
-    @staticmethod
-    def create_directory_if_not_exists(directory):
-        if not os.path.exists(directory):
-            try:
-                os.makedirs(directory)
-                print(f"Создана директория: {directory}")
-            except Exception as e:
-                print(f"Ошибка при создании директории {directory}: {e}")
-
-    @staticmethod
-    def is_file_closed(file_path):
-        try:
-            with open(file_path, 'rb') as file:
-                file.seek(0, os.SEEK_END)
-            return True
-        except IOError as e:
-            print(f"Файл {file_path} в данный момент используется: {e}")
-            return False
-
-    @staticmethod
-    def wait_for_file(file_path, timeout=30):
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if FileChangeHandler.is_file_closed(file_path):
-                return True
-        print(f"Файл {file_path} все еще используется после {timeout} секунд.")
-        return False
-
     def copy_files_from_source_dir(self):
         source_directory = self.config.get('Settings', 'source_directory')
         try:
-            self.create_directory_if_not_exists(self.directory)
+            FileHandler().create_directory_if_not_exists(self.directory)
             copied = False
             for filename in os.listdir(source_directory):
                 if filename.endswith('.log'):
                     source_file = os.path.join(source_directory, filename)
                     dest_file = os.path.join(self.directory, filename)
 
-                    if FileChangeHandler.wait_for_file(source_file):
+                    if FileHandler.wait_for_file(source_file):
                         if not os.path.exists(dest_file):
                             FileHandler.copy_file_without_waiting(source_file, dest_file)
                             print(f'Скопирован файл {filename} из директории A в {self.directory}')
@@ -122,16 +95,6 @@ class FileChangeHandler(FileSystemEventHandler):
             self.error_text_widget.configure(state=tk.DISABLED)
             if not self.app.is_window_open:
                 self.event_queue.put(self.show_window_from_tray)
-
-    @staticmethod
-    def can_read_file(file_path):
-        try:
-            with open(file_path, 'r', encoding='utf-8'):
-                pass
-            return True
-        except Exception as e:
-            print(f"Не удалось прочитать файл {file_path}: {e}")
-            return False
 
     def read_new_lines(self, file_path):
         new_lines = []
