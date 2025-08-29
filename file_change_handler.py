@@ -46,19 +46,41 @@ class FileChangeHandler(FileSystemEventHandler):
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
 
+    # def check_new_errors(self, file_path):
+    #     new_lines = self.read_new_lines(file_path)
+    #     current_time = os.path.getmtime(file_path)
+    #     last_error_line = None
+    #     for line in new_lines:
+    #         if line.strip().startswith(self.word) and current_time > self.last_update_time.get(file_path, -1):
+    #             last_error_line = line.strip()
+    #     self.last_update_time[file_path] = current_time
+    #     if last_error_line:
+    #         self.last_error_file = file_path
+    #         file_name = os.path.basename(file_path)
+    #         self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}"))
+    #         print(f"Новая строка с ошибкой: {last_error_line}")
+    #         self.error_text_widget.configure(state=tk.NORMAL)
+    #         self.error_text_widget.delete(1.0, tk.END)
+    #         self.error_text_widget.insert(tk.END, last_error_line + "\n")
+    #         self.error_text_widget.configure(state=tk.DISABLED)
+    #         if not self.app.is_window_open:
+    #             self.event_queue.put(self.show_window_from_tray)
+
     def check_new_errors(self, file_path):
         new_lines = self.read_new_lines(file_path)
-        current_time = os.path.getmtime(file_path)
         last_error_line = None
         for line in new_lines:
-            if line.strip().startswith(self.word) and current_time > self.last_update_time.get(file_path, -1):
+            if line.strip().startswith(self.word):
                 last_error_line = line.strip()
-        self.last_update_time[file_path] = current_time
+
+        if new_lines:
+            self.last_update_time[file_path] = os.path.getmtime(file_path)
+
         if last_error_line:
             self.last_error_file = file_path
             file_name = os.path.basename(file_path)
             self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}"))
-            print(f"Новая строка с ошибкой: {last_error_line}")
+            print(f"New line with error: {last_error_line}")
             self.error_text_widget.configure(state=tk.NORMAL)
             self.error_text_widget.delete(1.0, tk.END)
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
@@ -87,7 +109,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 print(f"Файл {event.src_path} был удален. Остановлено отслеживание.")
             else:
                 print(f"Изменен файл: {event.src_path}")
-                self.check_new_errors(event.src_path)
+                # self.check_new_errors(event.src_path)
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
