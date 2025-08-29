@@ -46,26 +46,6 @@ class FileChangeHandler(FileSystemEventHandler):
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
 
-    # def check_new_errors(self, file_path):
-    #     new_lines = self.read_new_lines(file_path)
-    #     current_time = os.path.getmtime(file_path)
-    #     last_error_line = None
-    #     for line in new_lines:
-    #         if line.strip().startswith(self.word) and current_time > self.last_update_time.get(file_path, -1):
-    #             last_error_line = line.strip()
-    #     self.last_update_time[file_path] = current_time
-    #     if last_error_line:
-    #         self.last_error_file = file_path
-    #         file_name = os.path.basename(file_path)
-    #         self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}"))
-    #         print(f"Новая строка с ошибкой: {last_error_line}")
-    #         self.error_text_widget.configure(state=tk.NORMAL)
-    #         self.error_text_widget.delete(1.0, tk.END)
-    #         self.error_text_widget.insert(tk.END, last_error_line + "\n")
-    #         self.error_text_widget.configure(state=tk.DISABLED)
-    #         if not self.app.is_window_open:
-    #             self.event_queue.put(self.show_window_from_tray)
-
     def check_new_errors(self, file_path):
         new_lines = self.read_new_lines(file_path)
         last_error_line = None
@@ -86,7 +66,7 @@ class FileChangeHandler(FileSystemEventHandler):
             self.error_text_widget.insert(tk.END, last_error_line + "\n")
             self.error_text_widget.configure(state=tk.DISABLED)
             if not self.app.is_window_open:
-                self.event_queue.put(self.show_window_from_tray)
+                self.event_queue.put(lambda: TrayManager.restore_window(self.app.root, self.app))
 
     def read_new_lines(self, file_path):
         new_lines = []
@@ -120,7 +100,7 @@ class FileChangeHandler(FileSystemEventHandler):
         if file_path in self.file_paths:
             del self.file_paths[file_path]
 
-    def show_window_from_tray(self):
-        if not self.app.is_window_open:
-            self.app.root.after(0, lambda: TrayManager.restore_window(self.app.root, self.app))
-            self.app.is_window_open = True
+    # def show_window_from_tray(self):
+    #     if not self.app.is_window_open:
+    #         self.app.root.after(0, lambda: TrayManager.restore_window(self.app.root, self.app))
+    #         self.app.is_window_open = True
