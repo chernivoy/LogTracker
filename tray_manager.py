@@ -23,18 +23,7 @@ class TrayManager:
         return image
 
     @staticmethod
-    def on_exit(icon, item, root, app):
-        print("Quitting application from tray...")
-        if app.observer:
-            print("Stopping observer from tray...")
-            app.observer.stop()
-            app.observer.join(timeout=5)  # Ждем 5 секунд для завершения
-            if app.observer.is_alive():
-                print("Observer is still running. Force stopping from tray...")
-                app.observer = None  # Принудительно освобождаем объект наблюдателя
-            else:
-                print("Observer stopped successfully from tray.")
-        icon.stop()
+    def on_exit(root, app):
         root.after(0, app.on_closing)  # Вызываем on_closing в основном потоке
 
     @staticmethod
@@ -49,7 +38,9 @@ class TrayManager:
 
         menu = (
             pystray.MenuItem('Open', on_open),
-            pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(icon, item, root, app))
+            # pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(icon, item, root, app))
+            pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(root, app))
+
         )
 
         icon_file_path = PathUtils.resource_path(os.path.join("src", "bug2.png"))

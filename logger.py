@@ -1,26 +1,20 @@
+import configparser
 import os
-import time
-import shutil
 import queue
 import tkinter as tk
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import configparser
-import subprocess
-import ctypes
+
 import customtkinter as ctk
-from ctypes import windll
+from watchdog.observers import Observer
 
 from config_manager import ConfigManager
-from tray_manager import TrayManager
-from file_handler import FileHandler
 from file_change_handler import FileChangeHandler
+from file_handler import FileHandler
 from theme_manager import ThemeManager
-
-from utils.path import PathUtils
+from tray_manager import TrayManager
+from ui.error_window import ErrorWindow
 from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
-from ui.error_window import ErrorWindow
+from utils.path import PathUtils
 
 config_path = PathUtils.resource_path(os.path.join("src", "config.ini"))
 
@@ -47,20 +41,20 @@ class LogTrackerApp:
 
         # Инициализация других атрибутов
         self.observer = None
+        self.is_window_open = True
+        self.tray_icon = None
+
         self.error_window = ErrorWindow(self, self.root, self.image_manager)
+        self.event_queue = queue.Queue()
+        self.event_handler = FileChangeHandler(self, self.directory, self.word, self.event_queue)
 
         self.error_text_widget = self.error_window.error_text_widget
         self.file_label = self.error_window.file_label
         self.widgets_to_update = self.error_window.widgets_to_update
 
-        self.event_queue = queue.Queue()
-        self.event_handler = FileChangeHandler(self, self.directory, self.word, self.event_queue)
-
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
-        self.is_window_open = True
-        self.tray_icon = None
 
         WindowHandler.load_window_size('Window', self.root)
 
@@ -87,7 +81,7 @@ class LogTrackerApp:
         self.root.after(100, self.process_queue)
 
     def periodic_sync(self):
-        self.event_handler.sync_files_and_check(self.config.get('Settings', 'source_directory'))
+        self.event_handler.sync_files_and_check(self.source_directory)
         self.root.after(1000, self.periodic_sync)
 
     def on_closing(self):
