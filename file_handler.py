@@ -66,39 +66,44 @@ class FileHandler:
             print(f"Не удалось прочитать файл {file_path}: {e}")
             return False
 
-    def copy_files_from_source_dir(self):
-        source_directory = self.config.get('Settings', 'source_directory')
+    @staticmethod
+    def copy_files_from_source_dir(source_directory, dest_directory):
+
         try:
-            FileHandler().create_directory_if_not_exists(self.directory)
+            FileHandler().create_directory_if_not_exists(dest_directory)
             copied = False
             for filename in os.listdir(source_directory):
                 if filename.endswith('.log'):
                     source_file = os.path.join(source_directory, filename)
-                    dest_file = os.path.join(self.directory, filename)
+                    dest_file = os.path.join(dest_directory, filename)
 
                     if FileHandler.wait_for_file(source_file):
                         if not os.path.exists(dest_file):
                             FileHandler.copy_file_without_waiting(source_file, dest_file)
-                            print(f'Скопирован файл {filename} из директории A в {self.directory}')
+                            print(f'File {filename} copied from {source_directory} to {dest_directory}')
                             copied = True
-                            self.check_new_errors(dest_file)
                         else:
 
                             if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
                                 FileHandler.copy_file_without_waiting(source_file, dest_file)
-                                print(f'Обновлен файл {filename} в {self.directory}')
+                                print(f'File {filename} updated in {dest_directory}')
                                 copied = True
-                                self.check_new_errors(dest_file)
-            for filename in os.listdir(self.directory):
+            for filename in os.listdir(dest_directory):
                 if filename.endswith('.log'):
-                    dest_file = os.path.join(self.directory, filename)
+                    dest_file = os.path.join(dest_directory, filename)
                     source_file = os.path.join(source_directory, filename)
                     if not os.path.exists(source_file):
                         os.remove(dest_file)
                         print(
-                            f'Удален файл {filename} из {self.directory}, так как он не существует в {source_directory}')
+                            f'File {filename} removed from {dest_directory},  because it does not exist in {source_directory}')
                         copied = True
             if copied:
-                print(f'Завершено копирование из {source_directory} в {self.directory}.')
+                print(f'Finished copying from {source_directory} to {dest_directory}.')
+                return copied
         except Exception as e:
-            print(f"Ошибка при копировании файлов из директории A: {e}")
+            print(f" Error when copying file from {source_directory} to {dest_directory}: {e}")
+            return False
+
+
+
+

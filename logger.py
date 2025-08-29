@@ -56,8 +56,7 @@ class LogTrackerApp:
 
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
-                                               self.file_label, self.event_queue,
-                                               self.config)  # Передаем self в FileChangeHandler
+                                               self.file_label, self.event_queue)
 
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
@@ -90,7 +89,7 @@ class LogTrackerApp:
         self.root.after(100, self.process_queue)
 
     def periodic_sync(self):
-        self.event_handler.copy_files_from_source_dir()
+        self.event_handler.sync_files_and_check(self.config.get('Settings', 'source_directory'))
         self.root.after(2000, self.periodic_sync)
 
     def on_closing(self):
