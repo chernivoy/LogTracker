@@ -1,4 +1,3 @@
-import configparser
 import os
 import queue
 import tkinter as tk
@@ -7,6 +6,7 @@ import customtkinter as ctk
 from watchdog.observers import Observer
 
 from config_manager import ConfigManager
+from constants import CONFIG_PATH
 from file_change_handler import FileChangeHandler
 from file_handler import FileHandler
 from theme_manager import ThemeManager
@@ -14,19 +14,13 @@ from tray_manager import TrayManager
 from ui.error_window import ErrorWindow
 from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
-from utils.path import PathUtils
-
-config_path = PathUtils.resource_path(os.path.join("src", "config.ini"))
-
-config = configparser.ConfigParser()
-config.read(config_path)
 
 
 class LogTrackerApp:
     def __init__(self):
         # Загрузка конфигурации
         self.theme_manager = ThemeManager()
-        self.config = ConfigManager.load_config(config_path)
+        self.config = ConfigManager.load_config(CONFIG_PATH)
 
         # 1. Спочатку створюємо головне вікно
         self.root = ctk.CTk()
@@ -48,9 +42,11 @@ class LogTrackerApp:
         self.event_queue = queue.Queue()
         self.event_handler = FileChangeHandler(self, self.directory, self.word, self.event_queue)
 
-        self.error_text_widget = self.error_window.error_text_widget
-        self.file_label = self.error_window.file_label
-        self.widgets_to_update = self.error_window.widgets_to_update
+        self.error_text_widget, self.file_label, self.widgets_to_update = (
+            self.error_window.error_text_widget,
+            self.error_window.file_label,
+            self.error_window.widgets_to_update
+        )
 
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)

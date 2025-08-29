@@ -70,8 +70,8 @@ class SettingsWindow:
         app.config.set('Settings', 'directory', target_directory)
 
         # Уникаємо циклічного імпорту, імпортуючи config_path тут
-        from logger import config_path
-        with open(config_path, 'w') as configfile:
+        from constants import CONFIG_PATH
+        with open(CONFIG_PATH, 'w') as configfile:
             app.config.write(configfile)
 
         app.source_directory = source_directory
