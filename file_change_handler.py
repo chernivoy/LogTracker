@@ -11,12 +11,10 @@ from tray_manager import TrayManager
 
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, _app, directory, word, error_text_widget, file_label, event_queue):
+    def __init__(self, _app, directory, word, event_queue):
         self.app = _app
         self.directory = directory
         self.word = word
-        self.error_text_widget = error_text_widget
-        self.file_label = file_label
         self.event_queue = event_queue
         self.file_paths = {}
         self.last_error_file = None
@@ -58,15 +56,9 @@ class FileChangeHandler(FileSystemEventHandler):
 
         if last_error_line:
             self.last_error_file = file_path
-            file_name = os.path.basename(file_path)
-            self.event_queue.put(lambda: self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}"))
-            print(f"New line with error: {last_error_line}")
-            self.error_text_widget.configure(state=tk.NORMAL)
-            self.error_text_widget.delete(1.0, tk.END)
-            self.error_text_widget.insert(tk.END, last_error_line + "\n")
-            self.error_text_widget.configure(state=tk.DISABLED)
-            if not self.app.is_window_open:
-                self.event_queue.put(lambda: TrayManager.restore_window(self.app.root, self.app))
+            self.event_queue.put(
+                lambda: self.app.on_error_found(file_path, last_error_line)
+            )
 
     def read_new_lines(self, file_path):
         new_lines = []
@@ -99,8 +91,3 @@ class FileChangeHandler(FileSystemEventHandler):
     def stop_tracking(self, file_path):
         if file_path in self.file_paths:
             del self.file_paths[file_path]
-
-    # def show_window_from_tray(self):
-    #     if not self.app.is_window_open:
-    #         self.app.root.after(0, lambda: TrayManager.restore_window(self.app.root, self.app))
-    #         self.app.is_window_open = True

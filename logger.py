@@ -22,7 +22,6 @@ from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
 from ui.error_window import ErrorWindow
 
-
 config_path = PathUtils.resource_path(os.path.join("src", "config.ini"))
 
 config = configparser.ConfigParser()
@@ -55,8 +54,7 @@ class LogTrackerApp:
         self.widgets_to_update = self.error_window.widgets_to_update
 
         self.event_queue = queue.Queue()
-        self.event_handler = FileChangeHandler(self, self.directory, self.word, self.error_text_widget,
-                                               self.file_label, self.event_queue)
+        self.event_handler = FileChangeHandler(self, self.directory, self.word, self.event_queue)
 
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
@@ -90,7 +88,7 @@ class LogTrackerApp:
 
     def periodic_sync(self):
         self.event_handler.sync_files_and_check(self.config.get('Settings', 'source_directory'))
-        self.root.after(2000, self.periodic_sync)
+        self.root.after(1000, self.periodic_sync)
 
     def on_closing(self):
         def _safe_closing():
@@ -136,6 +134,21 @@ class LogTrackerApp:
 
         ThemeManager.update_widgets_theme(self, self.widgets_to_update)
         ConfigManager.save_config("Theme", "current", theme_name)
+
+    def on_error_found(self, file_path, error_line):
+        """Метод, який викликається при виявленні помилки в файлі."""
+        file_name = os.path.basename(file_path)
+
+        # Оновлення віджетів UI
+        self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}")
+        self.error_text_widget.configure(state=tk.NORMAL)
+        self.error_text_widget.delete(1.0, tk.END)
+        self.error_text_widget.insert(tk.END, error_line + "\n")
+        self.error_text_widget.configure(state=tk.DISABLED)
+
+        # Вирішуємо, чи потрібно показати вікно
+        if not self.is_window_open:
+            TrayManager.restore_window(self.root, self)
 
 
 if __name__ == "__main__":
