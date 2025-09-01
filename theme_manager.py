@@ -1,18 +1,15 @@
 import importlib
 import os
+
 import customtkinter as ctk
+
 from config_manager import ConfigManager
 from utils.path import PathUtils
-import configparser
 
 config_path = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
 
-# config = configparser.ConfigParser()
-# config.read(config_path)
-
 
 class ThemeManager:
-
     config = ConfigManager.load_config(config_path)
     theme = config.get('Theme', 'current', fallback='dark')
 
@@ -88,5 +85,3 @@ class ThemeManager:
         # Після оновлення всіх стилів викличте метод update_idletasks()
         # Це гарантує, що зміни будуть застосовані негайно
         app.root.update_idletasks()
-
-

@@ -1,20 +1,16 @@
 import os
-import time
-import queue
-import tkinter as tk
-import subprocess
 
 from watchdog.events import FileSystemEventHandler
 
 from file_handler import FileHandler
-from tray_manager import TrayManager
 
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, _app, directory, word, event_queue):
+    def __init__(self, _app, directory, word, file_extension, event_queue):
         self.app = _app
         self.directory = directory
         self.word = word
+        self.file_extension = file_extension
         self.event_queue = event_queue
         self.file_paths = {}
         self.last_error_file = None
@@ -23,23 +19,23 @@ class FileChangeHandler(FileSystemEventHandler):
         self.track_files()
 
     def track_files(self):
-        print("Tracking .log files in the directory:", self.directory)
+        print(f"Tracking {self.file_extension} files in the directory:", self.directory)
         try:
             for file_name in os.listdir(self.directory):
                 file_path = os.path.join(self.directory, file_name)
-                if file_name.endswith(".log") and FileHandler.can_read_file(file_path):
+                if file_name.endswith(self.file_extension) and FileHandler.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
                     self.last_update_time[file_path] = -1
                     print(f"File added for tracking: {file_path}")
         except Exception as e:
-            print(f"Ошибка при перечислении файлов в директории: {e}")
+            print(f"Error when tracking files: {e}")
 
     def sync_files_and_check(self, source_directory):
         try:
             copied = FileHandler.copy_files_from_source_dir(source_directory, self.directory)
             if copied:
                 for filename in os.listdir(self.directory):
-                    if filename.endswith('.log'):
+                    if filename.endswith(self.file_extension):
                         self.check_new_errors(os.path.join(self.directory, filename))
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
@@ -75,13 +71,12 @@ class FileChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.is_directory:
             return
-        if event.src_path.endswith(".log"):
+        if event.src_path.endswith(self.file_extension):
             if event.event_type == 'deleted':
                 self.stop_tracking(event.src_path)
                 print(f"Файл {event.src_path} был удален. Остановлено отслеживание.")
             else:
                 print(f"Изменен файл: {event.src_path}")
-                # self.check_new_errors(event.src_path)
 
     def on_deleted(self, event):
         if event.src_path in self.file_paths:
