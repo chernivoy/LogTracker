@@ -1,5 +1,5 @@
 # themes/dark_theme.py
-# Налаштування для кастомної
+# Налаштування для кастомної теми
 THEME_SETTINGS = {
     "name": "dark",
     "ctk_appearance_mode": "Dark",
@@ -8,8 +8,10 @@ THEME_SETTINGS = {
     # Window Transparency
     "transparent_color": "#000001",
     "window_alpha": 0.9,
+    #Стиль для header_label
     "header_label_text_color": "#5f8dfc",
     "header_label_font": ("Inter", 13),
+    #Стиль для button
     "button_text_color": "#ce885f",
     "button_font": ("Inter", 12),
     #Стиль для to_tray_button
@@ -33,6 +35,7 @@ THEME_SETTINGS = {
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
     "error_text_color": "#b4b361",
+    #Стиль для context_menu
     "context_menu_bg": "#383b40",
     "context_menu_fg": "#e2e0e6",
     "context_menu_active_bg": "#2d436e",

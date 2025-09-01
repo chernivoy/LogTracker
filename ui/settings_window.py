@@ -1,4 +1,5 @@
 import customtkinter as ctk
+
 from ui.window_handler import WindowHandler
 
 
@@ -33,9 +34,9 @@ class SettingsWindow:
         label_target_directory = ctk.CTkLabel(settings_window, text="Path to destination directory:")
         label_target_directory.pack(pady=10)
 
-        entry_target_directory = ctk.CTkEntry(settings_window, width=300)
-        entry_target_directory.insert(0, app.directory)
-        entry_target_directory.pack(pady=5)
+        entry_destination_directory = ctk.CTkEntry(settings_window, width=300)
+        entry_destination_directory.insert(0, app.destination_directory)
+        entry_destination_directory.pack(pady=5)
 
         # Кнопки збереження та відміни
         btn_save = ctk.CTkButton(
@@ -45,7 +46,7 @@ class SettingsWindow:
                 app,
                 settings_window,
                 entry_source_directory.get(),
-                entry_target_directory.get()
+                entry_destination_directory.get()
             )
         )
         btn_save.pack(pady=10)
@@ -62,12 +63,12 @@ class SettingsWindow:
                              lambda event: WindowHandler.save_window_size('Window_path', settings_window))
 
     @staticmethod
-    def save_settings(app, settings_window, source_directory, target_directory):
+    def save_settings(app, settings_window, source_directory, destination_directory):
         """
         Зберігає налаштування шляхів та закриває вікно налаштувань.
         """
         app.config.set('Settings', 'source_directory', source_directory)
-        app.config.set('Settings', 'directory', target_directory)
+        app.config.set('Settings', 'destination_directory', destination_directory)
 
         # Уникаємо циклічного імпорту, імпортуючи config_path тут
         from constants import CONFIG_PATH
@@ -75,7 +76,7 @@ class SettingsWindow:
             app.config.write(configfile)
 
         app.source_directory = source_directory
-        app.directory = target_directory
+        app.destination_directory = destination_directory
 
         WindowHandler.save_window_size('Window_path', settings_window)
         settings_window.destroy()

@@ -29,8 +29,8 @@ class LogTrackerApp:
         self.image_manager = ImageManager(self.root)
 
         # Инициализация директорий из конфигурации или установка значений по умолчанию, если их нет
-        self.directory = self.config.get('Settings', 'directory', fallback='')
         self.source_directory = self.config.get('Settings', 'source_directory', fallback='')
+        self.destination_directory = self.config.get('Settings', 'destination_directory', fallback=r'C:\temp\logger')
         self.word = self.config.get('Settings', 'word', fallback='')
         self.file_extension = self.config.get('Settings', 'file_extension', fallback='')
 
@@ -41,7 +41,8 @@ class LogTrackerApp:
 
         self.error_window = ErrorWindow(self, self.root, self.image_manager)
         self.event_queue = queue.Queue()
-        self.event_handler = FileChangeHandler(self, self.directory, self.word, self.file_extension, self.event_queue)
+        self.event_handler = FileChangeHandler(self, self.destination_directory, self.word, self.file_extension,
+                                               self.event_queue)
 
         self.error_text_widget, self.file_label, self.widgets_to_update = (
             self.error_window.error_text_widget,
@@ -57,7 +58,7 @@ class LogTrackerApp:
 
     def run(self):
         self.observer = Observer()
-        self.observer.schedule(self.event_handler, self.directory, recursive=False)
+        self.observer.schedule(self.event_handler, self.destination_directory, recursive=False)
         self.observer.start()
 
         self.process_queue()
@@ -147,24 +148,6 @@ class LogTrackerApp:
         self.error_text_widget.insert(tk.END, error_line + "\n")
         self.error_text_widget.configure(state=tk.DISABLED)
 
-        self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}")
-        self.error_text_widget.configure(state=tk.NORMAL)
-
-        # textbox_font = self.theme_manager.current_theme_data.get("error_textbox_font")
-        #
-        # if textbox_font:
-        #     self.file_label.configure(font=textbox_font, text=f" File: {file_name}")
-        # else:
-        #     self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}")
-        # self.error_text_widget.configure(font=("Inter", 10), state=tk.NORMAL)
-        # self.error_text_widget.delete(1.0, tk.END)
-        # self.error_text_widget.insert(tk.END, error_line + "\n")
-        # self.error_text_widget.configure(state=tk.DISABLED)
-        #
-        # self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}")
-        # self.error_text_widget.configure(state=tk.NORMAL)
-
-        # Вирішуємо, чи потрібно показати вікно
         if not self.is_window_open:
             TrayManager.restore_window(self.root, self)
 

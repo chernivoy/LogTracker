@@ -35,6 +35,7 @@ THEME_SETTINGS = {
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
     "error_text_color": "#2c3e50",
+    #Стиль для context_menu
     "context_menu_bg": "white",
     "context_menu_fg": "#333333",
     "context_menu_active_bg": "#dcdcdc",
