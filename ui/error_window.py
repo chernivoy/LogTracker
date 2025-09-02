@@ -1,12 +1,10 @@
-import os
 import customtkinter as ctk
 
-from utils import path as Path
-from ui.image_manager import ImageManager
-from ui.window_handler import WindowHandler
 from tray_manager import TrayManager
+from file_handler import FileHandler
 from ui.context_menu import ContextMenu
 from ui.ui_assets import BUG_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH
+from ui.window_handler import WindowHandler
 
 
 class ErrorWindow:
@@ -30,11 +28,11 @@ class ErrorWindow:
         ctk.set_appearance_mode(current_theme["ctk_appearance_mode"])
         ctk.set_default_color_theme(current_theme["default_color_theme"])
 
-        TRANSPARENT_COLOR = current_theme["transparent_color"]
+        transparent_color = current_theme["transparent_color"]
 
         self.root.overrideredirect(True)
-        self.root.configure(bg=TRANSPARENT_COLOR)
-        self.root.wm_attributes('-transparentcolor', TRANSPARENT_COLOR)
+        self.root.configure(bg=transparent_color)
+        self.root.wm_attributes('-transparentcolor', transparent_color)
         self.root.attributes('-alpha', current_theme["window_alpha"])
         self.root.title("LogTracker")
         self.root.minsize(300, 100)
@@ -171,7 +169,7 @@ class ErrorWindow:
         # У майбутньому, цей метод буде більш повним
         self.file_label.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.file_label.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
-        self.file_label.bind("<Double-Button-1>", lambda event: TrayManager.minimize_to_tray(self.root, self.app))
+        # self.file_label.bind("<Double-Button-1>", lambda event: TrayManager.minimize_to_tray(self.root, self.app))
 
         self.main_frame.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.main_frame.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))

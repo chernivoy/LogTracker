@@ -2,14 +2,13 @@
 
 import tkinter as tk
 import tkinter.font as tkFont
-import customtkinter as ctk
 
+from ui.settings_window import SettingsWindow
 from ui.ui_assets import (
-    EXIT_ICON_PATH, BUG_ICON_PATH, SETTINGS_ICON_PATH, THEME_ICON_PATH,
+    EXIT_ICON_PATH, SETTINGS_ICON_PATH, THEME_ICON_PATH,
     DARK_THEME_ICON_PATH, LIGHT_THEME_ICON_PATH, CUSTOM_THEME_ICON_PATH
 )
 from utils import rdp
-from ui.settings_window import SettingsWindow
 
 
 class ContextMenu:
@@ -119,8 +118,8 @@ class ContextMenu:
             self.menu.add_separator()
             self.menu.add_command(label="Exit", command=self.app.on_closing)
 
-        x = button.winfo_rootx() + button.winfo_width()
-        y = button.winfo_rooty()
+        x = int(button.winfo_rootx() + int(button.winfo_width()) / 2)
+        y = button.winfo_rooty() + button.winfo_width()
 
         try:
             # Відображаємо меню в правильній позиції

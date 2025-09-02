@@ -2,6 +2,9 @@ import os
 import shutil
 import subprocess
 import time
+import win32clipboard
+import win32con
+import struct
 
 
 class FileHandler:
@@ -104,6 +107,78 @@ class FileHandler:
             print(f" Error when copying file from {source_directory} to {dest_directory}: {e}")
             return False
 
+    @staticmethod
+    def copy_file_path_to_clipboard(file_path):
+        """
+        Копіює шлях до файлу в системний буфер обміну.
+        Використовує підхід, що залежить від операційної системи.
+        """
+        try:
+            if os.name == 'nt':  # Для Windows
+                subprocess.run(['clip'], input=file_path.encode('utf-8'), check=True, shell=True)
+                print(f"Шлях до файлу '{file_path}' скопійовано в буфер обміну.")
+            elif os.name == 'posix':  # Для macOS і Linux
+                try:
+                    subprocess.run(['xclip', '-selection', 'clipboard'], input=file_path.encode('utf-8'), check=True)
+                    print(f"Шлях до файлу '{file_path}' скопійовано в буфер обміну (Linux).")
+                except FileNotFoundError:
+                    try:
+                        subprocess.run(['pbcopy'], input=file_path.encode('utf-8'), check=True)
+                        print(f"Шлях до файлу '{file_path}' скопійовано в буфер обміну (macOS).")
+                    except FileNotFoundError:
+                        print("Інструмент для роботи з буфером обміну (xclip/pbcopy) не знайдено.")
+            else:
+                print("Копіювання в буфер обміну не підтримується на цій операційній системі.")
+        except subprocess.CalledProcessError as e:
+            print(f"Помилка виконання команди для буфера обміну: {e}")
+        except Exception as e:
+            print(f"Не вдалося скопіювати шлях до файлу в буфер обміну: {e}")
 
+    @staticmethod
+    def reveal_in_file_explorer(file_path):
+        """
+        Відкриває папку, де знаходиться файл, і виділяє його.
+        Працює на Windows, macOS та більшості дистрибутивів Linux.
+        """
+        try:
+            # Перетворюємо шлях на абсолютний, щоб уникнути помилок
+            abs_path = os.path.abspath(file_path)
 
+            if os.name == 'nt':  # Windows
+                # Команда `explorer.exe /select,` відкриває Провідник і виділяє файл
+                subprocess.run(['explorer', '/select,', abs_path], check=True)
+                print(f"Файл '{file_path}' відкрито у Провіднику Windows.")
 
+            elif os.name == 'posix':
+                # macOS та Linux використовують різні команди
+                if subprocess.run(['uname'], capture_output=True, text=True).stdout.strip() == 'Darwin':
+                    # macOS: `open -R`
+                    subprocess.run(['open', '-R', abs_path], check=True)
+                    print(f"Файл '{file_path}' відкрито у Finder.")
+                else:  # Linux
+                    # Спроба використання стандартних команд для різних DE
+                    # xdg-open зазвичай відкриває папку, але не виділяє файл
+                    # nautilus, dolphin - це специфічні менеджери файлів
+
+                    # Спочатку спробуємо nautilus (GNOME)
+                    try:
+                        subprocess.run(['nautilus', '--select', abs_path], check=True)
+                        print(f"Файл '{file_path}' відкрито у Nautilus.")
+                    except FileNotFoundError:
+                        # Якщо nautilus не знайдено, спробуємо dolphin (KDE)
+                        try:
+                            subprocess.run(['dolphin', '--select', abs_path], check=True)
+                            print(f"Файл '{file_path}' відкрито у Dolphin.")
+                        except FileNotFoundError:
+                            # Якщо нічого не підходить, просто відкриємо папку
+                            subprocess.run(['xdg-open', os.path.dirname(abs_path)], check=True)
+                            print(f"Папку з файлом '{file_path}' відкрито.")
+            else:
+                print("Операція не підтримується на поточній системі.")
+
+        except FileNotFoundError:
+            print(f"Помилка: Команда для відкриття провідника не знайдена.")
+        except subprocess.CalledProcessError as e:
+            print(f"Помилка при виконанні команди: {e}")
+        except Exception as e:
+            print(f"Не вдалося відкрити файл у провіднику: {e}")

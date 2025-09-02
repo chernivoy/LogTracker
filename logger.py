@@ -52,6 +52,7 @@ class LogTrackerApp:
 
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
+        self.file_label.bind("<Double-Button-1>", self.on_file_label_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
 
         WindowHandler.load_window_size('Window', self.root)
@@ -113,6 +114,11 @@ class LogTrackerApp:
     def on_error_double_click(self, event):
         if self.event_handler.last_error_file:
             FileHandler.open_file(self.event_handler.last_error_file)
+
+    def on_file_label_double_click(self, event):
+        """Копіює шлях до файлу в буфер обміну, якщо подія сталася на мітці."""
+        if self.event_handler.last_error_file:
+            FileHandler.reveal_in_file_explorer(self.event_handler.last_error_file)
 
     def on_window_resize(self, event):
         WindowHandler.save_window_size('Window', self.root)
