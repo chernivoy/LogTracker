@@ -1,7 +1,6 @@
 import customtkinter as ctk
 
 from tray_manager import TrayManager
-from file_handler import FileHandler
 from ui.context_menu import ContextMenu
 from ui.ui_assets import BUG_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH
 from ui.window_handler import WindowHandler
@@ -174,4 +173,3 @@ class ErrorWindow:
         self.main_frame.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.main_frame.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
         self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self.app))
-

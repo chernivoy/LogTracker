@@ -2,9 +2,6 @@ import os
 import shutil
 import subprocess
 import time
-import win32clipboard
-import win32con
-import struct
 
 
 class FileHandler:

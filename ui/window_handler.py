@@ -1,10 +1,12 @@
-import customtkinter as ctk
-import tkinter as tk
-import platform
-import os
 import ctypes
+import os
+import tkinter as tk
+
+import customtkinter as ctk
+
 from config_manager import ConfigManager
 from utils.path import PathUtils
+from utils import rdp
 
 CONFIG_FILE_WINDOW = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
 
@@ -40,9 +42,7 @@ class WindowHandler:
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
 
         try:
-            hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-            dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
-            dpi_scale = dpi / 96.0
+            dpi_scale = rdp.get_windows_dpi_scale(root)
         except Exception as e:
             print(
                 f"Попередження: Не вдалося отримати DPI Scale в load_window_size: {e}. Використовуємо 2.0 за замовчуванням.")
@@ -283,9 +283,7 @@ class WindowHandler:
         # Кінець логіки зміни розміру
 
         # Отримуємо поточний DPI Scale для вікна.
-        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-        dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
-        dpi_scale_for_geometry = dpi / 96.0
+        dpi_scale_for_geometry = rdp.get_windows_dpi_scale(root)
 
         # Компенсуємо ЛОГІЧНІ розміри, ділячи їх на DPI Scale, перед передачею в geometry()
         final_width_for_geometry = int(new_width_logical / dpi_scale_for_geometry)
@@ -323,4 +321,3 @@ class WindowHandler:
         # Повертаємо округлення після завершення ресайзу
         if root.overrideredirect():
             WindowHandler.round_corners(root, 30)
-

@@ -13,35 +13,14 @@ from utils import rdp
 
 class ContextMenu:
     def __init__(self, root, app, image_manager):
-        """
-        Ініціалізує контекстне меню та завантажує іконки.
-        """
         self.root = root
         self.app = app
         self.image_manager = image_manager
         self.menu = None
         self._load_icons()
 
-    def _load_icons(self):
-        """
-        Завантажує іконки меню та зберігає їх у класі.
-        """
-        try:
-            self._settings_icon = self.image_manager.get_tk_photo_image(SETTINGS_ICON_PATH, (16, 16))
-            self._exit_icon = self.image_manager.get_tk_photo_image(EXIT_ICON_PATH, (16, 16))
-            self._theme_icon = self.image_manager.get_tk_photo_image(THEME_ICON_PATH, (16, 16))
-            self._dark_theme_icon = self.image_manager.get_tk_photo_image(DARK_THEME_ICON_PATH, (16, 16))
-            self._light_theme_icon = self.image_manager.get_tk_photo_image(LIGHT_THEME_ICON_PATH, (16, 16))
-            self._custom_theme_icon = self.image_manager.get_tk_photo_image(CUSTOM_THEME_ICON_PATH, (16, 16))
-            self._has_icons = True
-        except Exception as e:
-            print(f"Error loading menu icons: {e}")
-            self._has_icons = False
-
     def show_menu(self, button):
-        """
-        Відображає контекстне меню.
-        """
+
         theme_manager = self.app.theme_manager
         current_theme = theme_manager.current_theme_data
 
@@ -50,32 +29,20 @@ class ContextMenu:
         scaled_font_size = int(base_font_size * dpi_scale_factor)
         menu_font = tkFont.Font(family="Inter", size=scaled_font_size)
 
-        # Створюємо меню, якщо воно не існує
-        if self.menu is None:
-            self.menu = tk.Menu(
-                self.root,
-                tearoff=0,
-                bg=current_theme["context_menu_bg"],
-                fg=current_theme["context_menu_fg"],
-                activebackground=current_theme["context_menu_active_bg"],
-                activeforeground=current_theme["context_menu_active_fg"],
-                font=menu_font,
-                borderwidth=0,
-                relief="flat"
-            )
-        else:
-            # Якщо існує, очищаємо його
-            self.menu.delete(0, 'end')
-
-        self.menu.configure(
+        self.menu = tk.Menu(
+            self.root,
+            tearoff=0,
             bg=current_theme["context_menu_bg"],
             fg=current_theme["context_menu_fg"],
             activebackground=current_theme["context_menu_active_bg"],
             activeforeground=current_theme["context_menu_active_fg"],
-            font=menu_font
+            font=menu_font,
+            borderwidth=0,
+            relief="flat"
         )
 
-        # Створюємо підменю "Тема"
+        self._load_icons()
+
         theme_menu = tk.Menu(
             self.menu, tearoff=0,
             bg=current_theme["context_menu_bg"], fg=current_theme["context_menu_fg"],
@@ -84,7 +51,6 @@ class ContextMenu:
             font=menu_font, borderwidth=0, relief="flat"
         )
 
-        # Додаємо елементи в підменю "Тема"
         if self._has_icons:
             theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"),
                                    image=self._dark_theme_icon, compound="left")
@@ -94,12 +60,16 @@ class ContextMenu:
             theme_menu.add_separator()
             theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"),
                                    image=self._custom_theme_icon, compound="left")
+            theme_menu.add_separator()
+            theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"),
+                                   image=self._custom_theme_icon, compound="left")
+
         else:
             theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"))
             theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"))
             theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"))
+            theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"))
 
-        # Додаємо підменю в головне меню
         if self._has_icons:
             self.menu.add_cascade(label="Theme", menu=theme_menu, image=self._theme_icon, compound="left")
         else:
@@ -107,7 +77,6 @@ class ContextMenu:
 
         self.menu.add_separator()
 
-        # Додаємо основні пункти
         if self._has_icons:
             self.menu.add_command(label="Path settings", command=lambda: SettingsWindow.open_settings_window(self.app),
                                   image=self._settings_icon, compound="left")
@@ -122,8 +91,22 @@ class ContextMenu:
         y = button.winfo_rooty() + button.winfo_width()
 
         try:
-            # Відображаємо меню в правильній позиції
             self.menu.tk_popup(x, y)
         finally:
             self.menu.grab_release()
 
+    def _load_icons(self):
+        try:
+            base_icon_size = (16, 16)
+
+            self._settings_icon = self.image_manager.get_tk_photo_image(SETTINGS_ICON_PATH, base_icon_size)
+            self._exit_icon = self.image_manager.get_tk_photo_image(EXIT_ICON_PATH, base_icon_size)
+            self._theme_icon = self.image_manager.get_tk_photo_image(THEME_ICON_PATH, base_icon_size)
+            self._dark_theme_icon = self.image_manager.get_tk_photo_image(DARK_THEME_ICON_PATH, base_icon_size)
+            self._light_theme_icon = self.image_manager.get_tk_photo_image(LIGHT_THEME_ICON_PATH, base_icon_size)
+            self._custom_theme_icon = self.image_manager.get_tk_photo_image(CUSTOM_THEME_ICON_PATH, base_icon_size)
+
+            self._has_icons = True
+        except Exception as e:
+            print(f"Error when loading icons: {e}")
+            self._has_icons = False
