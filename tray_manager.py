@@ -1,12 +1,9 @@
-import os
-import ctypes
 import pystray
 from PIL import Image, ImageDraw
-from ctypes import windll
-from config_manager import ConfigManager
-from utils.rdp import check_rdp_status
-from utils.path import PathUtils
+
+from ui.ui_assets import BUG_ICON_PATH
 from ui.window_handler import WindowHandler
+from utils.path import PathUtils
 
 
 class TrayManager:
@@ -24,7 +21,7 @@ class TrayManager:
 
     @staticmethod
     def on_exit(root, app):
-        root.after(0, app.on_closing)  # Вызываем on_closing в основном потоке
+        root.after(0, app.on_closing)
 
     @staticmethod
     def minimize_to_tray(root, app):
@@ -37,13 +34,12 @@ class TrayManager:
             TrayManager.restore_window(root, app)
 
         menu = (
-            pystray.MenuItem('Open', on_open),
-            # pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(icon, item, root, app))
+            pystray.MenuItem('Open', on_open, default=True),
             pystray.MenuItem('Exit', lambda icon, item: TrayManager.on_exit(root, app))
 
         )
 
-        icon_file_path = PathUtils.resource_path(os.path.join("src", "bug2.png"))
+        icon_file_path = PathUtils.resource_path(BUG_ICON_PATH)
         try:
             icon_image = Image.open(icon_file_path)
         except FileNotFoundError:

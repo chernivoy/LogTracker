@@ -18,12 +18,12 @@ THEME_SETTINGS = {
     "to_tray_button_text_color": "#ce885f",
     "to_tray_button_font": ("Inter", 11, "bold"),
     "to_tray_button_fg_color": "transparent",
-    "to_tray_button_hover_color": "#2d436e",
+    "to_tray_button_hover_color": "#eee9e5",
     #Стиль для burger_button
     "burger_button_text_color": "#ce885f",
     "burger_button_font": ("Inter", 11, "bold"),
     "burger_button_fg_color": "transparent",
-    "burger_button_hover_color": "#2d436e",
+    "burger_button_hover_color": "#eee9e5",
     #Стиль для error_frame
     "error_frame_fg_color": "transparent",
     "error_frame_border_color": "#ce885f",

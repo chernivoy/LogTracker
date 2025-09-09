@@ -6,23 +6,23 @@ from file_handler import FileHandler
 
 
 class FileChangeHandler(FileSystemEventHandler):
-    def __init__(self, _app, directory, word, file_extension, event_queue):
+    def __init__(self, _app, destination_directory, word, file_extension, event_queue):
         self.app = _app
-        self.directory = directory
+        self.destination_directory = destination_directory
         self.word = word
         self.file_extension = file_extension
         self.event_queue = event_queue
         self.file_paths = {}
         self.last_error_file = None
         self.last_update_time = {}
-        FileHandler().create_directory_if_not_exists(self.directory)
+        FileHandler().create_directory_if_not_exists(self.destination_directory)
         self.track_files()
 
     def track_files(self):
-        print(f"Tracking {self.file_extension} files in the directory:", self.directory)
+        print(f"Tracking files with {self.file_extension} extension in the directory:", self.destination_directory)
         try:
-            for file_name in os.listdir(self.directory):
-                file_path = os.path.join(self.directory, file_name)
+            for file_name in os.listdir(self.destination_directory):
+                file_path = os.path.join(self.destination_directory, file_name)
                 if file_name.endswith(self.file_extension) and FileHandler.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
                     self.last_update_time[file_path] = -1
@@ -32,11 +32,11 @@ class FileChangeHandler(FileSystemEventHandler):
 
     def sync_files_and_check(self, source_directory):
         try:
-            copied = FileHandler.copy_files_from_source_dir(source_directory, self.directory)
+            copied = FileHandler.copy_files_from_source_dir(source_directory, self.destination_directory)
             if copied:
-                for filename in os.listdir(self.directory):
+                for filename in os.listdir(self.destination_directory):
                     if filename.endswith(self.file_extension):
-                        self.check_new_errors(os.path.join(self.directory, filename))
+                        self.check_new_errors(os.path.join(self.destination_directory, filename))
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
 
