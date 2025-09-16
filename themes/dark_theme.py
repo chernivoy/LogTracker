@@ -10,7 +10,7 @@ THEME_SETTINGS = {
     "window_alpha": 0.9,
     #Стиль для header_label
     "header_label_text_color": "#5f8dfc",
-    "header_label_font": ("Inter", 13),
+    "header_label_font": ("Inter", 13, "bold"),
     #Стиль для button
     "button_text_color": "#ce885f",
     "button_font": ("Inter", 12),

@@ -1,16 +1,16 @@
 # themes/adaica_light_theme.py
 # Налаштування для світлої теми
 THEME_SETTINGS = {
-    "name": "light",
+    "name": "adaica_light",
     "ctk_appearance_mode": "Light",
     "default_color_theme": "blue",
-    "main_frame_fg_color": "#f8f0f3",
+    "main_frame_fg_color": "#e4e6f5",
     # Window Transparency
     "transparent_color": "#000001",
     "window_alpha": 1,
     #Стиль для header_label
     "header_label_text_color": "#1c3c6f",
-    "header_label_font": ("Inter", 13),
+    "header_label_font": ("Inter", 13, "bold"),
     #Стиль для button
     "button_text_color": "#9b59b6",
     "button_font": ("Inter", 13),
@@ -25,7 +25,7 @@ THEME_SETTINGS = {
     "burger_button_fg_color": "transparent",
     "burger_button_hover_color": "#2d436e",
     #Стиль для error_frame
-    "error_frame_fg_color": "#e2e2e2",
+    "error_frame_fg_color": "#e4e6f5",
     "error_frame_border_color": "#ce885f",
     "error_frame_border_width": 1,
     #Стиль для error_textbox
@@ -33,7 +33,7 @@ THEME_SETTINGS = {
     "error_textbox_text_color": "#1c3c6f",
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
-    "error_textbox_corner_radius": 1,
+    "error_textbox_corner_radius": 10,
     "error_text_color": "#2c3e50",
     #Стиль для context_menu
     "context_menu_bg": "white",

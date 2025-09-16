@@ -1,7 +1,7 @@
 # themes/dark_theme.py
 # Налаштування для кастомної теми
 THEME_SETTINGS = {
-    "name": "dark",
+    "name": "custom_dark",
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
     "main_frame_fg_color": "#383b40",

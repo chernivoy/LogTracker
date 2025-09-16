@@ -25,27 +25,25 @@ class ImageManager:
         cache_key = (full_path, "ctk", size)
 
         if cache_key in self._cache:
+            print(f"INFO: Retrieving CTk image from cache for path: {full_path}")
             return self._cache[cache_key]
 
         try:
             image = Image.open(full_path)
             ctk_image = ctk.CTkImage(light_image=image, dark_image=image, size=size)
             self._cache[cache_key] = ctk_image
+            print(f"INFO: Loaded and cached new CTk image for path: {full_path}")
             return ctk_image
         except FileNotFoundError:
             print(f"Помилка: Файл іконки не знайдено за шляхом: {full_path}")
             return None
 
-    def get_tk_photo_image(self, path: str, base_size: tuple) -> tk.PhotoImage | None:
+    def get_tk_photo_image(self, path: str, base_size: tuple, force_reload: bool = False) -> tk.PhotoImage | None:
         """
         Завантажує та масштабує зображення для нативних Tkinter віджетів (напр., Menu).
         """
         full_path = Path.PathUtils.resource_path(path)
         dpi_scale_factor = rdp.get_windows_dpi_scale(self.root)
-        cache_key = (full_path, "tk", base_size, dpi_scale_factor)
-
-        if cache_key in self._cache:
-            return self._cache[cache_key]
 
         try:
             pil_image = Image.open(full_path)
@@ -54,10 +52,12 @@ class ImageManager:
 
             if scaled_width <= 0: scaled_width = 1
             if scaled_height <= 0: scaled_height = 1
+            print(
+                f"INFO: Scaling Tk PhotoImage from {base_size} to ({scaled_width}, {scaled_height}) with DPI factor {dpi_scale_factor}")
 
             resized_image = pil_image.resize((scaled_width, scaled_height), Image.LANCZOS)
             tk_photo = ImageTk.PhotoImage(resized_image)
-            self._cache[cache_key] = tk_photo
+            print(f"INFO: Loaded and cached new Tk PhotoImage for path: {full_path}")
             return tk_photo
         except FileNotFoundError:
             print(f"Помилка: Файл іконки Tkinter PhotoImage не знайдено за шляхом: {full_path}")

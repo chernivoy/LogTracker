@@ -14,6 +14,18 @@ from tray_manager import TrayManager
 from ui.error_window import ErrorWindow
 from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
+import sys
+import ctypes
+
+if sys.platform == "win32":
+    try:
+        # Ця функція доступна з Windows 8.1+
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        print("INFO: SetProcessDpiAwareness set to PER_MONITOR_DPI_AWARE")
+    except AttributeError:
+        # Для старих версій Windows
+        ctypes.windll.user32.SetProcessDPIAware()
+        print("INFO: SetProcessDPIAware set")
 
 
 class LogTrackerApp:
