@@ -4,7 +4,7 @@ THEME_SETTINGS = {
     "name": "adaica_light",
     "ctk_appearance_mode": "Light",
     "default_color_theme": "blue",
-    "main_frame_fg_color": "#e4e6f5",
+    "main_frame_fg_color": "#2b2c2f",
     # Window Transparency
     "transparent_color": "#000001",
     "window_alpha": 1,
@@ -25,7 +25,7 @@ THEME_SETTINGS = {
     "burger_button_fg_color": "transparent",
     "burger_button_hover_color": "#2d436e",
     #Стиль для error_frame
-    "error_frame_fg_color": "#e4e6f5",
+    "error_frame_fg_color": "#2b2c2f",
     "error_frame_border_color": "#ce885f",
     "error_frame_border_width": 1,
     #Стиль для error_textbox

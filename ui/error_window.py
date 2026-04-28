@@ -2,7 +2,7 @@ import customtkinter as ctk
 
 from tray_manager import TrayManager
 from ui.context_menu import ContextMenu
-from ui.ui_assets import BUG_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH
+from ui.ui_assets import BUG_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH, HEADER_ICON_PATH
 from ui.window_handler import WindowHandler
 
 
@@ -33,7 +33,8 @@ class ErrorWindow:
         self.root.configure(bg=transparent_color)
         self.root.wm_attributes('-transparentcolor', transparent_color)
         self.root.attributes('-alpha', current_theme["window_alpha"])
-        self.root.title("LogTracker")
+        self.root.title("ADAICA: Log Tracker")
+        self.root.iconbitmap(HEADER_ICON_PATH)
         self.root.minsize(300, 100)
 
         self._load_window_geometry()
