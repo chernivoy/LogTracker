@@ -91,6 +91,11 @@ class LogTrackerApp:
         self.observer.schedule(self.event_handler, self.destination_directory, recursive=False)
         self.observer.start()
 
+        # Спершу синхронізація, щоб у теці призначення вже лежали свіжі
+        # копії, і лише потім пошук найсвіжішої відомої помилки.
+        self.event_handler.sync_files_and_check(self.source_directory)
+        self.show_latest_known_error()
+
         self.process_queue()
         self.periodic_sync()
 
@@ -181,11 +186,31 @@ class LogTrackerApp:
         ThemeManager.update_widgets_theme(self, self.widgets_to_update)
         ConfigManager.save_config("Theme", "current", theme_name)
 
-    def on_error_found(self, file_path, error_line):
+    def show_latest_known_error(self):
+        """Заповнює вікно найсвіжішою вже відомою помилкою при старті.
+
+        Без цього поле лишається порожнім аж до першої нової помилки:
+        офсети на старті стоять на кінці файлів, тож усе вже записане
+        вважається переглянутим. alert=False — це стан, а не подія, тож
+        вікно з трею не піднімаємо.
+        """
+        latest = self.event_handler.find_latest_existing_error()
+        if latest is None:
+            print("No existing errors found in tracked files")
+            return
+
+        _, file_path, error_line = latest
+        self.event_handler.last_error_file = file_path
+        self.on_error_found(file_path, error_line, alert=False)
+
+    def on_error_found(self, file_path, error_line, alert=True):
         """Показує найсвіжішу помилку тіку — одну, з будь-якого файлу.
 
         Вибір робить FileChangeHandler: він читає всі нові рядки всіх
         файлів і порівнює мітки часу, тож сюди приходить уже переможець.
+
+        alert=False — показ уже відомої помилки при старті: вміст той
+        самий, але вікно не має вискакувати з трею через стару подію.
         """
         file_name = os.path.basename(file_path)
 
@@ -201,7 +226,7 @@ class LogTrackerApp:
         self.error_text_widget.insert(tk.END, error_line + "\n")
         self.error_text_widget.configure(state=tk.DISABLED)
 
-        if not self.is_window_open:
+        if alert and not self.is_window_open:
             TrayManager.restore_window(self.root, self)
 
 

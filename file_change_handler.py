@@ -102,12 +102,15 @@ class FileChangeHandler(FileSystemEventHandler):
             print(f"Error when sync and check files and errors: {e}")
 
     def _newest_error(self, file_path, current_newest):
-        """Порівнює помилки файлу з поточним лідером і повертає найсвіжішу.
+        """Порівнює НОВІ помилки файлу з лідером і повертає найсвіжішу."""
+        return self._pick_newest(file_path, self.check_new_errors(file_path), current_newest)
+
+    def _pick_newest(self, file_path, errors, current_newest):
+        """Обирає найсвіжішу помилку між списком і поточним лідером.
 
         Рядок без розпізнаваної мітки часу оцінюється за mtime файлу —
         грубо, але дозволяє змішувати логи різних форматів в одному тіку.
         """
-        errors = self.check_new_errors(file_path)
         if not errors:
             return current_newest
 
@@ -123,6 +126,43 @@ class FileChangeHandler(FileSystemEventHandler):
             # а в межах файлу порядок читання збігається з порядком запису.
             if newest is None or stamp >= newest[0]:
                 newest = (stamp, file_path, line)
+
+        return newest
+
+    def find_latest_existing_error(self):
+        """Найсвіжіша помилка серед уже наявного вмісту всіх файлів.
+
+        Потрібна, щоб заповнити вікно на старті. track_files() ставить
+        офсети на кінець наявних файлів — усе, що вже записано, вважається
+        переглянутим, тож звичайний прохід не побачить нічого і поле
+        лишається порожнім, доки не станеться нова помилка. Тут навпаки:
+        файли читаються цілком, але офсети не чіпаються.
+        """
+        newest = None
+
+        try:
+            file_names = os.listdir(self.destination_directory)
+        except OSError as e:
+            print(f"Cannot list {self.destination_directory}: {e}")
+            return None
+
+        for file_name in file_names:
+            if not file_name.endswith(self.file_extension):
+                continue
+
+            file_path = os.path.join(self.destination_directory, file_name)
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+                    errors = [
+                        line
+                        for line in (normalize_line(raw) for raw in file)
+                        if line.startswith(self.word)
+                    ]
+            except OSError as e:
+                print(f"Cannot scan {file_path}: {e}")
+                continue
+
+            newest = self._pick_newest(file_path, errors, newest)
 
         return newest
 
