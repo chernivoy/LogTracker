@@ -49,6 +49,8 @@ class FileChangeHandler(FileSystemEventHandler):
         self.event_queue = event_queue
         self.file_paths = {}
         self.last_error_file = None
+        # Межа «історія / свіже» для файлів, що з'являються під час роботи.
+        self.started_at = datetime.now()
         # Імена файлів, які саме цей застосунок скопіював у теку призначення.
         # Лише їх дозволено видаляти при синхронізації.
         self.managed_files = set()
@@ -81,10 +83,13 @@ class FileChangeHandler(FileSystemEventHandler):
                         file_path = os.path.join(self.destination_directory, filename)
                         present.add(file_path)
 
-                        if self._baseline_if_new(file_path):
-                            continue
-
-                        newest = self._newest_error(file_path, newest)
+                        adopted = self._adopt_if_new(file_path)
+                        if adopted is not None:
+                            # Файл побачено вперше: офсет уже на кінці,
+                            # показати можна лише свіжу частину його вмісту.
+                            newest = self._pick_newest(file_path, adopted, newest)
+                        else:
+                            newest = self._newest_error(file_path, newest)
 
                 self._forget_missing_files(present)
 
@@ -166,26 +171,50 @@ class FileChangeHandler(FileSystemEventHandler):
 
         return newest
 
-    def _baseline_if_new(self, file_path):
-        """Бере новий файл на облік без сповіщень. True — файл щойно взято.
+    def _adopt_if_new(self, file_path):
+        """Бере файл на облік при першій появі.
 
-        track_files() на старті ставить офсет на кінець кожного файлу, що
-        вже лежить у теці, тож стара історія не показується. А от файл,
-        скопійований уже після старту, не мав запису в file_paths і читався
-        з нуля — і вся його історія висипалася як свіжі помилки. На першому
+        None — файл не новий. Інакше список помилок з наявного вмісту,
+        які варто показати.
+
+        Офсет ставиться на кінець: читати такий файл з нуля не можна, бо
+        тоді вся його історія висипалася б як свіжі помилки (на першому
         запуску, коли тека призначення порожня, так поводилися геть усі
-        файли: у вікні опинялася помилка тижневої давнини.
+        файли — у вікні опинявся запис тижневої давнини).
+
+        Але просто змовчати теж не можна: застосунок, за яким стежимо,
+        заводить НОВИЙ лог на кожну сесію, і помилки, записані туди до
+        першого погляду трекера, зникли б безслідно. Тому з наявного
+        вмісту беруться записи, новіші за момент запуску трекера.
         """
         if file_path in self.file_paths:
-            return False
+            return None
 
+        errors = []
+        offset = 0
         try:
-            self.file_paths[file_path] = os.path.getsize(file_path)
-        except OSError:
-            self.file_paths[file_path] = 0
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+                errors = [
+                    line
+                    for line in (normalize_line(raw) for raw in file)
+                    if line.startswith(self.word)
+                ]
+                offset = file.tell()
+        except OSError as e:
+            print(f"Cannot adopt {file_path}: {e}")
+            try:
+                offset = os.path.getsize(file_path)
+            except OSError:
+                offset = 0
 
-        print(f"Baseline set for new file: {file_path}")
-        return True
+        self.file_paths[file_path] = offset
+
+        fresh = [
+            line for line in errors
+            if (parse_line_time(line) or datetime.min) >= self.started_at
+        ]
+        print(f"Adopted {file_path}: {len(errors)} errors, {len(fresh)} newer than startup")
+        return fresh
 
     def _forget_missing_files(self, present):
         """Прибирає з словників записи про файли, яких уже немає.
