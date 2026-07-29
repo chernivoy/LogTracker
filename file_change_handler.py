@@ -1,8 +1,32 @@
 import os
+import re
+from datetime import datetime
 
 from watchdog.events import FileSystemEventHandler
 
 from file_handler import FileHandler
+
+# Штатний формат рядка лога: "ERR █ 2026.07.08 12.49.45.1094076 █ 31 █ ...".
+# Дробова частина буває різної довжини, тому необов'язкова група.
+TIMESTAMP_RE = re.compile(
+    r'(\d{4})\.(\d{2})\.(\d{2})[ T](\d{2})\.(\d{2})\.(\d{2})(?:\.(\d+))?'
+)
+
+
+def parse_line_time(line):
+    """Витягує мітку часу з рядка лога. None, якщо формат інший."""
+    match = TIMESTAMP_RE.search(line)
+    if not match:
+        return None
+
+    year, month, day, hour, minute, second, fraction = match.groups()
+    microsecond = int(fraction[:6].ljust(6, '0')) if fraction else 0
+
+    try:
+        return datetime(int(year), int(month), int(day),
+                        int(hour), int(minute), int(second), microsecond)
+    except ValueError:
+        return None
 
 # Логи пишуться з BOM (EF BB BF). Файл читається як 'utf-8', а не
 # 'utf-8-sig', щоб офсети лишалися звичайними байтовими зміщеннями, тож
@@ -50,7 +74,7 @@ class FileChangeHandler(FileSystemEventHandler):
             )
             if copied:
                 present = set()
-                found = {}
+                newest = None  # (мітка_часу, шлях, рядок)
 
                 for filename in os.listdir(self.destination_directory):
                     if filename.endswith(self.file_extension):
@@ -60,20 +84,47 @@ class FileChangeHandler(FileSystemEventHandler):
                         if self._baseline_if_new(file_path):
                             continue
 
-                        errors = self.check_new_errors(file_path)
-                        if errors:
-                            found[file_path] = errors
+                        newest = self._newest_error(file_path, newest)
 
                 self._forget_missing_files(present)
 
-                # Одне повідомлення на весь тік. Якщо помилки прийшли в
-                # кількох файлах одразу, раніше кожен клав свій колбек у
-                # чергу і на екрані лишався тільки останній.
-                if found:
-                    self.last_error_file = list(found)[-1]
-                    self.event_queue.put(lambda batch=found: self.app.on_error_found(batch))
+                # На екран іде рівно одна помилка — найсвіжіша з усіх файлів
+                # тіку. Читаємо при цьому всі нові рядки кожного файлу, тож
+                # порівняння йде за реальними мітками часу, а не за порядком,
+                # у якому os.listdir() віддав імена.
+                if newest is not None:
+                    _, file_path, error_line = newest
+                    self.last_error_file = file_path
+                    self.event_queue.put(
+                        lambda p=file_path, line=error_line: self.app.on_error_found(p, line)
+                    )
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
+
+    def _newest_error(self, file_path, current_newest):
+        """Порівнює помилки файлу з поточним лідером і повертає найсвіжішу.
+
+        Рядок без розпізнаваної мітки часу оцінюється за mtime файлу —
+        грубо, але дозволяє змішувати логи різних форматів в одному тіку.
+        """
+        errors = self.check_new_errors(file_path)
+        if not errors:
+            return current_newest
+
+        try:
+            fallback = datetime.fromtimestamp(os.path.getmtime(file_path))
+        except OSError:
+            fallback = datetime.min
+
+        newest = current_newest
+        for line in errors:
+            stamp = parse_line_time(line) or fallback
+            # >= : за однакових міток перемагає пізніше зустрінутий рядок,
+            # а в межах файлу порядок читання збігається з порядком запису.
+            if newest is None or stamp >= newest[0]:
+                newest = (stamp, file_path, line)
+
+        return newest
 
     def _baseline_if_new(self, file_path):
         """Бере новий файл на облік без сповіщень. True — файл щойно взято.
