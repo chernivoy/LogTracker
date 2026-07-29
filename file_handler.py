@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import time
 
 
 class FileHandler:
@@ -66,24 +65,6 @@ class FileHandler:
             return False
 
     @staticmethod
-    def wait_for_file(file_path, timeout=2, poll_interval=0.1):
-        """Чекає, доки файл звільниться. Викликається з головного потоку Tk."""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if FileHandler.is_file_closed(file_path):
-                return True
-            # Пауза принципова: без неї цикл крутив open() безперервно і
-            # з'їдав ядро на 100%. А оскільки викликається він із
-            # periodic_sync (root.after -> головний потік Tk), кожна секунда
-            # очікування — це секунда повністю замороженого вікна.
-            time.sleep(poll_interval)
-
-        # Таймаут малий навмисно: periodic_sync повторює спробу щосекунди,
-        # тож блокувати UI на 30 с у надії дочекатися сенсу не мало.
-        print(f"File still locked after {timeout}s: {file_path}")
-        return False
-
-    @staticmethod
     def can_read_file(file_path):
         try:
             with open(file_path, 'r', encoding='utf-8'):
@@ -94,23 +75,33 @@ class FileHandler:
             return False
 
     @staticmethod
-    def copy_files_from_source_dir(source_directory, dest_directory, managed_files=None):
-        """Синхронізує .log з джерела в теку призначення.
+    def copy_files_from_source_dir(source_directory, dest_directory, managed_files=None,
+                                   file_extension='.log'):
+        """Синхронізує логи з джерела в теку призначення.
 
         managed_files — множина імен, які скопіював саме цей застосунок.
         Прибирання застарілих копій обмежене цією множиною: тека
         призначення задається користувачем через UI, і раніше сюди
-        потрапляв будь-який сторонній .log, який просто видалявся.
+        потрапляв будь-який сторонній лог, який просто видалявся.
+
+        file_extension приходить з конфігу. Раніше тут стояв жорсткий
+        '.log', тож зміна file_extension давала розбіжність: застосунок
+        стежив за одним розширенням, а копіював інше.
         """
         try:
             FileHandler().create_directory_if_not_exists(dest_directory)
             copied = False
             for filename in os.listdir(source_directory):
-                if filename.endswith('.log'):
+                if filename.endswith(file_extension):
                     source_file = os.path.join(source_directory, filename)
                     dest_file = os.path.join(dest_directory, filename)
 
-                    if FileHandler.wait_for_file(source_file):
+                    # Заблокований файл просто пропускаємо. Раніше тут стояв
+                    # wait_for_file(), який блокував головний потік Tk до 2 с
+                    # на файл — при 56 файлах тік, розрахований на секунду,
+                    # міг розтягтися на хвилини. Наступний тік через секунду
+                    # повторить спробу, чекати немає сенсу.
+                    if FileHandler.is_file_closed(source_file):
                         needs_copy = (
                             not os.path.exists(dest_file)
                             or os.path.getmtime(source_file) > os.path.getmtime(dest_file)
@@ -126,7 +117,7 @@ class FileHandler:
                                 managed_files.add(filename)
 
             for filename in os.listdir(dest_directory):
-                if filename.endswith('.log'):
+                if filename.endswith(file_extension):
                     dest_file = os.path.join(dest_directory, filename)
                     source_file = os.path.join(source_directory, filename)
                     if os.path.exists(source_file):

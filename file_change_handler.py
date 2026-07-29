@@ -47,7 +47,8 @@ class FileChangeHandler(FileSystemEventHandler):
     def sync_files_and_check(self, source_directory):
         try:
             copied = FileHandler.copy_files_from_source_dir(
-                source_directory, self.destination_directory, self.managed_files
+                source_directory, self.destination_directory,
+                self.managed_files, self.file_extension
             )
             if copied:
                 present = set()
