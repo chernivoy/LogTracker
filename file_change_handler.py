@@ -25,7 +25,6 @@ class FileChangeHandler(FileSystemEventHandler):
         self.event_queue = event_queue
         self.file_paths = {}
         self.last_error_file = None
-        self.last_update_time = {}
         # Імена файлів, які саме цей застосунок скопіював у теку призначення.
         # Лише їх дозволено видаляти при синхронізації.
         self.managed_files = set()
@@ -39,7 +38,6 @@ class FileChangeHandler(FileSystemEventHandler):
                 file_path = os.path.join(self.destination_directory, file_name)
                 if file_name.endswith(self.file_extension) and FileHandler.can_read_file(file_path):
                     self.file_paths[file_path] = os.path.getsize(file_path)
-                    self.last_update_time[file_path] = -1
                     print(f"File added for tracking: {file_path}")
         except Exception as e:
             print(f"Error when tracking files: {e}")
@@ -101,13 +99,12 @@ class FileChangeHandler(FileSystemEventHandler):
     def _forget_missing_files(self, present):
         """Прибирає з словників записи про файли, яких уже немає.
 
-        file_paths і last_update_time поповнювалися при кожному новому
-        файлі, але ніколи не чистилися — включно з файлами, які видаляла
-        сама ж синхронізація. За довгу сесію словники росли необмежено.
+        file_paths поповнювався при кожному новому файлі, але ніколи не
+        чистився — включно з файлами, які видаляла сама ж синхронізація.
+        За довгу сесію словник ріс необмежено.
         """
         for gone in [p for p in self.file_paths if p not in present]:
             del self.file_paths[gone]
-            self.last_update_time.pop(gone, None)
 
     def check_new_errors(self, file_path):
         """Повертає ВСІ рядки-помилки з нової частини файлу.
@@ -162,21 +159,26 @@ class FileChangeHandler(FileSystemEventHandler):
 
         return new_lines
 
+    # --- watchdog ---
+    # Обробники нижче лише логують і чистять стан. Виявлення помилок
+    # тримається на periodic_sync, а не на цих подіях (див. CLAUDE.md).
+
     def on_modified(self, event):
         if event.is_directory:
             return
         if event.src_path.endswith(self.file_extension):
-            if event.event_type == 'deleted':
-                self.stop_tracking(event.src_path)
-                print(f"Файл {event.src_path} был удален. Остановлено отслеживание.")
-            else:
-                print(f"Изменен файл: {event.src_path}")
+            # Тут була гілка `if event.event_type == 'deleted'`, недосяжна
+            # за визначенням: watchdog викликає on_modified лише для
+            # FileModifiedEvent. Через неї stop_tracking() не викликався
+            # ніколи, а видалення обробляє on_deleted.
+            print(f"Modified: {event.src_path}")
 
     def on_deleted(self, event):
-        if event.src_path in self.file_paths:
-            del self.file_paths[event.src_path]
-            print(f"Файл {event.src_path} был удален.")
+        if event.is_directory:
+            return
+        self.stop_tracking(event.src_path)
 
     def stop_tracking(self, file_path):
         if file_path in self.file_paths:
             del self.file_paths[file_path]
+            print(f"Stopped tracking deleted file: {file_path}")
