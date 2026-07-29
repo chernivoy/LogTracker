@@ -57,15 +57,34 @@ class FileChangeHandler(FileSystemEventHandler):
             )
 
     def read_new_lines(self, file_path):
+        """Читає «хвіст» файлу від збереженого офсету до кінця."""
         new_lines = []
-        current_size = os.path.getsize(file_path)
+
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                file.seek(self.file_paths.get(file_path, 0))
+            current_size = os.path.getsize(file_path)
+        except OSError as e:
+            print(f"Cannot stat {file_path}: {e}")
+            return new_lines
+
+        previous_offset = self.file_paths.get(file_path, 0)
+
+        try:
+            # errors='replace' обов'язковий: лог може містити не-UTF-8 байти
+            # (напр. рядок у cp1251). Раніше readlines() кидав UnicodeDecodeError,
+            # офсет лишався незмінним, і кожне наступне читання билося об той
+            # самий байт — помилки в цьому файлі не виявлялися вже ніколи.
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+                # Файл могли ротувати або обрізати — тоді збережений офсет
+                # більший за розмір, і читати треба з початку.
+                file.seek(previous_offset if previous_offset <= current_size else 0)
                 new_lines = file.readlines()
-                self.file_paths[file_path] = current_size
-        except Exception as e:
-            print(f"Ошибка при чтении файла {file_path}: {e}")
+        except OSError as e:
+            print(f"Cannot read {file_path}: {e}")
+        finally:
+            # Офсет рухаємо завжди, навіть після збою: інакше одна невдача
+            # заморожує позицію назавжди і файл випадає зі спостереження.
+            self.file_paths[file_path] = current_size
+
         return new_lines
 
     def on_modified(self, event):
