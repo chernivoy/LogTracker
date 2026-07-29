@@ -66,6 +66,7 @@ class LogTrackerApp:
         self.observer = None
         self.is_window_open = True
         self.tray_icon = None
+        self._geometry_save_job = None
 
         self.error_window = ErrorWindow(self, self.root, self.image_manager)
         self.event_queue = queue.Queue()
@@ -149,6 +150,20 @@ class LogTrackerApp:
             FileHandler.reveal_in_file_explorer(self.event_handler.last_error_file)
 
     def on_window_resize(self, event):
+        """Зберігає геометрію з дебаунсом.
+
+        <Configure> сипле десятками подій за секунду під час перетягування
+        чи ресайзу, а save_window_size щоразу робить повний цикл
+        читання-модифікації-запису ini. Відкладаємо запис до моменту, коли
+        рух припинився.
+        """
+        if self._geometry_save_job is not None:
+            self.root.after_cancel(self._geometry_save_job)
+
+        self._geometry_save_job = self.root.after(500, self._save_geometry_now)
+
+    def _save_geometry_now(self):
+        self._geometry_save_job = None
         WindowHandler.save_window_size('Window', self.root)
 
     def toggle_theme(self, theme_name: str):

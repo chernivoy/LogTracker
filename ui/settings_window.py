@@ -58,9 +58,22 @@ class SettingsWindow:
         )
         btn_cancel.pack(pady=5)
 
-        # Зберігання позиції вікна налаштувань при його зміні
-        settings_window.bind("<Configure>",
-                             lambda event: WindowHandler.save_window_size('Window_path', settings_window))
+        # Зберігання позиції вікна налаштувань при його зміні — з дебаунсом,
+        # інакше кожна подія <Configure> під час перетягування переписує ini.
+        settings_window._geometry_save_job = None
+
+        def _save_geometry():
+            settings_window._geometry_save_job = None
+            # Save/Cancel можуть знищити вікно, поки запис ще відкладений.
+            if settings_window.winfo_exists():
+                WindowHandler.save_window_size('Window_path', settings_window)
+
+        def _on_configure(event):
+            if settings_window._geometry_save_job is not None:
+                settings_window.after_cancel(settings_window._geometry_save_job)
+            settings_window._geometry_save_job = settings_window.after(500, _save_geometry)
+
+        settings_window.bind("<Configure>", _on_configure)
 
     @staticmethod
     def save_settings(app, settings_window, source_directory, destination_directory):
