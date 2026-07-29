@@ -39,21 +39,34 @@ class FileHandler:
 
     @staticmethod
     def is_file_closed(file_path):
+        """Предикат: чи можна зараз відкрити файл на читання.
+
+        Свідомо мовчазний — викликається в циклі опитування, і будь-який
+        print() тут перетворював очікування на потік однакових рядків.
+        """
         try:
             with open(file_path, 'rb') as file:
                 file.seek(0, os.SEEK_END)
             return True
-        except IOError as e:
-            print(f"Файл {file_path} в данный момент используется: {e}")
+        except OSError:
             return False
 
     @staticmethod
-    def wait_for_file(file_path, timeout=30):
+    def wait_for_file(file_path, timeout=2, poll_interval=0.1):
+        """Чекає, доки файл звільниться. Викликається з головного потоку Tk."""
         start_time = time.time()
         while time.time() - start_time < timeout:
             if FileHandler.is_file_closed(file_path):
                 return True
-        print(f"Файл {file_path} все еще используется после {timeout} секунд.")
+            # Пауза принципова: без неї цикл крутив open() безперервно і
+            # з'їдав ядро на 100%. А оскільки викликається він із
+            # periodic_sync (root.after -> головний потік Tk), кожна секунда
+            # очікування — це секунда повністю замороженого вікна.
+            time.sleep(poll_interval)
+
+        # Таймаут малий навмисно: periodic_sync повторює спробу щосекунди,
+        # тож блокувати UI на 30 с у надії дочекатися сенсу не мало.
+        print(f"File still locked after {timeout}s: {file_path}")
         return False
 
     @staticmethod
