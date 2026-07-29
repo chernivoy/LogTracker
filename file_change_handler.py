@@ -57,6 +57,10 @@ class FileChangeHandler(FileSystemEventHandler):
                     if filename.endswith(self.file_extension):
                         file_path = os.path.join(self.destination_directory, filename)
                         present.add(file_path)
+
+                        if self._baseline_if_new(file_path):
+                            continue
+
                         errors = self.check_new_errors(file_path)
                         if errors:
                             found[file_path] = errors
@@ -71,6 +75,27 @@ class FileChangeHandler(FileSystemEventHandler):
                     self.event_queue.put(lambda batch=found: self.app.on_error_found(batch))
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
+
+    def _baseline_if_new(self, file_path):
+        """Бере новий файл на облік без сповіщень. True — файл щойно взято.
+
+        track_files() на старті ставить офсет на кінець кожного файлу, що
+        вже лежить у теці, тож стара історія не показується. А от файл,
+        скопійований уже після старту, не мав запису в file_paths і читався
+        з нуля — і вся його історія висипалася як свіжі помилки. На першому
+        запуску, коли тека призначення порожня, так поводилися геть усі
+        файли: у вікні опинялася помилка тижневої давнини.
+        """
+        if file_path in self.file_paths:
+            return False
+
+        try:
+            self.file_paths[file_path] = os.path.getsize(file_path)
+        except OSError:
+            self.file_paths[file_path] = 0
+
+        print(f"Baseline set for new file: {file_path}")
+        return True
 
     def _forget_missing_files(self, present):
         """Прибирає з словників записи про файли, яких уже немає.
