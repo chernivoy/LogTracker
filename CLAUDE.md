@@ -73,8 +73,6 @@ LogTrackerApp.on_error_found → ErrorWindow (+ підняття вікна з �
 
 `ConfigManager.save_config()` за замовчуванням пише саме у **window_config.ini** — його дефолтний аргумент `config_file=CONFIG_FILE_WINDOW`. Налаштування шляхів зберігаються окремим кодом у `SettingsWindow.save_settings`, який пише напряму в `CONFIG_PATH`.
 
-`config.ini` у корені репо **не використовується** — застаріла копія зі старою схемою ключів (`directory`, `current_theme`). Не редагувати, код її не читає.
-
 Обидва ini перелічені в `.gitignore`, але були закомічені раніше, тому зміни в них далі потрапляють у `git status`.
 
 ### DPI-конвенція (легко зламати)
@@ -139,9 +137,7 @@ LogTrackerApp.on_error_found → ErrorWindow (+ підняття вікна з �
 
 Завдяки цьому виняток на старті потрапляє у файл. Без хука `console=False` дає лише діалог «Unhandled exception in script» без тексту — жодної діагностики.
 
-### Untracked-ассети
-
-`src/*.png` та `src/bug.ico` **не в git** (не ігноруються — просто ніколи не додавалися). Свіжий клон запуститься, але без іконок: `ImageManager.get_ctk_image()` поверне `None`, а `TrayManager` перейде на згенеровану `create_image()`-заглушку.
+Усі ресурси `src/` (іконки + ini) тепер у git. `ImageManager.get_ctk_image()` при відсутньому файлі повертає `None` мовчки, а `TrayManager` переходить на згенеровану `create_image()`-заглушку — тобто пропалий ассет не дає помилки, лише порожню іконку. Якщо іконки зникли, шукати треба саме тут.
 
 ## Життєвий цикл вікна
 
@@ -161,8 +157,7 @@ LogTrackerApp.on_error_found → ErrorWindow (+ підняття вікна з �
 
 - `pin.py` — окремий демо-скрипт `RoundedWindow`, ніде не імпортується;
 - `WindowHandler.save_window_params_2` — не викликається (використовується `save_window_params`);
-- `config.ini` у корені — застаріла копія;
-- `build/`, `dist/`, `output/` — артефакти збірки в робочому дереві.
+- `build/`, `dist/` (від `pyinstaller logger.spec`) та `output/` (від auto-py-to-exe) — артефакти збірки, у `.gitignore`.
 
 ## Мова
 
