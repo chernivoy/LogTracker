@@ -181,25 +181,40 @@ class LogTrackerApp:
         ThemeManager.update_widgets_theme(self, self.widgets_to_update)
         ConfigManager.save_config("Theme", "current", theme_name)
 
-    def on_error_found(self, file_path, error_line):
-        """Метод, який викликається при виявленні помилки в файлі."""
-        file_name = os.path.basename(file_path)
+    def on_error_found(self, batch):
+        """Показує всі помилки, знайдені за один тік синхронізації.
+
+        batch — {шлях_до_файлу: [рядки_помилок]}. Приймає саме пачку, а не
+        один рядок: раніше з кількох помилок відображалася лише остання.
+        """
+        if not batch:
+            return
+
+        total = sum(len(lines) for lines in batch.values())
+        last_file = os.path.basename(list(batch)[-1])
+
+        if len(batch) == 1:
+            header = f" File: {last_file}" if total == 1 else f" File: {last_file} ({total} errors)"
+        else:
+            header = f" {total} errors in {len(batch)} files"
 
         header_label_font = self.theme_manager.current_theme_data.get("header_label_font")
         error_textbox_font = self.theme_manager.current_theme_data.get("error_textbox_font")
 
-        if header_label_font:
-            self.file_label.configure(font=header_label_font, text=f" File: {file_name}")
-        else:
-            self.file_label.configure(font=("Inter", 13), text=f" File: {file_name}")
-
-        if error_textbox_font:
-            self.error_text_widget.configure(font=error_textbox_font, state=tk.NORMAL)
-        else:
-            self.error_text_widget.configure(font=("Inter", 13), state=tk.NORMAL)
+        self.file_label.configure(font=header_label_font or ("Inter", 13), text=header)
+        self.error_text_widget.configure(font=error_textbox_font or ("Inter", 13), state=tk.NORMAL)
 
         self.error_text_widget.delete(1.0, tk.END)
-        self.error_text_widget.insert(tk.END, error_line + "\n")
+        for file_path, lines in batch.items():
+            # Ім'я файлу перед блоком потрібне лише коли їх кілька —
+            # для одного воно вже стоїть у заголовку.
+            if len(batch) > 1:
+                self.error_text_widget.insert(tk.END, f"--- {os.path.basename(file_path)} ---\n")
+            for line in lines:
+                self.error_text_widget.insert(tk.END, line + "\n")
+
+        # Останню помилку видно одразу, без ручного гортання.
+        self.error_text_widget.see(tk.END)
         self.error_text_widget.configure(state=tk.DISABLED)
 
         if not self.is_window_open:

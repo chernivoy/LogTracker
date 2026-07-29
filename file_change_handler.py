@@ -4,6 +4,17 @@ from watchdog.events import FileSystemEventHandler
 
 from file_handler import FileHandler
 
+# Логи пишуться з BOM (EF BB BF). Файл читається як 'utf-8', а не
+# 'utf-8-sig', щоб офсети лишалися звичайними байтовими зміщеннями, тож
+# BOM доходить до зіставлення як символ '﻿'. Пробільним він не
+# вважається, і str.strip() його не прибирає.
+BOM = '﻿'
+
+
+def normalize_line(line):
+    """Готує рядок до порівняння зі словом-маркером."""
+    return line.lstrip(BOM).strip()
+
 
 class FileChangeHandler(FileSystemEventHandler):
     def __init__(self, _app, destination_directory, word, file_extension, event_queue):
@@ -40,13 +51,24 @@ class FileChangeHandler(FileSystemEventHandler):
             )
             if copied:
                 present = set()
+                found = {}
+
                 for filename in os.listdir(self.destination_directory):
                     if filename.endswith(self.file_extension):
                         file_path = os.path.join(self.destination_directory, filename)
                         present.add(file_path)
-                        self.check_new_errors(file_path)
+                        errors = self.check_new_errors(file_path)
+                        if errors:
+                            found[file_path] = errors
 
                 self._forget_missing_files(present)
+
+                # Одне повідомлення на весь тік. Якщо помилки прийшли в
+                # кількох файлах одразу, раніше кожен клав свій колбек у
+                # чергу і на екрані лишався тільки останній.
+                if found:
+                    self.last_error_file = list(found)[-1]
+                    self.event_queue.put(lambda batch=found: self.app.on_error_found(batch))
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
 
@@ -62,20 +84,18 @@ class FileChangeHandler(FileSystemEventHandler):
             self.last_update_time.pop(gone, None)
 
     def check_new_errors(self, file_path):
-        new_lines = self.read_new_lines(file_path)
-        last_error_line = None
-        for line in new_lines:
-            if line.strip().startswith(self.word):
-                last_error_line = line.strip()
+        """Повертає ВСІ рядки-помилки з нової частини файлу.
 
-        if new_lines:
-            self.last_update_time[file_path] = os.path.getmtime(file_path)
-
-        if last_error_line:
-            self.last_error_file = file_path
-            self.event_queue.put(
-                lambda: self.app.on_error_found(file_path, last_error_line)
-            )
+        Раніше метод у циклі перезаписував одну змінну, тож із пачки
+        виживала лише остання помилка — решта губилася назавжди, бо офсет
+        уже зсунуто. Тепер повертається повний список, а рішення про показ
+        ухвалює sync_files_and_check, який бачить усі файли тіку разом.
+        """
+        return [
+            line
+            for line in (normalize_line(raw) for raw in self.read_new_lines(file_path))
+            if line.startswith(self.word)
+        ]
 
     def read_new_lines(self, file_path):
         """Читає «хвіст» файлу від збереженого офсету до кінця."""
