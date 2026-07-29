@@ -17,6 +17,22 @@ from ui.window_handler import WindowHandler
 import sys
 import ctypes
 
+# Логування в проєкті тримається на print(), а повідомлення часто містять
+# кирилицю. Консоль Windows зазвичай працює в cp1252/cp866, тож print()
+# падав з UnicodeEncodeError — найчастіше саме всередині except-гілки,
+# через що обробник помилки сам ставав помилкою і ховав початкову причину.
+# errors='replace' робить вивід ущербним (нелатиниця стає '?'), але ніколи
+# не аварійним. Кодування не чіпаємо: підміна на utf-8 дала б кракозябри
+# в консолях зі старою кодовою сторінкою.
+for _stream in (sys.stdout, sys.stderr):
+    # sys.stdout дорівнює None у windowed-збірці — там вивід перехоплює
+    # rthook_logfile.py, який пише у файл в utf-8 без втрат.
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(errors="replace")
+        except (OSError, ValueError):
+            pass
+
 if sys.platform == "win32":
     try:
         # Ця функція доступна з Windows 8.1+
