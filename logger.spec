@@ -2,26 +2,32 @@
 
 # -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
+import glob
+import os
+
+# Пакуємо всю теку src (іконки + ini) — шляхи резолвляться через
+# PathUtils.resource_path(os.path.join("src", ...)), тому цільова тека саме 'src'.
+src_datas = [(f, 'src') for f in glob.glob(os.path.join('src', '*')) if os.path.isfile(f)]
+
+# Теми вантажаться динамічно (ThemeManager.load_theme → importlib.import_module),
+# тому статичний аналіз PyInstaller їх не бачить — перелічуємо явно.
+theme_imports = [
+    'themes.' + os.path.splitext(os.path.basename(f))[0]
+    for f in glob.glob(os.path.join('themes', '*_theme.py'))
+]
 
 a = Analysis(
     ['logger.py'],
     pathex=['.'],
     binaries=[],
-    datas=[
-    ('src\\config.ini', 'src'),
-    ('src\\window_config.ini', 'src'),
-    ],
-    hiddenimports=[],
+    datas=src_datas,
+    hiddenimports=theme_imports,
     hookspath=[],
-    runtime_hooks=[],
+    runtime_hooks=['rthook_logfile.py'],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -35,7 +41,8 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,
+    icon=os.path.join('src', 'Header.ico'),
 )
 
 coll = COLLECT(
