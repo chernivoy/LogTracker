@@ -67,6 +67,13 @@ class SettingsWindow:
         """
         Зберігає налаштування шляхів та закриває вікно налаштувань.
         """
+        # ConfigManager.load_config при відсутньому файлі створює його лише
+        # з секцією [Window] — байдуже, який це конфіг. Тож на свіжій
+        # інсталяції (немає src/config.ini) секції [Settings] не існувало,
+        # і .set() падав з NoSectionError просто по кнопці Save.
+        if not app.config.has_section('Settings'):
+            app.config.add_section('Settings')
+
         app.config.set('Settings', 'source_directory', source_directory)
         app.config.set('Settings', 'destination_directory', destination_directory)
 
