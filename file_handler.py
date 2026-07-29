@@ -7,16 +7,30 @@ import time
 class FileHandler:
     @staticmethod
     def copy_file_without_waiting(source_file, dest_file):
+        """Копіює файл атомарно. Повертає True лише при повному успіху.
+
+        Пишемо в тимчасовий файл і підміняємо через os.replace(), бо
+        відкриття призначення в 'wb' одразу обрізало його: зрив копіювання
+        на середині лишав обрізаний файл із mtime «зараз». Умова
+        getmtime(source) > getmtime(dest) після цього ніколи не
+        спрацьовувала, тож копія лишалася скаліченою доти, доки джерело не
+        запишуть знову — для завершеного лога назавжди.
+        """
+        temp_file = dest_file + '.part'
         try:
-            with open(source_file, 'rb') as src, open(dest_file, 'wb') as dst:
+            with open(source_file, 'rb') as src, open(temp_file, 'wb') as dst:
                 shutil.copyfileobj(src, dst)
-            print(f"Файл {source_file} успешно скопирован в {dest_file}")
-        except PermissionError as e:
-            print(f"Ошибка доступа при копировании файла {source_file}: {e}")
-        except FileNotFoundError as e:
-            print(f"Файл {source_file} не найден: {e}")
-        except Exception as e:
-            print(f"Не удалось скопировать файл {source_file}: {e}")
+            os.replace(temp_file, dest_file)
+            print(f"Copied {source_file} -> {dest_file}")
+            return True
+        except OSError as e:
+            print(f"Cannot copy {source_file}: {e}")
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except OSError:
+                pass
+            return False
 
     @staticmethod
     def open_file(file_path):
@@ -97,19 +111,19 @@ class FileHandler:
                     dest_file = os.path.join(dest_directory, filename)
 
                     if FileHandler.wait_for_file(source_file):
-                        if not os.path.exists(dest_file):
-                            FileHandler.copy_file_without_waiting(source_file, dest_file)
-                            print(f'File {filename} copied from {source_directory} to {dest_directory}')
+                        needs_copy = (
+                            not os.path.exists(dest_file)
+                            or os.path.getmtime(source_file) > os.path.getmtime(dest_file)
+                        )
+                        # copied відображає лише реальний успіх: раніше
+                        # прапорець ставився беззастережно, а помилку
+                        # копіювання проковтували — у лог ішло «File copied»
+                        # навіть коли файл не скопіювався.
+                        if needs_copy and FileHandler.copy_file_without_waiting(source_file, dest_file):
                             copied = True
-                        else:
 
-                            if os.path.getmtime(source_file) > os.path.getmtime(dest_file):
-                                FileHandler.copy_file_without_waiting(source_file, dest_file)
-                                print(f'File {filename} updated in {dest_directory}')
-                                copied = True
-
-                        if managed_files is not None:
-                            managed_files.add(filename)
+                            if managed_files is not None:
+                                managed_files.add(filename)
 
             for filename in os.listdir(dest_directory):
                 if filename.endswith('.log'):
