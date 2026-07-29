@@ -80,8 +80,14 @@ class FileHandler:
             return False
 
     @staticmethod
-    def copy_files_from_source_dir(source_directory, dest_directory):
+    def copy_files_from_source_dir(source_directory, dest_directory, managed_files=None):
+        """Синхронізує .log з джерела в теку призначення.
 
+        managed_files — множина імен, які скопіював саме цей застосунок.
+        Прибирання застарілих копій обмежене цією множиною: тека
+        призначення задається користувачем через UI, і раніше сюди
+        потрапляв будь-який сторонній .log, який просто видалявся.
+        """
         try:
             FileHandler().create_directory_if_not_exists(dest_directory)
             copied = False
@@ -101,15 +107,28 @@ class FileHandler:
                                 FileHandler.copy_file_without_waiting(source_file, dest_file)
                                 print(f'File {filename} updated in {dest_directory}')
                                 copied = True
+
+                        if managed_files is not None:
+                            managed_files.add(filename)
+
             for filename in os.listdir(dest_directory):
                 if filename.endswith('.log'):
                     dest_file = os.path.join(dest_directory, filename)
                     source_file = os.path.join(source_directory, filename)
-                    if not os.path.exists(source_file):
-                        os.remove(dest_file)
-                        print(
-                            f'File {filename} removed from {dest_directory},  because it does not exist in {source_directory}')
-                        copied = True
+                    if os.path.exists(source_file):
+                        continue
+
+                    # Чужий файл — не ми його сюди поклали, не нам і прибирати.
+                    if managed_files is not None and filename not in managed_files:
+                        print(f'File {filename} left alone: not copied by this app')
+                        continue
+
+                    os.remove(dest_file)
+                    if managed_files is not None:
+                        managed_files.discard(filename)
+                    print(
+                        f'File {filename} removed from {dest_directory},  because it does not exist in {source_directory}')
+                    copied = True
             if copied:
                 print(f'Finished copying from {source_directory} to {dest_directory}.')
                 return copied

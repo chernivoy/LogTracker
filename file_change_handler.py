@@ -15,6 +15,9 @@ class FileChangeHandler(FileSystemEventHandler):
         self.file_paths = {}
         self.last_error_file = None
         self.last_update_time = {}
+        # Імена файлів, які саме цей застосунок скопіював у теку призначення.
+        # Лише їх дозволено видаляти при синхронізації.
+        self.managed_files = set()
         FileHandler().create_directory_if_not_exists(self.destination_directory)
         self.track_files()
 
@@ -32,7 +35,9 @@ class FileChangeHandler(FileSystemEventHandler):
 
     def sync_files_and_check(self, source_directory):
         try:
-            copied = FileHandler.copy_files_from_source_dir(source_directory, self.destination_directory)
+            copied = FileHandler.copy_files_from_source_dir(
+                source_directory, self.destination_directory, self.managed_files
+            )
             if copied:
                 for filename in os.listdir(self.destination_directory):
                     if filename.endswith(self.file_extension):
