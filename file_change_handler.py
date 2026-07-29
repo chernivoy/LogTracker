@@ -88,6 +88,8 @@ class FileChangeHandler(FileSystemEventHandler):
             return new_lines
 
         previous_offset = self.file_paths.get(file_path, 0)
+        # Запасне значення на випадок, коли до tell() справа не дійде.
+        next_offset = current_size
 
         try:
             # errors='replace' обов'язковий: лог може містити не-UTF-8 байти
@@ -99,12 +101,18 @@ class FileChangeHandler(FileSystemEventHandler):
                 # більший за розмір, і читати треба з початку.
                 file.seek(previous_offset if previous_offset <= current_size else 0)
                 new_lines = file.readlines()
+                # Саме tell(), а не зафіксований до відкриття current_size.
+                # Лог дописують безперервно, тож між getsize() і readlines()
+                # у файл встигали потрапити нові рядки: readlines() їх читав,
+                # а офсет лишався на доростовому розмірі — і наступний тік
+                # показував ті самі помилки вдруге.
+                next_offset = file.tell()
         except OSError as e:
             print(f"Cannot read {file_path}: {e}")
         finally:
             # Офсет рухаємо завжди, навіть після збою: інакше одна невдача
             # заморожує позицію назавжди і файл випадає зі спостереження.
-            self.file_paths[file_path] = current_size
+            self.file_paths[file_path] = next_offset
 
         return new_lines
 
