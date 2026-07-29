@@ -1,4 +1,15 @@
 /venv/
+/.venv/
 /.idea/
 /src/config.ini
 /src/window_config.ini
+
+# Артефакти збірки: build/ і dist/ від pyinstaller logger.spec,
+# output/ від auto-py-to-exe
+/build/
+/dist/
+/output/
+
+# Байт-код Python
+__pycache__/
+*.pyc
