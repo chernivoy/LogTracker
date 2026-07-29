@@ -131,7 +131,10 @@ class FileHandler:
                     copied = True
             if copied:
                 print(f'Finished copying from {source_directory} to {dest_directory}.')
-                return copied
+            # Явний return: раніше при copied=False функція просто добігала
+            # до кінця і віддавала None. Працювало випадково — обидва
+            # значення хибні — але тип, що залежить від гілки, це пастка.
+            return copied
         except Exception as e:
             print(f" Error when copying file from {source_directory} to {dest_directory}: {e}")
             return False
@@ -174,8 +177,12 @@ class FileHandler:
             abs_path = os.path.abspath(file_path)
 
             if os.name == 'nt':  # Windows
-                # Команда `explorer.exe /select,` відкриває Провідник і виділяє файл
-                subprocess.run(['explorer', '/select,', abs_path], check=True)
+                # Команда `explorer.exe /select,` відкриває Провідник і виділяє файл.
+                # Без check=True навмисно: explorer повертає ненульовий код
+                # навіть коли вікно успішно відкрилося, тож перевірка коду
+                # породжувала CalledProcessError і фальшиве повідомлення про
+                # помилку при кожному вдалому виклику.
+                subprocess.run(['explorer', '/select,', abs_path])
                 print(f"Файл '{file_path}' відкрито у Провіднику Windows.")
 
             elif os.name == 'posix':

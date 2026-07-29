@@ -39,11 +39,27 @@ class FileChangeHandler(FileSystemEventHandler):
                 source_directory, self.destination_directory, self.managed_files
             )
             if copied:
+                present = set()
                 for filename in os.listdir(self.destination_directory):
                     if filename.endswith(self.file_extension):
-                        self.check_new_errors(os.path.join(self.destination_directory, filename))
+                        file_path = os.path.join(self.destination_directory, filename)
+                        present.add(file_path)
+                        self.check_new_errors(file_path)
+
+                self._forget_missing_files(present)
         except Exception as e:
             print(f"Error when sync and check files and errors: {e}")
+
+    def _forget_missing_files(self, present):
+        """Прибирає з словників записи про файли, яких уже немає.
+
+        file_paths і last_update_time поповнювалися при кожному новому
+        файлі, але ніколи не чистилися — включно з файлами, які видаляла
+        сама ж синхронізація. За довгу сесію словники росли необмежено.
+        """
+        for gone in [p for p in self.file_paths if p not in present]:
+            del self.file_paths[gone]
+            self.last_update_time.pop(gone, None)
 
     def check_new_errors(self, file_path):
         new_lines = self.read_new_lines(file_path)

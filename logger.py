@@ -98,14 +98,19 @@ class LogTrackerApp:
         self.root.mainloop()
 
     def process_queue(self):
-        try:
-            while True:
+        while True:
+            try:
                 event = self.event_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            # try всередині циклу, а не навколо нього: раніше один збійний
+            # колбек обривав розбір усієї черги на цей тік, і решта подій
+            # чекала наступного проходу.
+            try:
                 event()
-        except queue.Empty:
-            pass
-        except Exception as e:
-            print(f"Exception in process_queue: {e}")
+            except Exception as e:
+                print(f"Exception in queued event: {e}")
         self.root.after(100, self.process_queue)
 
     def periodic_sync(self):
