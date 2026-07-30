@@ -329,17 +329,22 @@ class LogTrackerApp:
             font_spec = inner.cget("font") if inner is not None else self.file_label.cget("font")
             measurer = tkfont.Font(font=font_spec)
 
-            # Доступну ширину рахуємо від ШИРИНИ ВІКНА, а НЕ від позиції кнопок.
-            # Мітка sticky="nw" має натуральну ширину, тож довгий текст сам
-            # розсуває колонку й заштовхує кнопки за правий край — їхній
-            # winfo_x() тоді завеликий, і обрізання не спрацювало б (саме тому
-            # напис лишався перекритим). `reserved` — фіксоване місце під кнопки
-            # праворуч (їхній padx+ширина ≈ 60 лог.); `left` — лівий відступ
-            # мітки (стабільний, від тексту не залежить).
-            scale = WindowHandler._window_scale(self.root)
-            reserved = int(60 * scale)
-            left = self.file_label.winfo_x()
-            avail = self.root.winfo_width() - reserved - left
+            # Доступну ширину беремо з РЕАЛЬНОЇ комірки колонки заголовка
+            # (grid_bbox), а не з ширини вікна чи позиції кнопок. Колонка з
+            # weight=1 при нестачі місця ЗВУЖУЄТЬСЯ першою (кнопки лишаються),
+            # тож мітка обрізається саме своєю коміркою — від вікна/кнопок
+            # оцінка виходила завеликою і обрізання не спрацьовувало.
+            #   avail = ширина_комірки - padx(обидва боки) - chrome
+            # chrome = іконка + внутрішні відступи мітки (reqwidth поверх тексту).
+            mf = self.error_window.main_frame
+            cell = mf.grid_bbox(0, 0)  # (x, y, w, h) комірки заголовка
+            cell_w = cell[2] if cell and cell[2] > 0 else self.root.winfo_width()
+            info = self.file_label.grid_info()
+            padx = info.get("padx", 0)
+            padx_total = (padx[0] + padx[1]) if isinstance(padx, (tuple, list)) else 2 * int(padx)
+            current_text = self.file_label.cget("text")
+            chrome = max(0, self.file_label.winfo_reqwidth() - measurer.measure(current_text))
+            avail = cell_w - padx_total - chrome - 4  # -4 невеликий запас
         except Exception:
             if self.file_label.cget("text") != full:
                 self.file_label.configure(text=full)
@@ -358,22 +363,10 @@ class LogTrackerApp:
                     break
 
         # TODO: тимчасовий діагностичний вивід — прибрати після налаштування.
-        try:
-            fl_x = self.file_label.winfo_x()
-            fl_w = self.file_label.winfo_width()       # РЕАЛЬНА ширина мітки (з іконкою+padding)
-            fl_req = self.file_label.winfo_reqwidth()  # бажана ширина мітки
-            bx = self.error_window.burger_button.winfo_x()
-            tx = self.error_window.to_tray_button.winfo_x()
-            cur_text = self.file_label.cget("text")
-            chrome = fl_w - measurer.measure(cur_text)  # іконка+padding (з поточного тексту)
-        except Exception as e:
-            fl_x = fl_w = fl_req = bx = tx = chrome = -1
-            cur_text = f"<err {e}>"
-        print(f"[fit_header] win_w={self.root.winfo_width()} avail={avail} full_w={full_w} "
-              f"trunc={text != full} result_w={measurer.measure(text)} | "
-              f"label_x={fl_x} label_w={fl_w} label_req={fl_req} label_right={fl_x + fl_w} "
-              f"chrome={chrome} | burger_x={bx} tray_x={tx} | "
-              f"overlap={(fl_x + fl_w) - bx} | text={text!r}")
+        print(f"[fit_header] win_w={self.root.winfo_width()} cell_w={cell_w} "
+              f"padx={padx_total} chrome={chrome} avail={avail} | "
+              f"full_w={full_w} trunc={text != full} result_w={measurer.measure(text)} | "
+              f"label_reqw={self.file_label.winfo_reqwidth()} text={text!r}")
 
         if self.file_label.cget("text") != text:
             self.file_label.configure(text=text)
