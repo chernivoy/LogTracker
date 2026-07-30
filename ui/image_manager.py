@@ -41,9 +41,19 @@ class ImageManager:
     def get_tk_photo_image(self, path: str, base_size: tuple, force_reload: bool = False) -> tk.PhotoImage | None:
         """
         Завантажує та масштабує зображення для нативних Tkinter віджетів (напр., Menu).
+
+        Результат кешується за (шлях, розмір, DPI): бургер-меню будується заново
+        на кожне відкриття, і без кешу кожен клік знову читав би PNG з диска й
+        гнав LANCZOS-resize. Ключ включає DPI, тож зміна масштабу (реконект RDP)
+        дає новий запис, а не стару картинку. force_reload обходить кеш.
         """
         full_path = Path.PathUtils.resource_path(path)
         dpi_scale_factor = rdp.get_windows_dpi_scale(self.root)
+        cache_key = (full_path, "tk", base_size, dpi_scale_factor)
+
+        if not force_reload and cache_key in self._cache:
+            print(f"INFO: Retrieving Tk PhotoImage from cache for path: {full_path}")
+            return self._cache[cache_key]
 
         try:
             pil_image = Image.open(full_path)
@@ -57,6 +67,7 @@ class ImageManager:
 
             resized_image = pil_image.resize((scaled_width, scaled_height), Image.LANCZOS)
             tk_photo = ImageTk.PhotoImage(resized_image)
+            self._cache[cache_key] = tk_photo
             print(f"INFO: Loaded and cached new Tk PhotoImage for path: {full_path}")
             return tk_photo
         except FileNotFoundError:

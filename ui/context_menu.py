@@ -121,10 +121,11 @@ class ContextMenu:
 
         self._icons = {}
         try:
-            # Примусово створюємо нові іконки, не використовуючи кеш
+            # Кеш ImageManager (за шляхом+розміром+DPI) переживає повторні
+            # відкриття меню, тож force_reload не потрібен — PNG читається один раз.
             for name, path in icon_paths.items():
                 self._icons[name] = self.image_manager.get_tk_photo_image(
-                    path, base_icon_size, force_reload=True)
+                    path, base_icon_size)
         except Exception as e:
             print(f"Error when loading icons: {e}")
 
