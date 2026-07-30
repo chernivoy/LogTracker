@@ -18,6 +18,7 @@ class ContextMenu:
         self.image_manager = image_manager
         self.menu = None
         self._icons = {}
+        self._has_icons = False
 
     def show_menu(self, button):
         print("INFO: Attempting to show context menu.")
@@ -58,8 +59,11 @@ class ContextMenu:
             self.menu.grab_release()
 
     def _populate_menu(self):
-        # Логіка наповнення меню, яка використовує self._icons
-        if self._icons:
+        # Логіка наповнення меню, яка використовує self._icons.
+        # Перевіряємо саме _has_icons, а не truthiness self._icons: get_tk_photo_image
+        # повертає None на відсутній файл, тож словник міг бути непорожнім, але з
+        # None-значеннями — і гілка «з іконками» ставила image=None замість фолбеку.
+        if self._has_icons:
             # Створення підменю Theme
             theme_menu = tk.Menu(self.menu, tearoff=0,
                                  bg=self.menu['bg'], fg=self.menu['fg'],
@@ -104,25 +108,33 @@ class ContextMenu:
             self.menu.add_command(label="Exit", command=self.app.on_closing)
 
     def _load_icons(self):
-        try:
-            base_icon_size = (16, 16)
-            print(f"INFO: Loading icons with base size: {base_icon_size}")
+        base_icon_size = (16, 16)
+        icon_paths = {
+            'settings': SETTINGS_ICON_PATH,
+            'exit': EXIT_ICON_PATH,
+            'theme': THEME_ICON_PATH,
+            'dark_theme': DARK_THEME_ICON_PATH,
+            'light_theme': LIGHT_THEME_ICON_PATH,
+            'custom_theme': CUSTOM_THEME_ICON_PATH,
+        }
+        print(f"INFO: Loading icons with base size: {base_icon_size}")
 
+        self._icons = {}
+        try:
             # Примусово створюємо нові іконки, не використовуючи кеш
-            self._icons['settings'] = self.image_manager.get_tk_photo_image(SETTINGS_ICON_PATH, base_icon_size,
-                                                                            force_reload=True)
-            self._icons['exit'] = self.image_manager.get_tk_photo_image(EXIT_ICON_PATH, base_icon_size,
-                                                                        force_reload=True)
-            self._icons['theme'] = self.image_manager.get_tk_photo_image(THEME_ICON_PATH, base_icon_size,
-                                                                         force_reload=True)
-            self._icons['dark_theme'] = self.image_manager.get_tk_photo_image(DARK_THEME_ICON_PATH, base_icon_size,
-                                                                              force_reload=True)
-            self._icons['light_theme'] = self.image_manager.get_tk_photo_image(LIGHT_THEME_ICON_PATH, base_icon_size,
-                                                                               force_reload=True)
-            self._icons['custom_theme'] = self.image_manager.get_tk_photo_image(CUSTOM_THEME_ICON_PATH, base_icon_size,
-                                                                                force_reload=True)
-            self._has_icons = True
-            print("INFO: Icons loaded successfully.")
+            for name, path in icon_paths.items():
+                self._icons[name] = self.image_manager.get_tk_photo_image(
+                    path, base_icon_size, force_reload=True)
         except Exception as e:
             print(f"Error when loading icons: {e}")
-            self._has_icons = False
+
+        # get_tk_photo_image повертає None на відсутній файл (не кидає виняток),
+        # тож меню з іконками показуємо лише коли завантажились УСІ. Часткова
+        # невдача → чистимо словник і йдемо на текстовий фолбек у _populate_menu.
+        self._has_icons = bool(self._icons) and all(
+            img is not None for img in self._icons.values())
+        if self._has_icons:
+            print("INFO: Icons loaded successfully.")
+        else:
+            self._icons = {}
+            print("WARNING: not all menu icons loaded, falling back to text labels.")
