@@ -1,32 +1,21 @@
 import os
-import re
-from datetime import datetime
+import time
 
 from watchdog.events import FileSystemEventHandler
 
 from file_handler import FileHandler
 
-# Штатний формат рядка лога: "ERR █ 2026.07.08 12.49.45.1094076 █ 31 █ ...".
-# Дробова частина буває різної довжини, тому необов'язкова група.
-TIMESTAMP_RE = re.compile(
-    r'(\d{4})\.(\d{2})\.(\d{2})[ T](\d{2})\.(\d{2})\.(\d{2})(?:\.(\d+))?'
-)
-
-
-def parse_line_time(line):
-    """Витягує мітку часу з рядка лога. None, якщо формат інший."""
-    match = TIMESTAMP_RE.search(line)
-    if not match:
-        return None
-
-    year, month, day, hour, minute, second, fraction = match.groups()
-    microsecond = int(fraction[:6].ljust(6, '0')) if fraction else 0
-
-    try:
-        return datetime(int(year), int(month), int(day),
-                        int(hour), int(minute), int(second), microsecond)
-    except ValueError:
-        return None
+# Свіжість визначається ВИКЛЮЧНО за mtime файлу.
+#
+# Мітка часу всередині рядка ("ERR █ 2026.07.30 05.32.40.1515517 █ ...")
+# для цього непридатна: застосунок пише її в UTC, а файлова система живе
+# за місцевим часом. Різниця стала і мовчазна — на цій машині 2 години.
+# Порівняння такої мітки з datetime.now() оголошувало щойно записану
+# помилку «старішою за запуск трекера», і вона не показувалась.
+#
+# Копії зберігають mtime джерела (див. copy_file_without_waiting), тож
+# mtime — це реальний час останнього запису в лог, в одному годиннику
+# з усім іншим.
 
 # Логи пишуться з BOM (EF BB BF). Файл читається як 'utf-8', а не
 # 'utf-8-sig', щоб офсети лишалися звичайними байтовими зміщеннями, тож
@@ -50,7 +39,8 @@ class FileChangeHandler(FileSystemEventHandler):
         self.file_paths = {}
         self.last_error_file = None
         # Межа «історія / свіже» для файлів, що з'являються під час роботи.
-        self.started_at = datetime.now()
+        # time.time(), бо порівнюється з os.path.getmtime().
+        self.started_at = time.time()
         # Імена файлів, які саме цей застосунок скопіював у теку призначення.
         # Лише їх дозволено видаляти при синхронізації.
         self.managed_files = set()
@@ -113,26 +103,23 @@ class FileChangeHandler(FileSystemEventHandler):
     def _pick_newest(self, file_path, errors, current_newest):
         """Обирає найсвіжішу помилку між списком і поточним лідером.
 
-        Рядок без розпізнаваної мітки часу оцінюється за mtime файлу —
-        грубо, але дозволяє змішувати логи різних форматів в одному тіку.
+        Кандидат від файлу — його ОСТАННЯ помилка: лог дописується в
+        кінець, тож порядок читання збігається з порядком запису.
+        Між файлами виграє той, у якого новіший mtime.
         """
         if not errors:
             return current_newest
 
         try:
-            fallback = datetime.fromtimestamp(os.path.getmtime(file_path))
+            stamp = os.path.getmtime(file_path)
         except OSError:
-            fallback = datetime.min
+            return current_newest
 
-        newest = current_newest
-        for line in errors:
-            stamp = parse_line_time(line) or fallback
-            # >= : за однакових міток перемагає пізніше зустрінутий рядок,
-            # а в межах файлу порядок читання збігається з порядком запису.
-            if newest is None or stamp >= newest[0]:
-                newest = (stamp, file_path, line)
+        # >= : за однакового mtime перемагає пізніше оброблений файл.
+        if current_newest is None or stamp >= current_newest[0]:
+            return (stamp, file_path, errors[-1])
 
-        return newest
+        return current_newest
 
     def find_latest_existing_error(self):
         """Найсвіжіша помилка серед уже наявного вмісту всіх файлів.
@@ -184,8 +171,12 @@ class FileChangeHandler(FileSystemEventHandler):
 
         Але просто змовчати теж не можна: застосунок, за яким стежимо,
         заводить НОВИЙ лог на кожну сесію, і помилки, записані туди до
-        першого погляду трекера, зникли б безслідно. Тому з наявного
-        вмісту беруться записи, новіші за момент запуску трекера.
+        першого погляду трекера, зникли б безслідно.
+
+        Ознака «файл живий» — mtime не старіший за момент запуску
+        трекера. Саме mtime, а не мітка в рядку: та йде в UTC і на дві
+        години відстає від місцевого часу, тому щойно записана помилка
+        завжди виглядала давнішою за старт і мовчки відкидалась.
         """
         if file_path in self.file_paths:
             return None
@@ -209,12 +200,13 @@ class FileChangeHandler(FileSystemEventHandler):
 
         self.file_paths[file_path] = offset
 
-        fresh = [
-            line for line in errors
-            if (parse_line_time(line) or datetime.min) >= self.started_at
-        ]
-        print(f"Adopted {file_path}: {len(errors)} errors, {len(fresh)} newer than startup")
-        return fresh
+        try:
+            active = os.path.getmtime(file_path) >= self.started_at
+        except OSError:
+            active = False
+
+        print(f"Adopted {file_path}: {len(errors)} errors, active={active}")
+        return errors if active else []
 
     def _forget_missing_files(self, present):
         """Прибирає з словників записи про файли, яких уже немає.

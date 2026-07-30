@@ -19,6 +19,15 @@ class FileHandler:
         try:
             with open(source_file, 'rb') as src, open(temp_file, 'wb') as dst:
                 shutil.copyfileobj(src, dst)
+
+            # Переносимо час зміни джерела на копію. Інакше mtime копії
+            # дорівнює моменту копіювання, і за ним неможливо судити, коли
+            # застосунок насправді щось записав. А мітка часу всередині
+            # рядка для цього не годиться: лог пише UTC, файлова система —
+            # місцевий час, різниця стала (тут 2 год) і мовчазна.
+            source_stat = os.stat(source_file)
+            os.utime(temp_file, (source_stat.st_atime, source_stat.st_mtime))
+
             os.replace(temp_file, dest_file)
             print(f"Copied {source_file} -> {dest_file}")
             return True
@@ -102,10 +111,16 @@ class FileHandler:
                     # міг розтягтися на хвилини. Наступний тік через секунду
                     # повторить спробу, чекати немає сенсу.
                     if FileHandler.is_file_closed(source_file):
-                        needs_copy = (
-                            not os.path.exists(dest_file)
-                            or os.path.getmtime(source_file) > os.path.getmtime(dest_file)
-                        )
+                        # Копія зберігає mtime джерела, тож будь-яка
+                        # РІЗНИЦЯ означає розсинхрон — і в той, і в інший
+                        # бік. Порівняння через '>' лишало б застарілими
+                        # копії, зроблені до введення переносу mtime: у них
+                        # стоїть час копіювання, тобто завідомо новіший за
+                        # джерело, і оновитись вони не могли б ніколи.
+                        # Допуск 1 мс — на похибку представлення float.
+                        needs_copy = not os.path.exists(dest_file) or abs(
+                            os.path.getmtime(source_file) - os.path.getmtime(dest_file)
+                        ) > 0.001
                         # copied відображає лише реальний успіх: раніше
                         # прапорець ставився беззастережно, а помилку
                         # копіювання проковтували — у лог ішло «File copied»
