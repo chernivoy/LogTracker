@@ -288,14 +288,13 @@ class LogTrackerApp:
         """
         self._header_file_path = file_path
 
-        header_label_font = self.theme_manager.current_theme_data.get("header_label_font")
-        error_textbox_font = self.theme_manager.current_theme_data.get("error_textbox_font")
-
-        self.file_label.configure(font=header_label_font or ("Inter", 13))
+        # Шрифти тут НЕ чіпаємо: їх виставляє ErrorWindow.create_widgets при
+        # створенні й ThemeManager.update_widgets_theme при зміні теми. Раніше на
+        # КОЖНУ помилку робився зайвий configure(font=...) із захисним фолбеком
+        # ("Inter", 13), що суперечив контракту «всі теми мають однакові ключі».
         self._fit_header_text()
-        self.error_text_widget.configure(font=error_textbox_font or ("Inter", 13),
-                                         state=tk.NORMAL)
 
+        self.error_text_widget.configure(state=tk.NORMAL)
         self.error_text_widget.delete(1.0, tk.END)
         self.error_text_widget.insert(tk.END, error_line + "\n")
         self.error_text_widget.configure(state=tk.DISABLED)
