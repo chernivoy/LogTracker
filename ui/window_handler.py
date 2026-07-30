@@ -89,35 +89,58 @@ class WindowHandler:
             config.write(configfile)
 
     @staticmethod
+    def _window_scale(root):
+        """Масштаб, який CTk застосовує до geometry() (== DPI монітора / 96).
+
+        Беремо його з самого CustomTkinter — це кешоване значення, без
+        Win32-викликів на кожну подію. Тоді ділення розмірів тут і множення
+        всередині CTk.geometry() скорочуються ТОЧНО (включно з можливим
+        користувацьким window_scaling), а не приблизно, як при окремому
+        запиті GetDpiForMonitor. Запасний варіант — прямий запит DPI монітора.
+        """
+        getter = getattr(root, "_get_window_scaling", None)
+        if callable(getter):
+            try:
+                scale = getter()
+                if scale and scale > 0:
+                    return scale
+            except Exception:
+                pass
+        try:
+            scale = rdp.get_windows_dpi_scale(root)
+            if scale and scale > 0:
+                return scale
+        except Exception:
+            pass
+        return 2.0
+
+    @staticmethod
     def load_window_size(section, root):
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
 
-        try:
-            dpi_scale = rdp.get_windows_dpi_scale(root)
-        except Exception as e:
-            print(
-                f"Попередження: Не вдалося отримати DPI Scale в load_window_size: {e}. Використовуємо 2.0 за замовчуванням.")
-            dpi_scale = 2.0
-
-        if section in config:
-            # Зчитуємо ШИРИНУ, ВИСОТУ, X, Y з INI (всі вони тепер ЛОГІЧНІ)
-            width = config.getint(section, 'width', fallback=800)
-            height = config.getint(section, 'height', fallback=600)
-            x = config.getint(section, 'x', fallback=100)
-            y = config.getint(section, 'y', fallback=100)
-
-            # Розміри: ділимо логічні розміри на dpi_scale для geometry()
-            width_for_geometry = int(width / dpi_scale)
-            height_for_geometry = int(height / dpi_scale)
-
-            # ✅ КЛЮЧОВА ЗМІНА: Позиція X та Y: передаємо ЛОГІЧНІ значення без додаткового ділення.
-            # geometry() сам скомпенсує їх з урахуванням DPI.
-            x_for_geometry = x
-            y_for_geometry = y
-
-            return f'{width_for_geometry}x{height_for_geometry}+{x_for_geometry}+{y_for_geometry}'
-        else:
+        if section not in config:
             return None
+
+        dpi_scale = WindowHandler._window_scale(root)
+
+        # У INI лежать ФІЗИЧНІ пікселі (winfo_*). Ширину/висоту ділимо на
+        # масштаб CTk — усередині CTk.geometry() їх множить назад, тож у Win32
+        # доходить рівно збережений фізичний розмір. X/Y CTk не масштабує,
+        # вони передаються як фізичні координати без ділення.
+        width = config.getint(section, 'width', fallback=800)
+        height = config.getint(section, 'height', fallback=600)
+        x = config.getint(section, 'x', fallback=100)
+        y = config.getint(section, 'y', fallback=100)
+
+        # Захист від зниклого вікна: якщо збережена позиція поза екраном
+        # (типово після реконекту RDP з іншою роздільною здатністю чи
+        # розкладкою моніторів) — повертаємо її у видиму область.
+        x, y = rdp.clamp_to_visible(x, y, width, height)
+
+        width_for_geometry = int(width / dpi_scale)
+        height_for_geometry = int(height / dpi_scale)
+
+        return f'{width_for_geometry}x{height_for_geometry}+{x}+{y}'
 
     @staticmethod
     def round_corners(window, radius):
@@ -152,6 +175,12 @@ class WindowHandler:
         Переміщує вікно відповідно до руху курсора.
         """
         if not root.overrideredirect():
+            return
+
+        # Якщо активний ресайз краю — не рухаємо вікно. Обробники move (на
+        # заголовку/фреймі) і resize (на root) прив'язані обидва, і в зоні
+        # краю спрацьовували б разом, даючи дрож «рух + зміна розміру».
+        if getattr(root, "_resize_dir", None):
             return
 
         new_x_logical = event.x_root - root._start_move_x
@@ -197,12 +226,23 @@ class WindowHandler:
             root._resize_dir = None
             return
 
-        # Отримуємо логічні координати курсора відносно ВІКНА
+        # Над кнопками (згорнути/бургер) у куті не показуємо resize-курсор:
+        # зона краю масштабується за DPI і перекриває їх, а клік має лишатись
+        # кліком, а не ресайзом. Шлях Tk-віджета кнопки містить "ctkbutton".
+        if "ctkbutton" in str(event.widget):
+            root.configure(cursor="")
+            root._resize_dir = None
+            return
+
+        # Координати курсора відносно ВІКНА (у фізичних пікселях, як і winfo_*).
         x_logical = event.x_root - root.winfo_rootx()
         y_logical = event.y_root - root.winfo_rooty()
         width_logical = root.winfo_width()
         height_logical = root.winfo_height()
-        border = 20
+        # Зона краю ~20 логічних px: множимо на масштаб, інакше при DPI 200%
+        # смуга захоплення була б лише ~10 фізичних px — важко влучити,
+        # надто трекпадом через RDP. _window_scale читає кеш CTk, без Win32.
+        border = int(20 * WindowHandler._window_scale(root))
 
         cursor = ""
         root._resize_dir = None  # Скидаємо напрямок ресайзу
@@ -239,11 +279,22 @@ class WindowHandler:
     def start_resize(event: tk.Event):
         root = event.widget.winfo_toplevel()
 
+        # Клік по кнопці в куті — це клік, а не початок ресайзу (зона краю
+        # масштабується за DPI і перекриває кнопки). Не чіпаємо _resize_dir і
+        # регіон заокруглення, щоб кнопка спрацювала чисто.
+        if "ctkbutton" in str(event.widget):
+            root._resize_dir = None
+            return
+
+        # Кешуємо масштаб на весь жест: DPI монітора під час одного
+        # перетягування не змінюється, тож не смикаємо Win32 на кожну подію.
+        scale = WindowHandler._window_scale(root)
+
         x_logical = event.x_root - root.winfo_rootx()
         y_logical = event.y_root - root.winfo_rooty()
         width_logical = root.winfo_width()
         height_logical = root.winfo_height()
-        border = 20
+        border = int(20 * scale)
 
         # Визначаємо напрямок ресайзу на основі позиції курсора в момент кліка
         root._resize_dir = None
@@ -274,6 +325,7 @@ class WindowHandler:
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
 
+        root._resize_scale = scale  # масштаб зафіксовано на весь жест ресайзу
         root._start_cursor_x_logical = event.x_root
         root._start_cursor_y_logical = event.y_root
         root._start_width_logical = root.winfo_width()
@@ -300,74 +352,84 @@ class WindowHandler:
         dy_logical = current_cursor_y_logical - root._start_cursor_y_logical
 
         dir = root._resize_dir
-        min_width_logical = 300
-        min_height_logical = 100
+
+        # Масштаб зафіксовано в start_resize — не смикаємо Win32 на кожну подію.
+        scale = getattr(root, "_resize_scale", None) or WindowHandler._window_scale(root)
+
+        # Мінімум у ФІЗИЧНИХ пікселях, узгоджений з root.minsize(300, 100):
+        # CTk застосовує до minsize той самий масштаб, тож OS-мінімум теж
+        # 300x100 * scale. Якби тут мінімум лишався 300x100 фізичних, при
+        # ресайзі з заходу/півночі на межі OS клампив би ширину, а x усе одно
+        # зсувався б — вікно «повзло» б убік. Тепер межі збігаються.
+        min_width = int(300 * scale)
+        min_height = int(100 * scale)
 
         new_width_logical = root._start_width_logical
         new_height_logical = root._start_height_logical
         new_x_logical = root._start_win_x_logical
         new_y_logical = root._start_win_y_logical
 
-        # Логіка зміни розміру та позиції (БЕЗ ЗМІН в цьому блоці)
         if "e" in dir:  # East (right)
-            new_width_logical = max(root._start_width_logical + dx_logical, min_width_logical)
+            new_width_logical = max(root._start_width_logical + dx_logical, min_width)
         if "s" in dir:  # South (bottom)
-            new_height_logical = max(root._start_height_logical + dy_logical, min_height_logical)
+            new_height_logical = max(root._start_height_logical + dy_logical, min_height)
 
         if "w" in dir:  # West (left)
             potential_new_width = root._start_width_logical - dx_logical
-            if potential_new_width >= min_width_logical:
+            if potential_new_width >= min_width:
                 new_width_logical = potential_new_width
                 new_x_logical = root._start_win_x_logical + dx_logical
             else:
-                new_width_logical = min_width_logical
-                new_x_logical = root._start_win_x_logical + root._start_width_logical - min_width_logical
+                new_width_logical = min_width
+                new_x_logical = root._start_win_x_logical + root._start_width_logical - min_width
 
         if "n" in dir:  # North (top)
             potential_new_height = root._start_height_logical - dy_logical
-            if potential_new_height >= min_height_logical:
+            if potential_new_height >= min_height:
                 new_height_logical = potential_new_height
                 new_y_logical = root._start_win_y_logical + dy_logical
             else:
-                new_height_logical = min_height_logical
-                new_y_logical = root._start_win_y_logical + root._start_height_logical - min_height_logical
-        # Кінець логіки зміни розміру
+                new_height_logical = min_height
+                new_y_logical = root._start_win_y_logical + root._start_height_logical - min_height
 
-        # Отримуємо поточний DPI Scale для вікна.
-        dpi_scale_for_geometry = rdp.get_windows_dpi_scale(root)
-
-        # Компенсуємо ЛОГІЧНІ розміри, ділячи їх на DPI Scale, перед передачею в geometry()
-        final_width_for_geometry = int(new_width_logical / dpi_scale_for_geometry)
-        final_height_for_geometry = int(new_height_logical / dpi_scale_for_geometry)
-
-        # Для позиції X та Y передаємо ЛОГІЧНІ значення без додаткового ділення.
-        final_x_for_geometry = new_x_logical
-        final_y_for_geometry = new_y_logical
-
-        print(f"DO RESIZE: Dir='{dir}'")
-        print(f"  Cursor (Logical/Screen): X={current_cursor_x_logical}, Y={current_cursor_y_logical}")
-        print(f"  Delta (Log): dx={dx_logical:.2f}, dy={dy_logical:.2f}")
-        print(
-            f"  New Window (Log calculated): X={new_x_logical:.2f}, Y={new_y_logical:.2f}, W={new_width_logical:.2f}, H={new_height_logical:.2f}")
-        print(
-            f"  Applying (Compensated Logical to geometry): {final_width_for_geometry}x{final_height_for_geometry}+{final_x_for_geometry}+{final_y_for_geometry}")
+        # Компенсуємо фізичні розміри, ділячи на масштаб CTk перед geometry()
+        # (усередині CTk множить назад). X/Y — фізичні, без ділення.
+        final_width_for_geometry = int(new_width_logical / scale)
+        final_height_for_geometry = int(new_height_logical / scale)
 
         # Застосовуємо нові розміри та позицію
         root.geometry(
-            f"{final_width_for_geometry}x{final_height_for_geometry}+{final_x_for_geometry}+{final_y_for_geometry}")
+            f"{final_width_for_geometry}x{final_height_for_geometry}+{int(new_x_logical)}+{int(new_y_logical)}")
 
     @staticmethod
     def stop_resize(event: tk.Event):
         root = event.widget.winfo_toplevel()
 
+        # Ресайзу не було (звичайний клік у не-крайовій зоні) — не пишемо ini
+        # на кожен клік і не перемальовуємо кути, лише скидаємо курсор.
+        if not getattr(root, "_resize_dir", None):
+            root.configure(cursor="")
+            return
+
+        # Оновлюємо реальні розміри перед clamp/заокругленням: після geometry()
+        # у do_resize winfo_* могли ще не оновитися.
+        root.update_idletasks()
+
+        # Підстраховка: якщо вікно якось опинилося фактично поза екраном —
+        # повертаємо його всередину. Перевіряємо саме видимість (а не «цілком
+        # уміщається»), щоб звичайний ресайз за правий/нижній край не смикав
+        # протилежну межу.
+        cur_x, cur_y = root.winfo_x(), root.winfo_y()
+        cur_w, cur_h = root.winfo_width(), root.winfo_height()
+        if not rdp.is_rect_visible(cur_x, cur_y, cur_w, cur_h):
+            nx, ny = rdp.clamp_to_visible(cur_x, cur_y, cur_w, cur_h)
+            root.geometry(f"+{nx}+{ny}")
+            root.update_idletasks()
+
         WindowHandler.save_window_size('Window', root)
         root._resize_dir = None
+        root._resize_scale = None
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
-
-        print("--- STOP RESIZE LOG ---")
-        print(
-            f"Final Window (Log): X={root.winfo_x()}, Y={root.winfo_y()}, W={root.winfo_width()}, H={root.winfo_height()}")
-        print("-----------------------")
 
         # Повертаємо округлення після завершення ресайзу
         if root.overrideredirect():
