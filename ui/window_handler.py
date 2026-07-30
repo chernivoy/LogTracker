@@ -249,10 +249,15 @@ class WindowHandler:
             root._resize_dir = None
             return
 
-        # Над кнопками (згорнути/бургер) у куті не показуємо resize-курсор:
-        # зона краю масштабується за DPI і перекриває їх, а клік має лишатись
-        # кліком, а не ресайзом. Шлях Tk-віджета кнопки містить "ctkbutton".
-        if "ctkbutton" in str(event.widget):
+        # Не показуємо resize-курсор над елементами, які зона краю
+        # (масштабована за DPI) перекриває згори:
+        #   - кнопки згорнути/бургер — клік має лишатись кліком;
+        #   - заголовок `file_label` — це ручка ПЕРЕМІЩЕННЯ вікна, тож хапання
+        #     за текст має рухати вікно, а не розтягувати його.
+        # Шлях Tk-віджета містить "ctkbutton" / "ctklabel" відповідно (в т.ч.
+        # для внутрішніх canvas/label цих CTk-віджетів).
+        widget_path = str(event.widget)
+        if "ctkbutton" in widget_path or "ctklabel" in widget_path:
             root.configure(cursor="")
             root._resize_dir = None
             return
@@ -302,10 +307,12 @@ class WindowHandler:
     def start_resize(event: tk.Event):
         root = event.widget.winfo_toplevel()
 
-        # Клік по кнопці в куті — це клік, а не початок ресайзу (зона краю
-        # масштабується за DPI і перекриває кнопки). Не чіпаємо _resize_dir і
-        # регіон заокруглення, щоб кнопка спрацювала чисто.
-        if "ctkbutton" in str(event.widget):
+        # Клік по кнопці в куті або по заголовку — це не початок ресайзу
+        # (зона краю масштабується за DPI і перекриває їх згори). Заголовок
+        # `file_label` — ручка ПЕРЕМІЩЕННЯ вікна, тож хапання за текст рухає
+        # вікно, а не розтягує. Не чіпаємо _resize_dir і регіон заокруглення.
+        widget_path = str(event.widget)
+        if "ctkbutton" in widget_path or "ctklabel" in widget_path:
             root._resize_dir = None
             return
 
