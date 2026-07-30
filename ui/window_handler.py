@@ -387,6 +387,7 @@ class WindowHandler:
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
 
+        root._resize_hwnd = hwnd     # кешуємо hwnd на весь жест (для перемальовки)
         root._resize_scale = scale  # масштаб зафіксовано на весь жест ресайзу
         root._start_cursor_x_logical = event.x_root
         root._start_cursor_y_logical = event.y_root
@@ -463,6 +464,20 @@ class WindowHandler:
         root.geometry(
             f"{final_width_for_geometry}x{final_height_for_geometry}+{int(new_x_logical)}+{int(new_y_logical)}")
 
+        # Прибираємо темні артефакти при ресайзі, що рухає ПОЧАТОК вікна
+        # (захід/північ). Там увесь контент їде екраном щокадру, і майже-чорні
+        # згладжені краї тексту хедера (transparent_color="#000001" не збігається
+        # з ними точно, тож вони не keyʼяться в прозорість) розмазуються слідом,
+        # бо стара позиція не стирається. Erase+repaint усіх дітей щокадру дає
+        # чистий кадр. Для сходу/півдня початок не рухається — там не потрібно.
+        if "w" in dir or "n" in dir:
+            hwnd = getattr(root, "_resize_hwnd", None)
+            if hwnd:
+                RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
+                ctypes.windll.user32.RedrawWindow(
+                    hwnd, None, None,
+                    RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW)
+
     @staticmethod
     def stop_resize(event: tk.Event):
         root = event.widget.winfo_toplevel()
@@ -491,6 +506,7 @@ class WindowHandler:
         WindowHandler.save_window_size('Window', root)
         root._resize_dir = None
         root._resize_scale = None
+        root._resize_hwnd = None
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
 
         # Повертаємо округлення після завершення ресайзу
