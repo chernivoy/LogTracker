@@ -45,9 +45,13 @@ THEME_SETTINGS = {
     "context_menu_active_bg": "#2d436e",
     "context_menu_active_fg": "#e2e0e6",
     #Стиль для settings_window (модальне вікно Path settings)
-    # Стиль співпадає з головним вікном: фон як у вікна теми (context_menu_bg),
-    # текст нейтральний, поля темніші за фон, кнопки — синій акцент.
-    "settings_bg": "#2b2c2f",
+    # Стиль співпадає з головним вікном. У dark main_frame_fg_color="transparent",
+    # тож усі шари головного вікна прозорі й воно показує ДЕФОЛТНИЙ фон вікна CTk
+    # для Dark — gray14 (#242424). Саме його беремо тут (а не context_menu_bg
+    # #2b2c2f, який світліший), інакше діалог у dark помітно світліший за головне
+    # вікно. В інших темах main_frame_fg_color конкретний, і settings_bg дорівнює
+    # йому. Текст нейтральний, поля темніші за фон, кнопки — синій акцент.
+    "settings_bg": "#242424",
     "settings_text_color": "#e2e0e6",
     "settings_font": ("Inter", 13),
     "settings_entry_fg_color": "#1e1f22",
