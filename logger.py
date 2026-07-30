@@ -14,6 +14,7 @@ from tray_manager import TrayManager
 from ui.error_window import ErrorWindow
 from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
+from utils import rdp
 import sys
 import ctypes
 
@@ -34,14 +35,32 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 if sys.platform == "win32":
+    # DPI-awareness критичний для RDP з Retina-клієнта. Виставляємо ДО
+    # створення CTk (яке саме намагається викликати SetProcessDpiAwareness(2)):
+    # рівень awareness ставиться один раз на процес, тож перемагає перший
+    # виклик. Раніше тут стояв SetProcessDpiAwareness(1) — це SYSTEM-aware
+    # (а не PER_MONITOR, попри старий лог), і CTk-івський виклик мовчки
+    # провалювався. Наслідок: процес «замерзав» на DPI входу, а при реконекті
+    # RDP з іншим DPI Windows віртуалізував координати (звідси від'ємні X/Y і
+    # зникле вікно), тоді як GetDpiForMonitor у CTk бачив реальний новий DPI —
+    # неузгодженість, що ламала і розмір, і позицію.
+    #
+    # PER_MONITOR_AWARE_V2 коректно реагує на зміну DPI сесії (WM_DPICHANGED),
+    # координати лишаються реальними, а масштаб CTk узгоджений з ними.
     try:
-        # Ця функція доступна з Windows 8.1+
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        print("INFO: SetProcessDpiAwareness set to PER_MONITOR_DPI_AWARE")
-    except AttributeError:
-        # Для старих версій Windows
-        ctypes.windll.user32.SetProcessDPIAware()
-        print("INFO: SetProcessDPIAware set")
+        # -4 == DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+        if not ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
+            raise OSError("SetProcessDpiAwarenessContext(-4) failed")
+        print("INFO: DPI awareness = PER_MONITOR_AWARE_V2")
+    except (AttributeError, OSError):
+        try:
+            # Windows 8.1 / 10 до 1607: per-monitor без v2.
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            print("INFO: DPI awareness = PER_MONITOR_DPI_AWARE")
+        except (AttributeError, OSError):
+            # Зовсім старі версії Windows.
+            ctypes.windll.user32.SetProcessDPIAware()
+            print("INFO: DPI awareness = SYSTEM (legacy)")
 
 
 class LogTrackerApp:
@@ -84,7 +103,8 @@ class LogTrackerApp:
         self.file_label.bind("<Double-Button-1>", self.on_file_label_double_click)
         self.root.bind("<Configure>", self.on_window_resize)
 
-        WindowHandler.load_window_size('Window', self.root)
+        # Геометрію вже застосував ErrorWindow.setup_window() → _load_window_geometry().
+        # Тут повторний виклик був би зайвим (результат усе одно ігнорувався).
 
     def run(self):
         self.observer = Observer()
@@ -98,9 +118,36 @@ class LogTrackerApp:
 
         self.process_queue()
         self.periodic_sync()
+        self._ensure_on_screen()
 
         self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self))
         self.root.mainloop()
+
+    def _ensure_on_screen(self):
+        """Періодичний вартовий видимості вікна.
+
+        Після реконекту RDP (особливо з Retina-клієнта зі зміною DPI) Windows
+        може віддати вікну некоректні/від'ємні координати, і воно зникає з
+        екрана — без жодної події від користувача, тож інші clamp-и не
+        спрацьовують. Раз на 2 с перевіряємо: якщо ВІДКРИТЕ вікно повністю поза
+        видимою областю — повертаємо його всередину і піднімаємо. Спрацьовує
+        лише коли вікно фактично невидиме (див. is_rect_visible), тож звичайне
+        користування чи свідоме заповзання за край не зачіпає.
+        """
+        try:
+            if self.is_window_open and self.root.winfo_exists():
+                x, y = self.root.winfo_x(), self.root.winfo_y()
+                w, h = self.root.winfo_width(), self.root.winfo_height()
+                if not rdp.is_rect_visible(x, y, w, h):
+                    nx, ny = rdp.clamp_to_visible(x, y, w, h)
+                    self.root.geometry(f"+{nx}+{ny}")
+                    self.root.lift()
+                    self.root.attributes('-topmost', True)
+                    print(f"[on-screen guard] вікно було поза екраном ({x},{y}) → ({nx},{ny})")
+        except Exception as e:
+            print(f"[on-screen guard] {e}")
+        finally:
+            self.root.after(2000, self._ensure_on_screen)
 
     def process_queue(self):
         while True:
