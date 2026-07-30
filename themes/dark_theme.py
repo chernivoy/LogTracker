@@ -26,9 +26,11 @@ THEME_SETTINGS = {
     "burger_button_hover_color": "#2d436e",
     #Стиль для error_frame
     "error_frame_fg_color": "transparent",
-    # Збігається з фоном поля (transparent_color), щоб бордер був невидимий.
+    # Поле в dark прозоре (немає суцільного фону), тож бордер кольором
+    # transparent_color лишав би прозору «щілину», а будь-який інший колір було б
+    # видно. Тому рамку тут прибираємо зовсім (width 0) — колір нижче не рендериться.
     "error_frame_border_color": "#000001",
-    "error_frame_border_width": 1,
+    "error_frame_border_width": 0,
     #Стиль для error_textbox
     "error_textbox_fg_color": "transparent",
     "error_textbox_text_color": "#b4b361",
