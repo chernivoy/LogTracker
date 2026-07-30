@@ -215,7 +215,14 @@ class WindowHandler:
     @staticmethod
     def bind_resize_events(root: ctk.CTk):
         """
-        Прив'язує всі необхідні події до вікна для ресайзу та переміщення.
+        Прив'язує події ресайзу (зміна розміру вікна) до кореневого вікна.
+
+        Move-прив'язки (перетягування за заголовок) тут НЕ ставляться: їх вішає
+        ErrorWindow.bind_events напряму на file_label і main_frame, де є прямі
+        посилання на віджети. Раніше цей метод ще й дублював їх, шукаючи заголовок
+        за жорстко зашитим Tk-шляхом ".!ctkframe.!ctklabel" — крихким до зміни
+        ієрархії віджетів; ті самі хендлери одразу перезаписувались у bind_events,
+        тож lookup був зайвий і лише створював точку мовчазної деградації.
         """
         # Події для ресайзу (зміна розміру вікна)
         resize_handlers = [
@@ -228,15 +235,6 @@ class WindowHandler:
         # Прив'язуємо події ресайзу безпосередньо до кореневого вікна.
         for event_type, handler_func in resize_handlers:
             root.bind(event_type, handler_func)
-
-        # Окремі прив'язки для переміщення вікна (заголовок/file_label).
-        try:
-            file_label = root.nametowidget(".!ctkframe.!ctklabel")
-            file_label.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, root))
-            file_label.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, root))
-        except KeyError:
-            print(
-                "Помилка: Не вдалося знайти віджет 'file_label' для прив'язки переміщення. Переміщення буде недоступне.")
 
     @staticmethod
     def _header_bottom(root):
