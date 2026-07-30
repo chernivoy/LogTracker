@@ -464,27 +464,30 @@ class WindowHandler:
         root.geometry(
             f"{final_width_for_geometry}x{final_height_for_geometry}+{int(new_x_logical)}+{int(new_y_logical)}")
 
-        # Синхронно застосовуємо re-layout. Кнопки праворуч угорі закріплені за
-        # правим краєм (sticky "ne", колонка з weight 0), тож на кожній зміні
-        # ширини Tk має їх переставити — але re-layout він відкладає в idle.
-        # Без цього виклику кнопки «підстрибують» (перемальовуються за старим
-        # розкладом, потім за новим) або зникають на схід-ресайзі до зупинки
-        # курсора. Робимо ДО RedrawWindow, щоб малювати вже коректний розклад.
+        # Спершу застосовуємо відкладений re-layout (пересунути HWND кнопок до
+        # нового правого краю), потім ФОРСУЄМО синхронну перемальовку дітей.
+        #
+        # Чому це потрібно: кнопки праворуч угорі закріплені за правим краєм
+        # (sticky "ne", колонка з weight 0), тож при ресайзі змінюється лише
+        # їхня ПОЗИЦІЯ, а не розмір. CTk перемальовує віджет тільки на зміні
+        # РОЗМІРУ (`_update_dimensions_event`), тож пересунуті кнопки не
+        # перемальовуються — на шаруватому вікні вони зникають/стрибають до
+        # наступної повної перемальовки (аж на stop_resize). `update_idletasks`
+        # не рятує: він не обробляє `WM_PAINT`. Тому явно кличемо
+        # RedrawWindow(...UPDATENOW) — синхронний WM_PAINT усім дочірнім HWND.
         root.update_idletasks()
-
-        # Прибираємо темні артефакти-сліди при ресайзі, що рухає ПОЧАТОК вікна
-        # (захід/північ): там контент їде екраном щокадру, і майже-чорні згладжені
-        # краї тексту хедера (transparent_color="#000001" не збігається з ними
-        # точно, тож не keyʼяться в прозорість) лишають слід на старому місці.
-        # Erase+repaint усіх дітей дає чистий кадр. Для сходу/півдня початок не
-        # рухається — досить update_idletasks вище.
-        if "w" in dir or "n" in dir:
-            hwnd = getattr(root, "_resize_hwnd", None)
-            if hwnd:
-                RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
-                ctypes.windll.user32.RedrawWindow(
-                    hwnd, None, None,
-                    RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW)
+        hwnd = getattr(root, "_resize_hwnd", None)
+        if hwnd:
+            RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
+            flags = RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW
+            # ERASE — лише для заходу/півночі, де рухається початок вікна:
+            # там контент їде екраном і майже-чорні згладжені краї тексту хедера
+            # (не keyʼяться в прозорість ключем "#000001") лишають слід на
+            # старому місці; стирання фону його прибирає. На сході/півдні
+            # початок не рухається — зайвий erase лише додав би мерехтіння.
+            if "w" in dir or "n" in dir:
+                flags |= RDW_ERASE
+            ctypes.windll.user32.RedrawWindow(hwnd, None, None, flags)
 
     @staticmethod
     def stop_resize(event: tk.Event):
