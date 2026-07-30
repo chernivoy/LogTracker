@@ -54,21 +54,19 @@ class TrayManager:
                 height=defaults['height']
             )
 
-            # Масштаб CTk (кешований, той самий, що CTk застосує в geometry()).
-            dpi_scale = WindowHandler._window_scale(root)
+            # Дефолтні width/height — ЛОГІЧНІ (симетрично з load/save):
+            # передаємо в geometry() як є, CTk домножить їх до фізичних сам.
+            scale = WindowHandler._window_scale(root)
 
-            # Розміри ділимо на масштаб (CTk множить назад). X/Y — фізичні.
-            w_geo = int(defaults['width'] / dpi_scale)
-            h_geo = int(defaults['height'] / dpi_scale)
-
-            # Про всяк випадок підганяємо дефолтну позицію у видиму область
-            # (напр. якщо первинний монітор має від'ємний origin).
+            # Позицію підганяємо у видиму область; для clamp потрібна ФІЗИЧНА
+            # оцінка розміру, тож логічні розміри множимо на масштаб.
             x_geo, y_geo = rdp.clamp_to_visible(
-                defaults['x'], defaults['y'], defaults['width'], defaults['height']
+                defaults['x'], defaults['y'],
+                int(defaults['width'] * scale), int(defaults['height'] * scale)
             )
 
             def _apply():
-                root.geometry(f"{w_geo}x{h_geo}+{x_geo}+{y_geo}")
+                root.geometry(f"{defaults['width']}x{defaults['height']}+{x_geo}+{y_geo}")
                 # Одразу показуємо вікно, а не лишаємо в треї до окремого кліку
                 # «Open»: сенс пункту — витягнути зникле вікно в один крок.
                 root.deiconify()

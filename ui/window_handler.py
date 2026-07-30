@@ -19,8 +19,17 @@ class WindowHandler:
 
     @staticmethod
     def save_window_size(section, root):
-        width = root.winfo_width()
-        height = root.winfo_height()
+        # Симетрично до load_window_size: зберігаємо ЛОГІЧНІ width/height
+        # (як їх бачить CTk) і ФІЗИЧНІ x/y. Round-trip save↔load іде через
+        # рідну модель масштабування CTk, без ручного множника: load віддає
+        # логічні w/h у geometry(), а CTk сам домножує їх до фізичних.
+        #
+        # x/y лишаємо фізичними через winfo_x()/winfo_y(): це надійні цілі
+        # (можуть бути від'ємними на моніторі ліворуч/вгорі), а розбір рядка
+        # geometry() для позиції неоднозначний — Tk трактує "-100" як «100 px
+        # від правого краю», а не x=-100.
+        width = WindowHandler._to_logical(root, root.winfo_width())
+        height = WindowHandler._to_logical(root, root.winfo_height())
         x = root.winfo_x()
         y = root.winfo_y()
 
@@ -29,10 +38,10 @@ class WindowHandler:
         if section not in config:
             config[section] = {}
 
-        config[section]['width'] = str(width)
-        config[section]['height'] = str(height)
-        config[section]['x'] = str(x)  # Зберігаємо ЛОГІЧНІ X
-        config[section]['y'] = str(y)  # Зберігаємо ЛОГІЧНІ Y
+        config[section]['width'] = str(width)   # ЛОГІЧНА ширина
+        config[section]['height'] = str(height)  # ЛОГІЧНА висота
+        config[section]['x'] = str(x)  # ФІЗИЧНИЙ X
+        config[section]['y'] = str(y)  # ФІЗИЧНИЙ Y
 
         with open(CONFIG_FILE_WINDOW, 'w') as configfile:
             config.write(configfile)
@@ -115,32 +124,46 @@ class WindowHandler:
         return 2.0
 
     @staticmethod
+    def _to_logical(root, physical_value):
+        """Фізичні пікселі → логічні (як їх зберігає CTk), тим самим
+        реверсом масштабу, який CTk застосовує в geometry(). Пара до того,
+        як geometry() домножує назад. Запасний варіант — ділення на
+        _window_scale()."""
+        rev = getattr(root, "_reverse_window_scaling", None)
+        if callable(rev):
+            try:
+                return int(rev(physical_value))
+            except Exception:
+                pass
+        scale = WindowHandler._window_scale(root)
+        return int(physical_value / scale) if scale else int(physical_value)
+
+    @staticmethod
     def load_window_size(section, root):
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
 
         if section not in config:
             return None
 
-        dpi_scale = WindowHandler._window_scale(root)
-
-        # У INI лежать ФІЗИЧНІ пікселі (winfo_*). Ширину/висоту ділимо на
-        # масштаб CTk — усередині CTk.geometry() їх множить назад, тож у Win32
-        # доходить рівно збережений фізичний розмір. X/Y CTk не масштабує,
-        # вони передаються як фізичні координати без ділення.
+        # У INI лежать ЛОГІЧНІ width/height і ФІЗИЧНІ x/y. Логічні w/h
+        # передаємо в geometry() як є — CTk домножить їх до фізичних сам
+        # (симетрично до save_window_size). Жодного ручного множника тут
+        # більше немає: round-trip повністю на рідній моделі масштабування
+        # CTk, тож при зміні DPI (реконект) зберігається ЛОГІЧНИЙ розмір
+        # вікна, а не фіксований піксельний.
         width = config.getint(section, 'width', fallback=800)
         height = config.getint(section, 'height', fallback=600)
         x = config.getint(section, 'x', fallback=100)
         y = config.getint(section, 'y', fallback=100)
 
-        # Захист від зниклого вікна: якщо збережена позиція поза екраном
-        # (типово після реконекту RDP з іншою роздільною здатністю чи
-        # розкладкою моніторів) — повертаємо її у видиму область.
-        x, y = rdp.clamp_to_visible(x, y, width, height)
+        # Захист від зниклого вікна: clamp у фізичному просторі екрана, тож
+        # логічні w/h переводимо в фізичну оцінку розміру через масштаб CTk.
+        scale = WindowHandler._window_scale(root)
+        phys_w = int(width * scale)
+        phys_h = int(height * scale)
+        x, y = rdp.clamp_to_visible(x, y, phys_w, phys_h)
 
-        width_for_geometry = int(width / dpi_scale)
-        height_for_geometry = int(height / dpi_scale)
-
-        return f'{width_for_geometry}x{height_for_geometry}+{x}+{y}'
+        return f'{width}x{height}+{x}+{y}'
 
     @staticmethod
     def round_corners(window, radius):

@@ -125,12 +125,18 @@ LogTrackerApp.on_error_found → ErrorWindow (+ підняття вікна з �
 
 ### DPI-конвенція (легко зламати)
 
-CustomTkinter сам множить розміри в `root.geometry()` на свій `window_scaling` (= DPI монітора / 96). Тому в ini зберігаються **фізичні** пікселі (`winfo_*`), а при відновленні геометрії (`WindowHandler.load_window_size`, `TrayManager.on_restore_defaults`, `WindowHandler.do_resize`):
+CustomTkinter сам множить розміри в `root.geometry()` на свій `window_scaling` (= DPI монітора / 96), а зворотно ділить у `root.geometry()`-**геттері** та `_reverse_window_scaling()`. Тому save↔load побудовані **симетрично поверх рідної моделі CTk, без ручного множника**. В ini зберігаються **ЛОГІЧНІ** width/height і **ФІЗИЧНІ** x/y:
 
-- **width/height** — діляться на масштаб перед передачею в `geometry()`, бо CTk усередині множить їх назад → у Win32 доходить рівно збережений фізичний розмір;
-- **x/y** — передаються **без ділення**: `_apply_geometry_scaling` у CTk координати **не** масштабує, вони проходять як фізичні пікселі.
+- **`save_window_size`** пише `_to_logical(winfo_width())` (= `winfo_width()/scale`, тобто логічну ширину) і `winfo_x()` (фізичний, надійне ціле — може бути від'ємним);
+- **`load_window_size`** віддає логічні w/h у `geometry()` **як є** — CTk домножує їх до фізичних сам. Жодного `/scale` тут більше немає.
 
-**Масштаб беруть з `WindowHandler._window_scale(root)`**, а не напряму з `rdp.get_windows_dpi_scale()`. `_window_scale` читає **кешоване** `root._get_window_scaling()` самого CTk — те саме значення, яким CTk множить `geometry()`, тож ділення тут і множення в CTk скорочуються **точно** (а не приблизно) і без Win32-виклику на кожну подію. Запасний ланцюг: `rdp.get_windows_dpi_scale()` → `2.0`. `rdp.get_windows_dpi_scale()` тепер усереднює `(dpi_x + dpi_y) / 2`, як і CTk.
+**x/y — тільки через `winfo_x()/winfo_y()`, не через розбір рядка `geometry()`.** Геттер `root.geometry()` реверсить лише w/h, але позицію Tk у рядку віддає неоднозначно: `-100` означає «100 px від правого краю», а не `x=-100`. Для мультимонітора з від'ємними координатами (сценарій Retina/RDP) це критично, тож позицію беремо цілим із `winfo_*`.
+
+**Наслідок для зміни DPI:** оскільки зберігається логічний розмір, при реконекті RDP з іншим DPI вікно тримає той самий **логічний** розмір (виглядає пропорційно так само), а не фіксований піксельний.
+
+**Де ще потрібен масштаб.** `WindowHandler._window_scale(root)` читає **кешоване** `root._get_window_scaling()` CTk (те саме значення, яким CTk множить `geometry()`, без Win32-виклику на подію). Він потрібен там, де код працює у фізичному просторі: `do_resize` (курсор у фізичних px → логічна `geometry()`), зона краю/мінімум ресайзу, і оцінка фізичного розміру для `clamp_to_visible` у `load_window_size`/`on_restore_defaults`. Запасний ланцюг: `rdp.get_windows_dpi_scale()` → `2.0` (усереднює `(dpi_x+dpi_y)/2`, як CTk). `_to_logical` реверсить через `root._reverse_window_scaling()` з тим самим fallback.
+
+> **Міграція ini.** Стара версія `save_window_size` зберігала **фізичні** w/h. Після переходу на логічне зберігання наявні фізичні значення в `window_config.ini` довелося поділити на масштаб (÷2 на цій машині), інакше перший запуск домножив би їх удвічі. Далі формат самоузгоджений: будь-який `save_window_size` перепише секцію в логічних одиницях.
 
 **DPI-awareness — рівно один раз на процес.** `logger.py` на старті виставляє `SetProcessDpiAwarenessContext(-4)` = **PER_MONITOR_AWARE_V2** (fallback: `SetProcessDpiAwareness(2)` → `SetProcessDPIAware()`) **до** створення `CTk()`. CTk у своєму `activate_high_dpi_awareness()` теж кличе `SetProcessDpiAwareness(2)`, але awareness ставиться один раз — перемагає перший виклик, і CTk-івський мовчки провалюється. Раніше тут стояв `SetProcessDpiAwareness(1)` (SYSTEM-aware, попри старий лог «PER_MONITOR»): процес «замерзав» на DPI входу, а при реконекті RDP з іншим DPI Windows віртуалізував координати (звідси від'ємні X/Y і зникле вікно), тоді як `GetDpiForMonitor` у CTk бачив реальний новий DPI — розсинхрон, що ламав і розмір, і позицію. V2 тримає координати реальними й узгодженими з масштабом CTk. (`rdp.get_window_dpi`, який теж кликав awareness(2), був мертвий — видалений.)
 
