@@ -296,30 +296,35 @@ class WindowHandler:
         cursor = ""
         root._resize_dir = None  # Скидаємо напрямок ресайзу
 
-        # Визначаємо, в якій зоні знаходиться курсор, щоб змінити його вигляд
+        # Визначаємо зону й ставимо СТАНДАРТНИЙ віндовсний курсор ресайзу.
+        # Ці Tk-імена мапляться на нативні курсори Windows:
+        #   size_nw_se -> IDC_SIZENWSE (⤡), size_ne_sw -> IDC_SIZENESW (⤢),
+        #   size_we    -> IDC_SIZEWE   (↔), size_ns    -> IDC_SIZENS   (↕).
+        # Раніше стояло "sizing <напрямок>": друге слово Tk ігнорує, тож усі
+        # зони показували один 4-стрілковий IDC_SIZEALL, а не напрямкові.
         if x_logical <= border and y_logical <= border:
-            cursor = "sizing northwest"
+            cursor = "size_nw_se"
             root._resize_dir = "nw"
         elif x_logical >= width_logical - border and y_logical <= border:
-            cursor = "sizing northeast"
+            cursor = "size_ne_sw"
             root._resize_dir = "ne"
         elif x_logical <= border and y_logical >= height_logical - border:
-            cursor = "sizing southwest"
+            cursor = "size_ne_sw"
             root._resize_dir = "sw"
         elif x_logical >= width_logical - border and y_logical >= height_logical - border:
-            cursor = "sizing southeast"
+            cursor = "size_nw_se"
             root._resize_dir = "se"
         elif x_logical <= border:
-            cursor = "sizing west"
+            cursor = "size_we"
             root._resize_dir = "w"
         elif x_logical >= width_logical - border:
-            cursor = "sizing east"
+            cursor = "size_we"
             root._resize_dir = "e"
         elif y_logical <= border:
-            cursor = "sizing north"
+            cursor = "size_ns"
             root._resize_dir = "n"
         elif y_logical >= height_logical - border:
-            cursor = "sizing south"
+            cursor = "size_ns"
             root._resize_dir = "s"
 
         root.configure(cursor=cursor or "")
