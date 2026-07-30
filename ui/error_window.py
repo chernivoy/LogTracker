@@ -35,7 +35,10 @@ class ErrorWindow:
         self.root.attributes('-alpha', current_theme["window_alpha"])
         self.root.title("ADAICA: Log Tracker")
         self.root.iconbitmap(HEADER_ICON_PATH)
-        self.root.minsize(300, 100)
+        # minsize виставляється в create_widgets → apply_dynamic_min_height
+        # (динамічна висота під заголовок). Ранній фіксований minsize тут був
+        # зайвий: вікно не показується до mainloop, а до того minsize ні на що
+        # не впливає.
 
         self._load_window_geometry()
 
