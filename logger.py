@@ -123,13 +123,30 @@ class LogTrackerApp:
         self._ensure_on_screen()
 
         # Після повного мапінгу вікна (на старті winfo_* ще неточні) повторюємо
-        # ре-фіт заголовка й перерахунок мінімальної висоти — тепер геометрія
-        # точна, тож обидва значення виходять коректними без раннього root.update().
+        # ре-фіт заголовка й перерахунок мінімальної висоти.
         self.root.after(200, self._fit_header_text)
         self.root.after(200, self.error_window.apply_dynamic_min_height)
+        # Запобіжник від «замалого вікна» на старті: перший check_dpi_scaling у
+        # CTk (~100 мс після mainloop) уточнює масштаб монітора, тож повторно
+        # застосовуємо збережену геометрію вже з коректним DPI — інакше на
+        # моніторі з іншим DPI, ніж первинний, вікно лишалось би зменшеним.
+        self.root.after(250, self._reapply_saved_geometry)
 
         self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self))
         self.root.mainloop()
+
+    def _reapply_saved_geometry(self):
+        """Повторно застосовує збережену геометрію після того, як CTk визначив
+        правильний DPI-масштаб монітора (перший check_dpi_scaling ~100 мс після
+        mainloop). На старті геометрія спершу застосовується з масштабом
+        первинного монітора; якщо вікно відкривається на моніторі з іншим DPI,
+        логічний розмір домножувався не на той масштаб і вікно з'являлося
+        замалим. Повторне застосування вже з коректним масштабом дає правильний
+        фізичний розмір без ручного ресайзу. Якщо розмір уже коректний —
+        геометрія та сама, тож повтор нічого не смикає."""
+        geometry_string = WindowHandler.load_window_size('Window', self.root)
+        if geometry_string:
+            self.root.geometry(geometry_string)
 
     def _ensure_on_screen(self):
         """Періодичний вартовий стану вікна після реконекту RDP.
