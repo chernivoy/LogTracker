@@ -81,7 +81,7 @@ class ContextMenu:
                                    image=self._icons['custom_theme'], compound="left")
             theme_menu.add_separator()
             theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"),
-                                   image=self._icons['custom_theme'], compound="left")
+                                   image=self._icons['light_theme'], compound="left")
             print("INFO: Icons loaded and added to theme menu.")
 
             self.menu.add_cascade(label="Theme", menu=theme_menu, image=self._icons['theme'], compound="left")
