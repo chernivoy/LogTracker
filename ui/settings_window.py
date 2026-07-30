@@ -1,5 +1,6 @@
 import customtkinter as ctk
 
+from ui.ui_assets import HEADER_ICON_PATH
 from ui.window_handler import WindowHandler
 
 
@@ -12,6 +13,17 @@ class SettingsWindow:
         """
         settings_window = ctk.CTkToplevel(app.root)
         settings_window.title("Path settings")
+
+        # Іконку заголовка виставляємо з відкладенням: CTkToplevel сам ставить
+        # свою іконку ~через 200 мс після створення, тож ранній iconbitmap він
+        # затер би. try/except — бо відсутній .ico кинув би TclError.
+        def _apply_icon():
+            try:
+                settings_window.iconbitmap(HEADER_ICON_PATH)
+            except Exception as e:
+                print(f"INFO: settings window icon not set: {e}")
+
+        settings_window.after(250, _apply_icon)
 
         # Завантаження та застосування геометрії для підвікна
         geometry_string = WindowHandler.load_window_size('Window_path', settings_window)
@@ -69,6 +81,10 @@ class SettingsWindow:
                 WindowHandler.save_window_size('Window_path', settings_window)
 
         def _on_configure(event):
+            # <Configure> надходить і від дочірніх віджетів; реагуємо лише на
+            # переміщення/ресайз самого вікна, щоб не смикати дебаунс дарма.
+            if event.widget is not settings_window:
+                return
             if settings_window._geometry_save_job is not None:
                 settings_window.after_cancel(settings_window._geometry_save_job)
             settings_window._geometry_save_job = settings_window.after(500, _save_geometry)
