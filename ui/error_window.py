@@ -71,11 +71,14 @@ class ErrorWindow:
         self.main_frame.grid_rowconfigure(0, weight=0)
         self.main_frame.grid_rowconfigure(1, weight=1)
 
-        # Створюємо дві колонки в main_frame:
-        # Колонка 0 (для заголовка) - weight=1, щоб розтягувалася
-        # Колонка 1 (для кнопок) - weight=0, щоб залишалася фіксованою
+        # Три колонки в main_frame:
+        # Колонка 0 (заголовок) — weight=1, розтягується й ЗВУЖУЄТЬСЯ першою;
+        # Колонки 1 (бургер) і 2 (згорнути в трей) — weight=0, фіксовані.
+        # Раніше обидві кнопки стояли в одній комірці (column=1) і не
+        # накладались лише завдяки різному padx — крихко до зміни ширини/іконок.
         self.main_frame.grid_columnconfigure(0, weight=1)
         self.main_frame.grid_columnconfigure(1, weight=0)
+        self.main_frame.grid_columnconfigure(2, weight=0)
 
         self.file_label = ctk.CTkLabel(
             self.main_frame,
@@ -100,7 +103,7 @@ class ErrorWindow:
             compound="right",
             command=lambda: TrayManager.minimize_to_tray(self.root, self.app)
         )
-        self.to_tray_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
+        self.to_tray_button.grid(row=0, column=2, padx=(0, 5), pady=5, sticky="ne")
 
         self.burger_button = ctk.CTkButton(
             self.main_frame,
@@ -114,7 +117,7 @@ class ErrorWindow:
             compound="left",
             command=lambda: self.context_menu.show_menu(self.burger_button)
         )
-        self.burger_button.grid(row=0, column=1, padx=30, pady=5, sticky="ne")
+        self.burger_button.grid(row=0, column=1, padx=(0, 5), pady=5, sticky="ne")
 
         self.error_frame = ctk.CTkFrame(
             self.main_frame,
@@ -122,7 +125,7 @@ class ErrorWindow:
             border_color=current_theme["error_frame_border_color"],
             border_width=current_theme["error_frame_border_width"]
         )
-        self.error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
+        self.error_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=1, pady=1)
 
         # Верх контент-фрейму = нижня межа заголовка. WindowHandler бере це,
         # щоб уся смуга заголовка над контентом рухала вікно, а не ресайзила.
