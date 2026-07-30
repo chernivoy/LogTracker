@@ -141,7 +141,12 @@ class ErrorWindow:
             state="disabled",
             text_color=current_theme["error_textbox_text_color"],
             font=current_theme["error_textbox_font"],
-            yscrollcommand=lambda *args: None
+            # Ховаємо смуги прокрутки CTkTextbox (при мінімальному розмірі вікна
+            # текст переносився й з'являвся вертикальний скролбар). Скрол колесом
+            # лишається — його дає сама tkinter.Text, а не скролбар. Попередній
+            # yscrollcommand=lambda:None не працював: CTk перекриває його своїм
+            # _y_scrollbar.set.
+            activate_scrollbars=False,
         )
 
         self.error_text_widget.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
