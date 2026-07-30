@@ -43,6 +43,9 @@ class TrayManager:
         }
 
         def on_restore_defaults(icon, item):
+            # Цей колбек виконується в потоці pystray. Файловий запис і чисті
+            # ctypes-обчислення тут безпечні, але всі операції з Tk-вікном
+            # маршалимо в головний цикл через root.after (правило потоків).
             WindowHandler.save_window_params(
                 'Window',
                 x=defaults['x'],
@@ -51,23 +54,35 @@ class TrayManager:
                 height=defaults['height']
             )
 
-            # 2. Отримуємо DPI scale для коректного розрахунку фізичного розміру
-            try:
-                dpi_scale = rdp.get_windows_dpi_scale(root)
-            except Exception:
-                dpi_scale = 2.0
+            # Масштаб CTk (кешований, той самий, що CTk застосує в geometry()).
+            dpi_scale = WindowHandler._window_scale(root)
 
-            # 3. Формуємо рядок geometry відповідно до логіки вашого load_window_size
-            # Логічні розміри ділимо на DPI
+            # Розміри ділимо на масштаб (CTk множить назад). X/Y — фізичні.
             w_geo = int(defaults['width'] / dpi_scale)
             h_geo = int(defaults['height'] / dpi_scale)
 
-            # Координати X та Y залишаємо логічними (без ділення)
-            x_geo = defaults['x']
-            y_geo = defaults['y']
+            # Про всяк випадок підганяємо дефолтну позицію у видиму область
+            # (напр. якщо первинний монітор має від'ємний origin).
+            x_geo, y_geo = rdp.clamp_to_visible(
+                defaults['x'], defaults['y'], defaults['width'], defaults['height']
+            )
 
-            # 4. Фізично оновлюємо вікно, поки воно приховане
-            root.geometry(f"{w_geo}x{h_geo}+{x_geo}+{y_geo}")
+            def _apply():
+                root.geometry(f"{w_geo}x{h_geo}+{x_geo}+{y_geo}")
+                # Одразу показуємо вікно, а не лишаємо в треї до окремого кліку
+                # «Open»: сенс пункту — витягнути зникле вікно в один крок.
+                root.deiconify()
+                app.is_window_open = True
+                root.lift()
+                root.attributes('-topmost', True)
+                if root.overrideredirect():
+                    root.update_idletasks()
+                    WindowHandler.round_corners(root, 30)
+
+            root.after(0, icon.stop)
+            root.after(0, _apply)
+            if app.tray_icon:
+                app.tray_icon.visible = False
 
         menu = (
             pystray.MenuItem('Open', on_open, default=True),
@@ -91,11 +106,18 @@ class TrayManager:
 
     @staticmethod
     def restore_window(root, app):
+        # load_window_size ПОВЕРТАЄ рядок геометрії (з уже підігнаною у видиму
+        # область позицією) — його треба ЗАСТОСУВАТИ. Раніше результат
+        # ігнорувався, тож відновлення не перепозиціонувало вікно, і зникле за
+        # межами екрана вікно так і лишалось невидимим.
+        geometry_string = WindowHandler.load_window_size('Window', root)
+        if geometry_string:
+            root.geometry(geometry_string)
 
-        WindowHandler.load_window_size('Window', root)  # Перечитываем размеры окна из файла конфигурации
         root.deiconify()
         app.is_window_open = True  # Обновляем состояние окна
         root.lift()
+        root.attributes('-topmost', True)  # overrideredirect-вікно легко втрачає topmost
         if app.tray_icon:
             app.tray_icon.visible = False
 
