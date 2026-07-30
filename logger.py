@@ -122,9 +122,11 @@ class LogTrackerApp:
         self.periodic_sync()
         self._ensure_on_screen()
 
-        # Початковий ре-фіт заголовка вже після того, як вікно повністю
-        # змаплене (на старті winfo_width міг бути ще неточним).
+        # Після повного мапінгу вікна (на старті winfo_* ще неточні) повторюємо
+        # ре-фіт заголовка й перерахунок мінімальної висоти — тепер геометрія
+        # точна, тож обидва значення виходять коректними без раннього root.update().
         self.root.after(200, self._fit_header_text)
+        self.root.after(200, self.error_window.apply_dynamic_min_height)
 
         self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self))
         self.root.mainloop()
