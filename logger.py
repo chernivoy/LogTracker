@@ -358,11 +358,22 @@ class LogTrackerApp:
                     break
 
         # TODO: тимчасовий діагностичний вивід — прибрати після налаштування.
-        print(f"[fit_header] win_w={self.root.winfo_width()} scale={scale} "
-              f"reserved={reserved} left={left} avail={avail} | "
-              f"full_w={full_w} truncated={text != full} | "
-              f"result_w={measurer.measure(text)} text={text!r} "
-              f"font={font_spec!r}")
+        try:
+            fl_x = self.file_label.winfo_x()
+            fl_w = self.file_label.winfo_width()       # РЕАЛЬНА ширина мітки (з іконкою+padding)
+            fl_req = self.file_label.winfo_reqwidth()  # бажана ширина мітки
+            bx = self.error_window.burger_button.winfo_x()
+            tx = self.error_window.to_tray_button.winfo_x()
+            cur_text = self.file_label.cget("text")
+            chrome = fl_w - measurer.measure(cur_text)  # іконка+padding (з поточного тексту)
+        except Exception as e:
+            fl_x = fl_w = fl_req = bx = tx = chrome = -1
+            cur_text = f"<err {e}>"
+        print(f"[fit_header] win_w={self.root.winfo_width()} avail={avail} full_w={full_w} "
+              f"trunc={text != full} result_w={measurer.measure(text)} | "
+              f"label_x={fl_x} label_w={fl_w} label_req={fl_req} label_right={fl_x + fl_w} "
+              f"chrome={chrome} | burger_x={bx} tray_x={tx} | "
+              f"overlap={(fl_x + fl_w) - bx} | text={text!r}")
 
         if self.file_label.cget("text") != text:
             self.file_label.configure(text=text)
