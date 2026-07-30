@@ -125,20 +125,33 @@ LogTrackerApp.on_error_found → ErrorWindow (+ підняття вікна з �
 
 ### DPI-конвенція (легко зламати)
 
-В ini зберігаються **логічні** значення. При відновленні геометрії (`WindowHandler.load_window_size`, `TrayManager.on_restore_defaults`, `WindowHandler.do_resize`):
+CustomTkinter сам множить розміри в `root.geometry()` на свій `window_scaling` (= DPI монітора / 96). Тому в ini зберігаються **фізичні** пікселі (`winfo_*`), а при відновленні геометрії (`WindowHandler.load_window_size`, `TrayManager.on_restore_defaults`, `WindowHandler.do_resize`):
 
-- **width/height** — діляться на `dpi_scale` перед передачею в `geometry()`;
-- **x/y** — передаються **без ділення**, `geometry()` компенсує сам.
+- **width/height** — діляться на масштаб перед передачею в `geometry()`, бо CTk усередині множить їх назад → у Win32 доходить рівно збережений фізичний розмір;
+- **x/y** — передаються **без ділення**: `_apply_geometry_scaling` у CTk координати **не** масштабує, вони проходять як фізичні пікселі.
 
-`rdp.get_windows_dpi_scale()` повертає `dpi_x / 96.0`; при винятку код навколо підставляє fallback `2.0` (не `1.0`). `logger.py` на старті викликає `SetProcessDpiAwareness(1)`, `rdp.get_window_dpi()` — `SetProcessDpiAwareness(2)`.
+**Масштаб беруть з `WindowHandler._window_scale(root)`**, а не напряму з `rdp.get_windows_dpi_scale()`. `_window_scale` читає **кешоване** `root._get_window_scaling()` самого CTk — те саме значення, яким CTk множить `geometry()`, тож ділення тут і множення в CTk скорочуються **точно** (а не приблизно) і без Win32-виклику на кожну подію. Запасний ланцюг: `rdp.get_windows_dpi_scale()` → `2.0`. `rdp.get_windows_dpi_scale()` тепер усереднює `(dpi_x + dpi_y) / 2`, як і CTk.
+
+**DPI-awareness — рівно один раз на процес.** `logger.py` на старті виставляє `SetProcessDpiAwarenessContext(-4)` = **PER_MONITOR_AWARE_V2** (fallback: `SetProcessDpiAwareness(2)` → `SetProcessDPIAware()`) **до** створення `CTk()`. CTk у своєму `activate_high_dpi_awareness()` теж кличе `SetProcessDpiAwareness(2)`, але awareness ставиться один раз — перемагає перший виклик, і CTk-івський мовчки провалюється. Раніше тут стояв `SetProcessDpiAwareness(1)` (SYSTEM-aware, попри старий лог «PER_MONITOR»): процес «замерзав» на DPI входу, а при реконекті RDP з іншим DPI Windows віртуалізував координати (звідси від'ємні X/Y і зникле вікно), тоді як `GetDpiForMonitor` у CTk бачив реальний новий DPI — розсинхрон, що ламав і розмір, і позицію. V2 тримає координати реальними й узгодженими з масштабом CTk. (`rdp.get_window_dpi`, який теж кликав awareness(2), був мертвий — видалений.)
+
+### Запобіжник від зниклого вікна (RDP-реконект)
+
+Головний сценарій зникнення: після реконекту RDP (особливо з Retina-клієнта зі зміною DPI/роздільної здатності) збережені координати опиняються поза новим екраном або стають від'ємними, і безрамкове вікно не видно. Три рівні захисту, усі у фізичних координатах (тих самих, у яких `winfo_*` і `GetSystemMetrics` при DPI-awareness):
+
+- **`rdp.clamp_to_visible(x, y, w, h)`** підганяє позицію в межі **віртуального** екрана (`SM_*VIRTUALSCREEN`, тобто всі монітори; від'ємний origin додаткового монітора зберігається). Викликається в `load_window_size`, `restore_window`, `on_restore_defaults`, `stop_resize`.
+- **`LogTrackerApp._ensure_on_screen`** — тік раз на 2 с: якщо **відкрите** вікно повністю поза екраном (`rdp.is_rect_visible`, поріг 48 px) — повертає його всередину й піднімає. Ловить саме реконект, бо там вікно зсуває сама ОС, без події від користувача.
+- **`restore_window` тепер ЗАСТОСОВУЄ** рядок з `load_window_size` (раніше результат ігнорувався, тож відновлення з трея не перепозиціонувало вікно). `on_restore_defaults` одразу `deiconify`+`lift` (Tk-операції з потоку pystray маршаляться через `root.after`), а не лишає вікно в треї до окремого «Open».
+
+`clamp_to_visible` у `stop_resize` спрацьовує лише коли вікно фактично невидиме (`is_rect_visible`), а не «цілком уміщається» — щоб звичайний ресайз за правий/нижній край не смикав протилежну межу.
 
 ### Безрамкове вікно
 
 `ErrorWindow.setup_window()` вмикає `overrideredirect(True)` + `-transparentcolor` + `-alpha` + `-topmost`. Наслідок — усе, що зазвичай робить ОС, реалізовано вручну в `ui/window_handler.py` через Win32-виклики `ctypes`:
 
-- переміщення — `start_move` / `do_move`;
-- ресайз за 8 напрямками — `change_cursor` / `start_resize` / `do_resize` / `stop_resize` (зона краю `border = 20`, мінімум 300×100);
-- заокруглені кути — `round_corners()` через `CreateRoundRectRgn` + `SetWindowRgn`; регіон **скидається** на час ресайзу і накладається знову в `stop_resize`.
+- переміщення — `start_move` / `do_move` (`do_move` виходить, якщо активний `_resize_dir`: move і resize прив'язані обидва й у зоні краю смикали б вікно разом);
+- ресайз за 8 напрямками — `change_cursor` / `start_resize` / `do_resize` / `stop_resize`. Зона краю `border = int(20 * scale)` — **масштабується за DPI** (20 фізичних px при DPI 200% давали б лише ~10 логічних, важко влучити трекпадом через RDP). Мінімум теж фізичний: `int(300*scale) × int(100*scale)`, щоб збігатися з `root.minsize(300,100)`, яку CTk теж множить, — інакше на межі OS клампив би ширину, а x усе одно зсувався б, і вікно «повзло» б. Масштаб кешується в `start_resize` (`_resize_scale`) на весь жест, `do_resize` не смикає Win32 на кожну подію і **не** друкує (раніше 6 `print` на подію роздували лог);
+- клік по кутовій кнопці (згорнути/бургер) **не** починає ресайз: `change_cursor`/`start_resize` виходять, якщо `"ctkbutton" in str(event.widget)` (масштабована зона краю перекриває кнопки);
+- заокруглені кути — `round_corners()` через `CreateRoundRectRgn` + `SetWindowRgn`; регіон **скидається** на час ресайзу і накладається знову в `stop_resize` (після `update_idletasks`, щоб узяти вже оновлений розмір).
 
 `bind_resize_events` знаходить заголовок за жорстко зашитим Tk-шляхом `".!ctkframe.!ctklabel"`. Зміна порядку/ієрархії створення віджетів у `ErrorWindow.create_widgets()` зламає цей lookup (буде тільки `print` про помилку, мовчазна деградація перетягування).
 
