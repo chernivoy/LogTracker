@@ -177,6 +177,8 @@ CustomTkinter сам множить розміри в `root.geometry()` на с�
 
 Додаючи новий стилізований віджет, треба змінити **два** місця: `ErrorWindow.create_widgets()` (початкове створення) і `ThemeManager.update_widgets_theme()` (перемикання на льоту), плюс зареєструвати віджет у словнику `widgets_to_update`.
 
+**Виняток — вікно `Path settings` (`SettingsWindow`).** Воно стилізується групою ключів `settings_*` (`settings_bg`, `settings_text_color`, `settings_font`, `settings_entry_fg_color`, `settings_entry_border_color`, `settings_button_fg_color`, `settings_button_hover_color`, `settings_button_text_color`), але **не** проходить через `update_widgets_theme`: вікно модальне (`grab_set`) і будується заново на кожне відкриття, тож стиль читається з `current_theme_data` **один раз при відкритті** — змінити тему, поки воно відкрите, неможливо, тож живого оновлення не потрібно. Значення `settings_*` виведені з палітри кожної теми, щоб вікно збігалося з головним (фон = фон вікна теми, кнопки = синій акцент). Ключі все одно підпадають під контракт вище — вони є в усіх чотирьох темах. `settings_font` навмисно дорівнює `error_textbox_font`, щоб текст діалогу і поля помилки мали однаковий кегль.
+
 ### Ресурси і PyInstaller
 
 `PathUtils.resource_path()` (`utils/path.py`) резолвить шляхи через `sys._MEIPASS` у зібраному вигляді і `os.path.abspath(".")` у dev. У `ui/ui_assets.py` є **дубль** тієї самої функції; там же `HEADER_ICON_PATH` уже резолвнутий, а решта констант — відносні шляхи, які резолвляться вже у викликачів (`ImageManager`, `TrayManager`). Непослідовно, але саме так це працює.

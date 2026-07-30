@@ -5,91 +5,128 @@ from ui.window_handler import WindowHandler
 
 
 class SettingsWindow:
+    """Модальне вікно налаштування шляхів.
+
+    Стиль повністю береться з поточної теми через групу ключів settings_* —
+    ті самі, що є в усіх темах (контракт: набір ключів однаковий скрізь). Тож
+    вікно візуально належить до того ж застосунку, що й головне вікно з полем
+    помилки, і виглядає коректно в кожній темі. Тема застосовується один раз
+    при відкритті: вікно модальне (grab_set), тож змінити тему, поки воно
+    відкрите, неможливо — живого оновлення стилю не потрібно.
+    """
 
     @staticmethod
     def open_settings_window(app):
-        """
-        Відкриває вікно налаштувань для шляхів.
-        """
-        settings_window = ctk.CTkToplevel(app.root)
-        settings_window.title("Path settings")
+        """Відкриває вікно налаштувань для шляхів, стилізоване під поточну тему."""
+        theme = app.theme_manager.current_theme_data
 
-        # Іконку заголовка виставляємо з відкладенням: CTkToplevel сам ставить
-        # свою іконку ~через 200 мс після створення, тож ранній iconbitmap він
-        # затер би. try/except — бо відсутній .ico кинув би TclError.
-        def _apply_icon():
+        window = ctk.CTkToplevel(app.root, fg_color=theme["settings_bg"])
+        window.title("Path settings")
+
+        SettingsWindow._apply_deferred_icon(window)
+        SettingsWindow._apply_geometry(window)
+        window.minsize(400, 270)
+        window.grab_set()  # Заблокувати інші вікна до закриття цього
+
+        source_entry = SettingsWindow._add_labeled_entry(
+            window, theme, "Path to source directory:", app.source_directory)
+        destination_entry = SettingsWindow._add_labeled_entry(
+            window, theme, "Path to destination directory:", app.destination_directory)
+
+        SettingsWindow._add_button(
+            window, theme, "Save", pady=10,
+            command=lambda: SettingsWindow.save_settings(
+                app, window, source_entry.get(), destination_entry.get()))
+        SettingsWindow._add_button(
+            window, theme, "Cancel", pady=5, command=window.destroy)
+
+        SettingsWindow._bind_geometry_autosave(window)
+
+    # ---- Побудова стилізованих під тему віджетів ----
+
+    @staticmethod
+    def _add_labeled_entry(window, theme, label_text, value):
+        """Підпис + поле вводу під ним, обидва в стилі теми. Повертає поле."""
+        ctk.CTkLabel(
+            window,
+            text=label_text,
+            text_color=theme["settings_text_color"],
+            font=theme["settings_font"],
+        ).pack(pady=10)
+
+        entry = ctk.CTkEntry(
+            window,
+            width=300,
+            fg_color=theme["settings_entry_fg_color"],
+            text_color=theme["settings_text_color"],
+            border_color=theme["settings_entry_border_color"],
+            font=theme["settings_font"],
+        )
+        entry.insert(0, value)
+        entry.pack(pady=5)
+        return entry
+
+    @staticmethod
+    def _add_button(window, theme, text, command, pady):
+        """Кнопка Save/Cancel у стилі теми."""
+        ctk.CTkButton(
+            window,
+            text=text,
+            command=command,
+            fg_color=theme["settings_button_fg_color"],
+            hover_color=theme["settings_button_hover_color"],
+            text_color=theme["settings_button_text_color"],
+            font=theme["settings_font"],
+        ).pack(pady=pady)
+
+    # ---- Вікно: іконка, геометрія, автозбереження позиції ----
+
+    @staticmethod
+    def _apply_deferred_icon(window):
+        """Ставить іконку заголовка з відкладенням.
+
+        CTkToplevel сам виставляє свою іконку ~через 200 мс після створення,
+        тож ранній iconbitmap він затер би. try/except — бо відсутній .ico
+        кинув би TclError.
+        """
+        def _apply():
             try:
-                settings_window.iconbitmap(HEADER_ICON_PATH)
+                window.iconbitmap(HEADER_ICON_PATH)
             except Exception as e:
                 print(f"INFO: settings window icon not set: {e}")
 
-        settings_window.after(250, _apply_icon)
+        window.after(250, _apply)
 
-        # Завантаження та застосування геометрії для підвікна
-        geometry_string = WindowHandler.load_window_size('Window_path', settings_window)
+    @staticmethod
+    def _apply_geometry(window):
+        geometry_string = WindowHandler.load_window_size('Window_path', window)
         if geometry_string:
-            settings_window.geometry(geometry_string)
+            window.geometry(geometry_string)
         else:
-            settings_window.geometry('400x270+668+661')  # Дефолтні розміри та позиція
+            window.geometry('400x270+668+661')  # Дефолтні розміри та позиція
 
-        settings_window.minsize(400, 270)
-        settings_window.grab_set()  # Заблокувати інші вікна до закриття цього
-
-        # Віджети для налаштувань шляхів
-        label_source_directory = ctk.CTkLabel(settings_window, text="Path to source directory:")
-        label_source_directory.pack(pady=10)
-
-        entry_source_directory = ctk.CTkEntry(settings_window, width=300)
-        entry_source_directory.insert(0, app.source_directory)
-        entry_source_directory.pack(pady=5)
-
-        label_target_directory = ctk.CTkLabel(settings_window, text="Path to destination directory:")
-        label_target_directory.pack(pady=10)
-
-        entry_destination_directory = ctk.CTkEntry(settings_window, width=300)
-        entry_destination_directory.insert(0, app.destination_directory)
-        entry_destination_directory.pack(pady=5)
-
-        # Кнопки збереження та відміни
-        btn_save = ctk.CTkButton(
-            settings_window,
-            text="Save",
-            command=lambda: SettingsWindow.save_settings(
-                app,
-                settings_window,
-                entry_source_directory.get(),
-                entry_destination_directory.get()
-            )
-        )
-        btn_save.pack(pady=10)
-
-        btn_cancel = ctk.CTkButton(
-            settings_window,
-            text="Cancel",
-            command=settings_window.destroy
-        )
-        btn_cancel.pack(pady=5)
-
-        # Зберігання позиції вікна налаштувань при його зміні — з дебаунсом,
-        # інакше кожна подія <Configure> під час перетягування переписує ini.
-        settings_window._geometry_save_job = None
+    @staticmethod
+    def _bind_geometry_autosave(window):
+        """Зберігає позицію вікна при зміні — з дебаунсом, інакше кожна подія
+        <Configure> під час перетягування переписує ini."""
+        window._geometry_save_job = None
 
         def _save_geometry():
-            settings_window._geometry_save_job = None
+            window._geometry_save_job = None
             # Save/Cancel можуть знищити вікно, поки запис ще відкладений.
-            if settings_window.winfo_exists():
-                WindowHandler.save_window_size('Window_path', settings_window)
+            if window.winfo_exists():
+                WindowHandler.save_window_size('Window_path', window)
 
         def _on_configure(event):
             # <Configure> надходить і від дочірніх віджетів; реагуємо лише на
             # переміщення/ресайз самого вікна, щоб не смикати дебаунс дарма.
-            if event.widget is not settings_window:
+            if event.widget is not window:
                 return
-            if settings_window._geometry_save_job is not None:
-                settings_window.after_cancel(settings_window._geometry_save_job)
-            settings_window._geometry_save_job = settings_window.after(500, _save_geometry)
+            if window._geometry_save_job is not None:
+                window.after_cancel(window._geometry_save_job)
+            window._geometry_save_job = window.after(500, _save_geometry)
 
-        settings_window.bind("<Configure>", _on_configure)
+        window.bind("<Configure>", _on_configure)
 
     @staticmethod
     def save_settings(app, settings_window, source_directory, destination_directory):

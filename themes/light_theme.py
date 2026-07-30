@@ -41,5 +41,16 @@ THEME_SETTINGS = {
     "context_menu_fg": "#333333",
     "context_menu_active_bg": "#dcdcdc",
     "context_menu_active_fg": "#333333",
+    #Стиль для settings_window (модальне вікно Path settings)
+    # Стиль співпадає з головним вікном: білий фон, темний текст, світло-сірі
+    # поля, кнопки — синій акцент теми.
+    "settings_bg": "white",
+    "settings_text_color": "#2c3e50",
+    "settings_font": ("Inter", 13),
+    "settings_entry_fg_color": "#f5f5f5",
+    "settings_entry_border_color": "#cccccc",
+    "settings_button_fg_color": "#1c3c6f",
+    "settings_button_hover_color": "#2d5490",
+    "settings_button_text_color": "white",
     "text_color": "#2c3e50",
 }
