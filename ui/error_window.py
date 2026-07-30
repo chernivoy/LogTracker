@@ -134,11 +134,11 @@ class ErrorWindow:
         # щоб уся смуга заголовка над контентом рухала вікно, а не ресайзила.
         self.root._content_frame = self.error_frame
 
-        self.error_text_widget_frame = ctk.CTkFrame(self.error_frame, fg_color="transparent")
-        self.error_text_widget_frame.grid(row=0, column=0, sticky="nsew")
-
+        # Текстбокс кладемо прямо в error_frame. Раніше між ними стояв прозорий
+        # error_text_widget_frame, який нічого не стилізував (update_widgets_theme
+        # його не чіпав) — зайвий рівень вкладеності.
         self.error_text_widget = ctk.CTkTextbox(
-            self.error_text_widget_frame,
+            self.error_frame,
             height=20,
             corner_radius=current_theme["error_textbox_corner_radius"],
             border_width=current_theme["error_textbox_border_width"],
@@ -160,9 +160,6 @@ class ErrorWindow:
         self.error_frame.grid_rowconfigure(0, weight=1)
         self.error_frame.grid_columnconfigure(0, weight=1)
 
-        self.error_text_widget_frame.grid_rowconfigure(0, weight=1)
-        self.error_text_widget_frame.grid_columnconfigure(0, weight=1)
-
         # Зберігаємо віджети, які потрібно оновлювати, у словник
         self.widgets_to_update = {
             "main_frame": self.main_frame,
@@ -170,7 +167,6 @@ class ErrorWindow:
             "to_tray_button": self.to_tray_button,
             "burger_button": self.burger_button,
             "error_frame": self.error_frame,
-            "error_text_widget_frame": self.error_text_widget_frame,
             "error_text_widget": self.error_text_widget
         }
 
