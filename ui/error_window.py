@@ -124,6 +124,10 @@ class ErrorWindow:
         )
         self.error_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=1, pady=1)
 
+        # Верх контент-фрейму = нижня межа заголовка. WindowHandler бере це,
+        # щоб уся смуга заголовка над контентом рухала вікно, а не ресайзила.
+        self.root._content_frame = self.error_frame
+
         self.error_text_widget_frame = ctk.CTkFrame(self.error_frame, fg_color="transparent")
         self.error_text_widget_frame.grid(row=0, column=0, sticky="nsew")
 

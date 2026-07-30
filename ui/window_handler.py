@@ -238,6 +238,20 @@ class WindowHandler:
                 "Помилка: Не вдалося знайти віджет 'file_label' для прив'язки переміщення. Переміщення буде недоступне.")
 
     @staticmethod
+    def _header_bottom(root):
+        """Нижня Y-межа заголовка у координатах вікна (фізичні px) = верх
+        контент-фрейму. Уся смуга над нею — зона ПЕРЕМІЩЕННЯ вікна, а не
+        ресайзу. Якщо межу не визначити — 0 (зони заголовка нема, поведінка
+        як раніше)."""
+        content = getattr(root, "_content_frame", None)
+        if content is not None:
+            try:
+                return content.winfo_rooty() - root.winfo_rooty()
+            except Exception:
+                pass
+        return 0
+
+    @staticmethod
     def change_cursor(event: tk.Event):
         """
         Змінює вигляд курсора на краю вікна для вказівки на можливість ресайзу.
@@ -249,15 +263,12 @@ class WindowHandler:
             root._resize_dir = None
             return
 
-        # Не показуємо resize-курсор над елементами, які зона краю
-        # (масштабована за DPI) перекриває згори:
-        #   - кнопки згорнути/бургер — клік має лишатись кліком;
-        #   - заголовок `file_label` — це ручка ПЕРЕМІЩЕННЯ вікна, тож хапання
-        #     за текст має рухати вікно, а не розтягувати його.
-        # Шлях Tk-віджета містить "ctkbutton" / "ctklabel" відповідно (в т.ч.
-        # для внутрішніх canvas/label цих CTk-віджетів).
+        # Кнопки згорнути/бургер — клік має лишатись кліком, не ресайзом і не
+        # переміщенням. Шлях Tk-віджета кнопки містить "ctkbutton" (в т.ч. для
+        # внутрішніх canvas/label). Перевіряємо ДО зони заголовка, бо кнопки
+        # теж у ній лежать.
         widget_path = str(event.widget)
-        if "ctkbutton" in widget_path or "ctklabel" in widget_path:
+        if "ctkbutton" in widget_path:
             root.configure(cursor="")
             root._resize_dir = None
             return
@@ -267,6 +278,16 @@ class WindowHandler:
         y_logical = event.y_root - root.winfo_rooty()
         width_logical = root.winfo_width()
         height_logical = root.winfo_height()
+
+        # Уся смуга заголовка (над контентом) — зона ПЕРЕМІЩЕННЯ: і текст
+        # заголовка, і порожній фон рухають вікно (move-прив'язки заголовка та
+        # main_frame самі це роблять), тож resize-курсор тут не показуємо й
+        # напрямок не ставимо. Ресайз лишається на нижньому/бічних краях.
+        if y_logical < WindowHandler._header_bottom(root):
+            root.configure(cursor="")
+            root._resize_dir = None
+            return
+
         # Зона краю ~20 логічних px: множимо на масштаб, інакше при DPI 200%
         # смуга захоплення була б лише ~10 фізичних px — важко влучити,
         # надто трекпадом через RDP. _window_scale читає кеш CTk, без Win32.
@@ -307,12 +328,11 @@ class WindowHandler:
     def start_resize(event: tk.Event):
         root = event.widget.winfo_toplevel()
 
-        # Клік по кнопці в куті або по заголовку — це не початок ресайзу
-        # (зона краю масштабується за DPI і перекриває їх згори). Заголовок
-        # `file_label` — ручка ПЕРЕМІЩЕННЯ вікна, тож хапання за текст рухає
-        # вікно, а не розтягує. Не чіпаємо _resize_dir і регіон заокруглення.
+        # Клік по кнопці в куті — це клік, а не початок ресайзу чи переміщення.
+        # Перевіряємо ДО зони заголовка, бо кнопки теж у ній. Шлях віджета
+        # кнопки містить "ctkbutton" (в т.ч. для внутрішніх canvas/label).
         widget_path = str(event.widget)
-        if "ctkbutton" in widget_path or "ctklabel" in widget_path:
+        if "ctkbutton" in widget_path:
             root._resize_dir = None
             return
 
@@ -325,6 +345,13 @@ class WindowHandler:
         width_logical = root.winfo_width()
         height_logical = root.winfo_height()
         border = int(20 * scale)
+
+        # Уся смуга заголовка (над контентом) — зона ПЕРЕМІЩЕННЯ, не ресайзу:
+        # move-прив'язки заголовка/main_frame самі рухатимуть вікно, а ми лише
+        # не вмикаємо тут ресайз. Ресайз лишається на нижньому/бічних краях.
+        if y_logical < WindowHandler._header_bottom(root):
+            root._resize_dir = None
+            return
 
         # Визначаємо напрямок ресайзу на основі позиції курсора в момент кліка
         root._resize_dir = None
