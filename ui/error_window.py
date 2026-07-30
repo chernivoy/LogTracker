@@ -171,6 +171,22 @@ class ErrorWindow:
         self.root.update_idletasks()
         self.root.update()
 
+        # Мінімальна висота вікна = висота заголовка + запас під кілька рядків
+        # тексту. Без цього при найменшому розмірі (100 лог.) нижня грань
+        # обрізала останній рядок у полі помилки: заголовок з'їдав ~40 лог., і
+        # для тексту лишалося менш ніж 3 рядки. Заголовок міряємо (його висота
+        # залежить від шрифту й DPI), поле беремо з запасом ~5 рядків. Значення
+        # зберігаємо на root — його читає і WindowHandler.do_resize, щоб межа
+        # ручного ресайзу збігалася з root.minsize.
+        try:
+            scale = WindowHandler._window_scale(self.root)
+            header_logical = int(WindowHandler._header_bottom(self.root) / scale)
+            min_height_logical = max(100, header_logical + 95)
+        except Exception:
+            min_height_logical = 135
+        self.root._min_height_logical = min_height_logical
+        self.root.minsize(300, min_height_logical)
+
     def bind_events(self):
         """Прив'язує всі події до віджетів."""
         WindowHandler.round_corners(self.root, 30)

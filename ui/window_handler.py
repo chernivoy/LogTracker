@@ -423,13 +423,14 @@ class WindowHandler:
         # Масштаб зафіксовано в start_resize — не смикаємо Win32 на кожну подію.
         scale = getattr(root, "_resize_scale", None) or WindowHandler._window_scale(root)
 
-        # Мінімум у ФІЗИЧНИХ пікселях, узгоджений з root.minsize(300, 100):
-        # CTk застосовує до minsize той самий масштаб, тож OS-мінімум теж
-        # 300x100 * scale. Якби тут мінімум лишався 300x100 фізичних, при
-        # ресайзі з заходу/півночі на межі OS клампив би ширину, а x усе одно
-        # зсувався б — вікно «повзло» б убік. Тепер межі збігаються.
+        # Мінімум у ФІЗИЧНИХ пікселях, узгоджений з root.minsize(...): CTk
+        # застосовує до minsize той самий масштаб, тож OS-мінімум теж
+        # (min_logical * scale). Якби межі не збігалися, при ресайзі з заходу/
+        # півночі OS клампив би розмір, а x/y усе одно зсувалися б — вікно
+        # «повзло» б убік. Висота — динамічна (заголовок + запас під текст),
+        # її рахує ErrorWindow і кладе в root._min_height_logical.
         min_width = int(300 * scale)
-        min_height = int(100 * scale)
+        min_height = int(getattr(root, "_min_height_logical", 100) * scale)
 
         new_width_logical = root._start_width_logical
         new_height_logical = root._start_height_logical
