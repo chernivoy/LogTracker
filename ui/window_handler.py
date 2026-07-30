@@ -1,5 +1,6 @@
 import ctypes
 import os
+import time
 import tkinter as tk
 
 import customtkinter as ctk
@@ -389,6 +390,9 @@ class WindowHandler:
 
         root._resize_hwnd = hwnd     # кешуємо hwnd на весь жест (для перемальовки)
         root._resize_scale = scale  # масштаб зафіксовано на весь жест ресайзу
+        root._resize_pending = None      # остання відкладена геометрія (тротлінг)
+        root._resize_trail_job = None    # трейлінг-таймер фінального кадру
+        root._resize_last_paint = 0.0    # час останнього застосованого кадру
         root._start_cursor_x_logical = event.x_root
         root._start_cursor_y_logical = event.y_root
         root._start_width_logical = root.winfo_width()
@@ -460,22 +464,49 @@ class WindowHandler:
         final_width_for_geometry = int(new_width_logical / scale)
         final_height_for_geometry = int(new_height_logical / scale)
 
-        # Застосовуємо нові розміри та позицію
-        root.geometry(
-            f"{final_width_for_geometry}x{final_height_for_geometry}+{int(new_x_logical)}+{int(new_y_logical)}")
+        # Зберігаємо цільову геометрію й малюємо з ТРОТЛІНГОМ ~60 к/с. Кожен
+        # застосований кадр — це `geometry()` + синхронна перемальовка дітей
+        # (див. _apply_resize_frame), що недешево, надто по RDP. Миша ж сипле
+        # ~100–125 подій/с; без тротлінгу кожна робила б повний erase+repaint
+        # шаруватого вікна, і кадри не встигали б — звідси ривки.
+        root._resize_pending = (
+            f"{final_width_for_geometry}x{final_height_for_geometry}+{int(new_x_logical)}+{int(new_y_logical)}",
+            dir,
+        )
+        now = time.perf_counter()
+        if now - getattr(root, "_resize_last_paint", 0.0) >= 0.016:  # leading edge, ~60 к/с
+            root._resize_last_paint = now
+            WindowHandler._apply_resize_frame(root)
+        # Трейлінг: гарантуємо, що остання позиція (можливо, «пропущена»
+        # тротлінгом) таки відмалюється, коли рух зупиниться.
+        trail = getattr(root, "_resize_trail_job", None)
+        if trail is not None:
+            root.after_cancel(trail)
+        root._resize_trail_job = root.after(24, lambda: WindowHandler._apply_resize_frame(root))
 
-        # Спершу застосовуємо відкладений re-layout (пересунути HWND кнопок до
-        # нового правого краю), потім ФОРСУЄМО синхронну перемальовку дітей.
-        #
-        # Чому це потрібно: кнопки праворуч угорі закріплені за правим краєм
-        # (sticky "ne", колонка з weight 0), тож при ресайзі змінюється лише
-        # їхня ПОЗИЦІЯ, а не розмір. CTk перемальовує віджет тільки на зміні
-        # РОЗМІРУ (`_update_dimensions_event`), тож пересунуті кнопки не
-        # перемальовуються — на шаруватому вікні вони зникають/стрибають до
-        # наступної повної перемальовки (аж на stop_resize). `update_idletasks`
-        # не рятує: він не обробляє `WM_PAINT`. Тому явно кличемо
-        # RedrawWindow(...UPDATENOW) — синхронний WM_PAINT усім дочірнім HWND.
+    @staticmethod
+    def _apply_resize_frame(root):
+        """Застосовує останню відкладену геометрію ресайзу і синхронно
+        перемальовує дітей.
+
+        Синхронна перемальовка потрібна, бо кнопки праворуч угорі закріплені
+        за правим краєм (grid `sticky "ne"`, колонка з `weight 0`), тож при
+        ресайзі змінюється лише їхня ПОЗИЦІЯ, а не розмір. CTk перемальовує
+        віджет тільки на зміні РОЗМІРУ (`_update_dimensions_event`), тож
+        пересунуті кнопки самі не перемальовуються — на шаруватому вікні вони
+        зникають/стрибають. `update_idletasks` спершу застосовує відкладений
+        re-layout (пересуває HWND кнопок), але не обробляє `WM_PAINT`, тому далі
+        явно кличемо `RedrawWindow(...UPDATENOW)` — синхронний `WM_PAINT` усім
+        дочірнім HWND на вже коректних позиціях.
+        """
+        pending = getattr(root, "_resize_pending", None)
+        if not pending:
+            return
+        geometry_string, dir = pending
+
+        root.geometry(geometry_string)
         root.update_idletasks()
+
         hwnd = getattr(root, "_resize_hwnd", None)
         if hwnd:
             RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
@@ -499,6 +530,15 @@ class WindowHandler:
             root.configure(cursor="")
             return
 
+        # Скасовуємо трейлінг-таймер і застосовуємо ФІНАЛЬНИЙ кадр: остання
+        # подія руху могла бути «пропущена» тротлінгом, тож без цього вікно
+        # завмерло б на передостанній позиції до кінця жесту.
+        trail = getattr(root, "_resize_trail_job", None)
+        if trail is not None:
+            root.after_cancel(trail)
+            root._resize_trail_job = None
+        WindowHandler._apply_resize_frame(root)
+
         # Оновлюємо реальні розміри перед clamp/заокругленням: після geometry()
         # у do_resize winfo_* могли ще не оновитися.
         root.update_idletasks()
@@ -518,6 +558,7 @@ class WindowHandler:
         root._resize_dir = None
         root._resize_scale = None
         root._resize_hwnd = None
+        root._resize_pending = None
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
 
         # Повертаємо округлення після завершення ресайзу
