@@ -122,6 +122,10 @@ class LogTrackerApp:
         self.periodic_sync()
         self._ensure_on_screen()
 
+        # Початковий ре-фіт заголовка вже після того, як вікно повністю
+        # змаплене (на старті winfo_width міг бути ще неточним).
+        self.root.after(200, self._fit_header_text)
+
         self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self))
         self.root.mainloop()
 
@@ -320,13 +324,22 @@ class LogTrackerApp:
 
         try:
             # Міряємо РЕАЛЬНИМ (масштабованим CTk) шрифтом внутрішнього label,
-            # щоб збігалося з фізичними winfo_x. Доступна ширина = від лівого
-            # краю мітки до лівого краю кнопок мінус невеликий проміжок.
+            # щоб збігалося з фізичними пікселями winfo_*.
             inner = getattr(self.file_label, "_label", None)
             font_spec = inner.cget("font") if inner is not None else self.file_label.cget("font")
             measurer = tkfont.Font(font=font_spec)
-            avail = (self.error_window.burger_button.winfo_x()
-                     - self.file_label.winfo_x() - 8)
+
+            # Доступну ширину рахуємо від ШИРИНИ ВІКНА, а НЕ від позиції кнопок.
+            # Мітка sticky="nw" має натуральну ширину, тож довгий текст сам
+            # розсуває колонку й заштовхує кнопки за правий край — їхній
+            # winfo_x() тоді завеликий, і обрізання не спрацювало б (саме тому
+            # напис лишався перекритим). `reserved` — фіксоване місце під кнопки
+            # праворуч (їхній padx+ширина ≈ 60 лог.); `left` — лівий відступ
+            # мітки (стабільний, від тексту не залежить).
+            scale = WindowHandler._window_scale(self.root)
+            reserved = int(60 * scale)
+            left = self.file_label.winfo_x()
+            avail = self.root.winfo_width() - reserved - left
         except Exception:
             if self.file_label.cget("text") != full:
                 self.file_label.configure(text=full)
