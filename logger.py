@@ -1,6 +1,7 @@
 import os
 import queue
 import tkinter as tk
+from tkinter import font as tkfont
 
 import customtkinter as ctk
 from watchdog.observers import Observer
@@ -86,6 +87,7 @@ class LogTrackerApp:
         self.is_window_open = True
         self.tray_icon = None
         self._geometry_save_job = None
+        self._header_file_path = None  # поточний файл у заголовку (для вписування імені)
 
         self.error_window = ErrorWindow(self, self.root, self.image_manager)
         self.event_queue = queue.Queue()
@@ -230,6 +232,11 @@ class LogTrackerApp:
         читання-модифікації-запису ini. Відкладаємо запис до моменту, коли
         рух припинився.
         """
+        # Перевписуємо ім'я файла в заголовку під нову ширину (лише на подіях
+        # самого вікна, а не кожного дочірнього віджета).
+        if event.widget is self.root:
+            self._fit_header_text()
+
         if self._geometry_save_job is not None:
             self.root.after_cancel(self._geometry_save_job)
 
@@ -275,13 +282,13 @@ class LogTrackerApp:
         alert=False — показ уже відомої помилки при старті: вміст той
         самий, але вікно не має вискакувати з трею через стару подію.
         """
-        file_name = os.path.basename(file_path)
+        self._header_file_path = file_path
 
         header_label_font = self.theme_manager.current_theme_data.get("header_label_font")
         error_textbox_font = self.theme_manager.current_theme_data.get("error_textbox_font")
 
-        self.file_label.configure(font=header_label_font or ("Inter", 13),
-                                  text=f" File: {file_name}")
+        self.file_label.configure(font=header_label_font or ("Inter", 13))
+        self._fit_header_text()
         self.error_text_widget.configure(font=error_textbox_font or ("Inter", 13),
                                          state=tk.NORMAL)
 
@@ -291,6 +298,53 @@ class LogTrackerApp:
 
         if alert and not self.is_window_open:
             TrayManager.restore_window(self.root, self)
+
+    def _fit_header_text(self, event=None):
+        """Вписує ' File: <ім'я>' у доступну ширину заголовка, зберігаючи
+        розширення (`.log`).
+
+        Заголовок стоїть sticky="nw" (натуральна ширина), тож при малій ширині
+        вікна довге ім'я виходило за колонку й лізло під кнопки праворуч —
+        кінець (`.log`) перекривався. Тут, якщо повний текст не влазить у
+        відстань до кнопок, обрізаємо хвіст ІМЕНІ й ставимо '…' перед
+        розширенням, щоб `.log` завжди було видно. Викликається при показі
+        помилки та на зміні розміру вікна.
+        """
+        file_path = self._header_file_path or self.event_handler.last_error_file
+        if not file_path:
+            return
+
+        filename = os.path.basename(file_path)
+        prefix = " File: "
+        full = prefix + filename
+
+        try:
+            # Міряємо РЕАЛЬНИМ (масштабованим CTk) шрифтом внутрішнього label,
+            # щоб збігалося з фізичними winfo_x. Доступна ширина = від лівого
+            # краю мітки до лівого краю кнопок мінус невеликий проміжок.
+            inner = getattr(self.file_label, "_label", None)
+            font_spec = inner.cget("font") if inner is not None else self.file_label.cget("font")
+            measurer = tkfont.Font(font=font_spec)
+            avail = (self.error_window.burger_button.winfo_x()
+                     - self.file_label.winfo_x() - 8)
+        except Exception:
+            if self.file_label.cget("text") != full:
+                self.file_label.configure(text=full)
+            return
+
+        if avail <= 0 or measurer.measure(full) <= avail:
+            text = full
+        else:
+            name, ext = os.path.splitext(filename)  # ext = ".log"
+            text = prefix + "…" + ext
+            for k in range(len(name), 0, -1):
+                candidate = prefix + name[:k] + "…" + ext
+                if measurer.measure(candidate) <= avail:
+                    text = candidate
+                    break
+
+        if self.file_label.cget("text") != text:
+            self.file_label.configure(text=text)
 
 
 if __name__ == "__main__":
