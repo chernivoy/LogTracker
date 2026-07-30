@@ -1,7 +1,6 @@
 # Файл: ui/context_menu.py
 
 import tkinter as tk
-import tkinter.font as tkFont
 
 from ui.settings_window import SettingsWindow
 from ui.ui_assets import (
@@ -23,13 +22,13 @@ class ContextMenu:
     def show_menu(self, button):
         current_theme = self.app.theme_manager.current_theme_data
 
-        # DPI: беремо той самий канонічний масштаб, що й решта застосунку —
-        # кешоване _get_window_scaling() CTk через WindowHandler._window_scale, а
-        # не сирий rdp.get_windows_dpi_scale. Нативний tk.Menu сам за DPI не
-        # масштабується (Tk не бачить per-monitor DPI при awareness V2), тож
-        # базовий кегль множимо вручну — узгоджено з масштабом вікна.
-        scale = WindowHandler._window_scale(self.root)
-        menu_font = tkFont.Font(family="Inter", size=max(1, int(6 * scale)))
+        # Шрифт меню робимо ІДЕНТИЧНИМ до поля з помилкою. Поле — це CTkTextbox,
+        # і CTk домножує його темовий error_textbox_font на widget_scaling,
+        # переводячи кегль у ПІКСЕЛІ (напр. ("Inter", 13) → "Inter -26" при
+        # scale 2.0). Нативний tk.Menu такого масштабування не отримує (Tk не
+        # бачить per-monitor DPI при awareness V2), тож замість ручної формули
+        # копіюємо вже готовий масштабований спек із поля помилки.
+        menu_font = self._error_field_font()
 
         self._load_icons()
 
@@ -54,6 +53,27 @@ class ContextMenu:
             self.menu.tk_popup(x, y)
         finally:
             self.menu.grab_release()
+
+    def _error_field_font(self):
+        """Спек шрифту, яким ЗАРАЗ рендериться поле з помилкою — щоб tk.Menu мав
+        ІДЕНТИЧНИЙ шрифт.
+
+        Беремо його з внутрішнього tkinter.Text у CTkTextbox: cget('font') віддає
+        вже масштабований CTk спек (сім'я + кегль у пікселях, напр. "Inter -26"),
+        придатний як font= для нативного меню. Так меню збігається з полем за
+        сім'єю, кеглем і DPI автоматично й лишається однаковим при зміні теми,
+        без ручного відтворення формули масштабування CTk.
+
+        Фолбек (якщо внутрішній віджет недоступний) відтворює масштаб CTk для
+        темового error_textbox_font вручну: розмір у пікселях = -round(base*scale),
+        сім'я й накреслення — ті самі.
+        """
+        try:
+            return self.app.error_text_widget._textbox.cget("font")
+        except Exception:
+            scale = WindowHandler._window_scale(self.root)
+            base = self.app.theme_manager.current_theme_data["error_textbox_font"]
+            return (base[0], -round(abs(base[1]) * scale), *base[2:])
 
     def _populate_menu(self, menu_font, menu_colors):
         # Одна побудова замість двох гілок: коли всіх іконок нема
