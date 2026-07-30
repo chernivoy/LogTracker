@@ -48,42 +48,6 @@ class WindowHandler:
             config.write(configfile)
 
     @staticmethod
-    def save_window_params_2(section, x=None, y=None, width=None, height=None):
-        """
-        Зберігає параметри вікна у конфіг.
-        Використовує передані значення або дефолтні, без розрахунку поточних координат.
-        """
-        DEFAULT_PARAMS = {
-            'width': '300',
-            'height': '300',
-            'x': '100',
-            'y': '100'
-        }
-
-        config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
-
-        if section not in config:
-            config[section] = {}
-
-        # Словник значень, які потрібно записати
-        provided_params = {
-            'width': width,
-            'height': height,
-            'x': x,
-            'y': y
-        }
-
-        for key, val in provided_params.items():
-            # Якщо аргумент передано — пишемо його, інакше беремо з DEFAULT_PARAMS
-            config[section][key] = str(val) if val is not None else DEFAULT_PARAMS[key]
-
-        try:
-            with open(CONFIG_FILE_WINDOW, 'w') as configfile:
-                config.write(configfile)
-        except Exception as e:
-            print(f"Помилка запису конфігурації: {e}")
-
-    @staticmethod
     def save_window_params(section, x=None, y=None, width=None, height=None):
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
 

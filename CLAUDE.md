@@ -227,7 +227,6 @@ CustomTkinter сам множить розміри в `root.geometry()` на с�
 Не редагувати без потреби, не брати за приклад:
 
 - `pin.py` — окремий демо-скрипт `RoundedWindow`, ніде не імпортується;
-- `WindowHandler.save_window_params_2` — не викликається (використовується `save_window_params`);
 - `build/`, `dist/` (від `pyinstaller logger.spec`) та `output/` (від auto-py-to-exe) — артефакти збірки, у `.gitignore`.
 
 ## Мова
