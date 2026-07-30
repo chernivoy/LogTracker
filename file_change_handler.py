@@ -288,7 +288,21 @@ class FileChangeHandler(FileSystemEventHandler):
     def on_deleted(self, event):
         if event.is_directory:
             return
-        self.stop_tracking(event.src_path)
+        # os.replace() у copy_file_without_waiting (атомарна підміна копії)
+        # породжує на Windows подію 'deleted' для цільового файлу, одразу за
+        # якою йде 'moved' (.part -> ціль). Файл при цьому НЕ зникає. Якщо тут
+        # беззастережно зняти його з обліку, наступний тік sync_files_and_check
+        # «усиновить» його заново через _adopt_if_new, а усиновлення повертає
+        # ВСІ наявні помилки файлу (офсет скидається на кінець аж після
+        # читання) — тож стара, вже показана помилка знову йде в on_error_found,
+        # і згорнуте вікно вискакує з трея, хоча нової помилки не було.
+        #
+        # Реальне видалення лишає файл відсутнім — перевіряємо саме це. os.replace
+        # атомарний: ціль завжди існує (стара або нова версія), тож exists()
+        # надійно відрізняє підміну від справжнього видалення. Осиротілі копії
+        # й без цього прибирає _forget_missing_files на тіку синхронізації.
+        if not os.path.exists(event.src_path):
+            self.stop_tracking(event.src_path)
 
     def stop_tracking(self, file_path):
         if file_path in self.file_paths:
