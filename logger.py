@@ -124,15 +124,21 @@ class LogTrackerApp:
         self.root.mainloop()
 
     def _ensure_on_screen(self):
-        """Періодичний вартовий видимості вікна.
+        """Періодичний вартовий стану вікна після реконекту RDP.
 
-        Після реконекту RDP (особливо з Retina-клієнта зі зміною DPI) Windows
-        може віддати вікну некоректні/від'ємні координати, і воно зникає з
-        екрана — без жодної події від користувача, тож інші clamp-и не
-        спрацьовують. Раз на 2 с перевіряємо: якщо ВІДКРИТЕ вікно повністю поза
-        видимою областю — повертаємо його всередину і піднімаємо. Спрацьовує
-        лише коли вікно фактично невидиме (див. is_rect_visible), тож звичайне
-        користування чи свідоме заповзання за край не зачіпає.
+        Реконект (особливо з Retina-клієнта зі зміною DPI) лишає по собі два
+        сліди, які треба лікувати на таймері, бо події від користувача нема:
+
+        1. **Позиція.** Windows може віддати вікну некоректні/від'ємні
+           координати, і воно зникає з екрана. Якщо ВІДКРИТЕ вікно повністю
+           поза видимою областю — повертаємо його всередину і піднімаємо.
+           Спрацьовує лише коли вікно фактично невидиме (див. is_rect_visible),
+           тож свідоме заповзання за край не зачіпає.
+        2. **Прозорість.** CustomTkinter (ScalingTracker.check_dpi_scaling) при
+           зміні DPI жорстко ставить `-alpha=1` **після** свого перемасштабу,
+           затираючи прозорість із теми; перекрити це в `_set_scaling` не можна
+           (alpha ставиться пізніше). Відновлюємо alpha теми тут — і лише коли
+           він реально «поплив», щоб не мигати вікном щотіку.
         """
         try:
             if self.is_window_open and self.root.winfo_exists():
@@ -144,6 +150,16 @@ class LogTrackerApp:
                     self.root.lift()
                     self.root.attributes('-topmost', True)
                     print(f"[on-screen guard] вікно було поза екраном ({x},{y}) → ({nx},{ny})")
+
+                target_alpha = self.theme_manager.current_theme_data.get("window_alpha")
+                if target_alpha is not None:
+                    try:
+                        current_alpha = float(self.root.attributes('-alpha'))
+                        if abs(current_alpha - float(target_alpha)) > 0.01:
+                            self.root.attributes('-alpha', target_alpha)
+                            print(f"[on-screen guard] відновлено alpha теми {current_alpha} → {target_alpha}")
+                    except (tk.TclError, ValueError):
+                        pass
         except Exception as e:
             print(f"[on-screen guard] {e}")
         finally:
