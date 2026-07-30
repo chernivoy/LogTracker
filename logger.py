@@ -345,7 +345,8 @@ class LogTrackerApp:
                 self.file_label.configure(text=full)
             return
 
-        if avail <= 0 or measurer.measure(full) <= avail:
+        full_w = measurer.measure(full)
+        if avail <= 0 or full_w <= avail:
             text = full
         else:
             name, ext = os.path.splitext(filename)  # ext = ".log"
@@ -355,6 +356,13 @@ class LogTrackerApp:
                 if measurer.measure(candidate) <= avail:
                     text = candidate
                     break
+
+        # TODO: тимчасовий діагностичний вивід — прибрати після налаштування.
+        print(f"[fit_header] win_w={self.root.winfo_width()} scale={scale} "
+              f"reserved={reserved} left={left} avail={avail} | "
+              f"full_w={full_w} truncated={text != full} | "
+              f"result_w={measurer.measure(text)} text={text!r} "
+              f"font={font_spec!r}")
 
         if self.file_label.cget("text") != text:
             self.file_label.configure(text=text)
