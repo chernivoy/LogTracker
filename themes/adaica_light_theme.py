@@ -26,7 +26,8 @@ THEME_SETTINGS = {
     "burger_button_hover_color": "#2d436e",
     #Стиль для error_frame
     "error_frame_fg_color": "#2b2c2f",
-    "error_frame_border_color": "#ce885f",
+    # Збігається з фоном поля (error_frame_fg_color), щоб бордер був невидимий.
+    "error_frame_border_color": "#2b2c2f",
     "error_frame_border_width": 1,
     #Стиль для error_textbox
     "error_textbox_fg_color": "transparent",
