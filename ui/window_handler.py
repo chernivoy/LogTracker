@@ -142,11 +142,12 @@ class WindowHandler:
             0, 0, width, height, radius, radius
         )
 
+        # round_corners викликається в кінці КОЖНОГО ресайзу і при відновленні
+        # з трея, тож друкуємо лише на збої — інакше success-рядок спамив би
+        # logger.log (у windowed-збірці файл має ліміт MAX_BYTES).
         result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
         if result == 0:
             print("[round_corners] SetWindowRgn failed")
-        else:
-            print("[round_corners] SetWindowRgn applied successfully")
 
     @staticmethod
     def start_move(event: tk.Event, root: ctk.CTk):
