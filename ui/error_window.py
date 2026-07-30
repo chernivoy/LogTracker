@@ -39,9 +39,12 @@ class ErrorWindow:
 
         self._load_window_geometry()
 
-        self.app.app_icon = self.image_manager.get_ctk_image(path=BUG_ICON_PATH, size=(16, 16))
-        self.app.close_icon = self.image_manager.get_ctk_image(path=CLOSE_ICON_PATH, size=(11, 11))
-        self.app.burger_menu_icon = self.image_manager.get_ctk_image(path=BURGER_MENU_ICON_PATH, size=(11, 11))
+        # Тримаємо посилання на self (ErrorWindow), а не на app: іконки потрібні
+        # лише цьому вікну, а живе воно стільки ж, скільки app.error_window, тож
+        # від GC вони захищені так само — без засмічення простору імен app.
+        self.app_icon = self.image_manager.get_ctk_image(path=BUG_ICON_PATH, size=(16, 16))
+        self.close_icon = self.image_manager.get_ctk_image(path=CLOSE_ICON_PATH, size=(11, 11))
+        self.burger_menu_icon = self.image_manager.get_ctk_image(path=BURGER_MENU_ICON_PATH, size=(11, 11))
 
         self.root.attributes('-topmost', True)
 
@@ -86,7 +89,7 @@ class ErrorWindow:
             anchor="w",
             text_color=current_theme["header_label_text_color"],
             font=current_theme["header_label_font"],
-            image=self.app.app_icon,
+            image=self.app_icon,
             compound="left"
         )
         self.file_label.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
@@ -99,7 +102,7 @@ class ErrorWindow:
             text_color=current_theme["to_tray_button_text_color"],
             font=current_theme["to_tray_button_font"],
             hover_color=current_theme["to_tray_button_hover_color"],
-            image=self.app.close_icon,
+            image=self.close_icon,
             compound="right",
             command=lambda: TrayManager.minimize_to_tray(self.root, self.app)
         )
@@ -113,7 +116,7 @@ class ErrorWindow:
             text_color=current_theme["burger_button_text_color"],
             font=current_theme["burger_button_font"],
             hover_color=current_theme["burger_button_hover_color"],
-            image=self.app.burger_menu_icon,
+            image=self.burger_menu_icon,
             compound="left",
             command=lambda: self.context_menu.show_menu(self.burger_button)
         )
