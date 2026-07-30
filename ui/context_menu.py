@@ -8,7 +8,7 @@ from ui.ui_assets import (
     EXIT_ICON_PATH, SETTINGS_ICON_PATH, THEME_ICON_PATH,
     DARK_THEME_ICON_PATH, LIGHT_THEME_ICON_PATH, CUSTOM_THEME_ICON_PATH
 )
-from utils import rdp
+from ui.window_handler import WindowHandler
 
 
 class ContextMenu:
@@ -21,91 +21,67 @@ class ContextMenu:
         self._has_icons = False
 
     def show_menu(self, button):
-        print("INFO: Attempting to show context menu.")
+        current_theme = self.app.theme_manager.current_theme_data
 
-        theme_manager = self.app.theme_manager
-        current_theme = theme_manager.current_theme_data
-
-        base_font_size = 6
-        dpi_scale_factor = rdp.get_windows_dpi_scale(self.root)
-        print(f"INFO: DPI scale factor detected: {dpi_scale_factor}")
-        scaled_font_size = int(base_font_size * dpi_scale_factor)
-        print(f"INFO: Scaled font size for menu: {scaled_font_size}")
-        menu_font = tkFont.Font(family="Inter", size=scaled_font_size)
+        # DPI: беремо той самий канонічний масштаб, що й решта застосунку —
+        # кешоване _get_window_scaling() CTk через WindowHandler._window_scale, а
+        # не сирий rdp.get_windows_dpi_scale. Нативний tk.Menu сам за DPI не
+        # масштабується (Tk не бачить per-monitor DPI при awareness V2), тож
+        # базовий кегль множимо вручну — узгоджено з масштабом вікна.
+        scale = WindowHandler._window_scale(self.root)
+        menu_font = tkFont.Font(family="Inter", size=max(1, int(6 * scale)))
 
         self._load_icons()
 
-        self.menu = tk.Menu(
-            self.root,
-            tearoff=0,
-            bg=current_theme["context_menu_bg"],
-            fg=current_theme["context_menu_fg"],
-            activebackground=current_theme["context_menu_active_bg"],
-            activeforeground=current_theme["context_menu_active_fg"],
-            font=menu_font,
-            borderwidth=0,
-            relief="flat"
-        )
+        # Кольори меню беремо з теми (context_menu_*). Фон навмисно збігається з
+        # фоном вікна теми (main_frame_fg_color) — див. значення в themes/*.
+        menu_colors = {
+            "bg": current_theme["context_menu_bg"],
+            "fg": current_theme["context_menu_fg"],
+            "activebackground": current_theme["context_menu_active_bg"],
+            "activeforeground": current_theme["context_menu_active_fg"],
+        }
+        self.menu = tk.Menu(self.root, tearoff=0, font=menu_font,
+                            borderwidth=0, relief="flat", **menu_colors)
 
-        self._populate_menu()
+        self._populate_menu(menu_font, menu_colors)
 
-        x = int(button.winfo_rootx() + int(button.winfo_width()) / 2)
-        y = button.winfo_rooty() + button.winfo_width()
-
+        # Позиція під кнопкою. winfo_* — фізичні пікселі (при DPI-awareness), саме
+        # їх чекає tk_popup; якщо меню не влазить у екран — Tk сам підправить.
+        x = button.winfo_rootx() + button.winfo_width() // 2
+        y = button.winfo_rooty() + button.winfo_height()
         try:
-            print(f"INFO: Displaying menu at coordinates: ({x}, {y})")
             self.menu.tk_popup(x, y)
         finally:
             self.menu.grab_release()
 
-    def _populate_menu(self):
-        # Логіка наповнення меню, яка використовує self._icons.
-        # Перевіряємо саме _has_icons, а не truthiness self._icons: get_tk_photo_image
-        # повертає None на відсутній файл, тож словник міг бути непорожнім, але з
-        # None-значеннями — і гілка «з іконками» ставила image=None замість фолбеку.
-        if self._has_icons:
-            # Створення підменю Theme
-            theme_menu = tk.Menu(self.menu, tearoff=0,
-                                 bg=self.menu['bg'], fg=self.menu['fg'],
-                                 activebackground=self.menu['activebackground'],
-                                 activeforeground=self.menu['activeforeground'],
-                                 font=self.menu['font'], borderwidth=0, relief="flat")
+    def _populate_menu(self, menu_font, menu_colors):
+        # Одна побудова замість двох гілок: коли всіх іконок нема
+        # (_has_icons=False), _img повертає порожній dict і пункти будуються лише
+        # з текстом. get_tk_photo_image повертає None на відсутній файл, тож без
+        # цієї перевірки в меню потрапив би image=None замість текстового фолбеку.
+        icons = self._icons if self._has_icons else {}
 
-            theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"),
-                                   image=self._icons['dark_theme'], compound="left")
-            theme_menu.add_separator()
-            theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"),
-                                   image=self._icons['light_theme'], compound="left")
-            theme_menu.add_separator()
-            theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"),
-                                   image=self._icons['custom_theme'], compound="left")
-            theme_menu.add_separator()
-            theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"),
-                                   image=self._icons['light_theme'], compound="left")
-            print("INFO: Icons loaded and added to theme menu.")
+        def _img(key):
+            return {"image": icons[key], "compound": "left"} if icons else {}
 
-            self.menu.add_cascade(label="Theme", menu=theme_menu, image=self._icons['theme'], compound="left")
-            self.menu.add_separator()
-            self.menu.add_command(label="Path settings", command=lambda: SettingsWindow.open_settings_window(self.app),
-                                  image=self._icons['settings'], compound="left")
-            self.menu.add_separator()
-            self.menu.add_command(label="Exit", command=self.app.on_closing, image=self._icons['exit'], compound="left")
-        else:
-            print("WARNING: Icons could not be loaded, using text labels only.")
-            theme_menu = tk.Menu(self.menu, tearoff=0,
-                                 bg=self.menu['bg'], fg=self.menu['fg'],
-                                 activebackground=self.menu['activebackground'],
-                                 activeforeground=self.menu['activeforeground'],
-                                 font=self.menu['font'], borderwidth=0, relief="flat")
-            theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"))
-            theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"))
-            theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"))
-            theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"))
-            self.menu.add_cascade(label="Theme", menu=theme_menu)
-            self.menu.add_separator()
-            self.menu.add_command(label="Path settings", command=lambda: SettingsWindow.open_settings_window(self.app))
-            self.menu.add_separator()
-            self.menu.add_command(label="Exit", command=self.app.on_closing)
+        theme_menu = tk.Menu(self.menu, tearoff=0, font=menu_font,
+                             borderwidth=0, relief="flat", **menu_colors)
+        theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"), **_img("dark_theme"))
+        theme_menu.add_separator()
+        theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"), **_img("light_theme"))
+        theme_menu.add_separator()
+        theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"), **_img("custom_theme"))
+        theme_menu.add_separator()
+        theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"),
+                               **_img("light_theme"))
+
+        self.menu.add_cascade(label="Theme", menu=theme_menu, **_img("theme"))
+        self.menu.add_separator()
+        self.menu.add_command(label="Path settings",
+                              command=lambda: SettingsWindow.open_settings_window(self.app), **_img("settings"))
+        self.menu.add_separator()
+        self.menu.add_command(label="Exit", command=self.app.on_closing, **_img("exit"))
 
     def _load_icons(self):
         base_icon_size = (16, 16)
@@ -117,7 +93,6 @@ class ContextMenu:
             'light_theme': LIGHT_THEME_ICON_PATH,
             'custom_theme': CUSTOM_THEME_ICON_PATH,
         }
-        print(f"INFO: Loading icons with base size: {base_icon_size}")
 
         self._icons = {}
         try:
@@ -127,15 +102,13 @@ class ContextMenu:
                 self._icons[name] = self.image_manager.get_tk_photo_image(
                     path, base_icon_size)
         except Exception as e:
-            print(f"Error when loading icons: {e}")
+            print(f"Error when loading menu icons: {e}")
 
         # get_tk_photo_image повертає None на відсутній файл (не кидає виняток),
         # тож меню з іконками показуємо лише коли завантажились УСІ. Часткова
         # невдача → чистимо словник і йдемо на текстовий фолбек у _populate_menu.
         self._has_icons = bool(self._icons) and all(
             img is not None for img in self._icons.values())
-        if self._has_icons:
-            print("INFO: Icons loaded successfully.")
-        else:
+        if not self._has_icons:
             self._icons = {}
             print("WARNING: not all menu icons loaded, falling back to text labels.")

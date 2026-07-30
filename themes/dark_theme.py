@@ -39,7 +39,8 @@ THEME_SETTINGS = {
     "error_textbox_corner_radius": 1,
     "error_text_color": "#b4b361",
     #Стиль для context_menu
-    "context_menu_bg": "black",
+    # Суцільний темний під примарний (transparent) фон вікна теми.
+    "context_menu_bg": "#2b2c2f",
     "context_menu_fg": "#e2e0e6",
     "context_menu_active_bg": "#2d436e",
     "context_menu_active_fg": "#e2e0e6",

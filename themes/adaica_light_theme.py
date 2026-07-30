@@ -37,9 +37,10 @@ THEME_SETTINGS = {
     "error_textbox_corner_radius": 10,
     "error_text_color": "#2c3e50",
     #Стиль для context_menu
-    "context_menu_bg": "white",
-    "context_menu_fg": "#333333",
-    "context_menu_active_bg": "#dcdcdc",
-    "context_menu_active_fg": "#333333",
+    # Збігається з фоном вікна теми (main_frame_fg_color = #2b2c2f), світлий текст.
+    "context_menu_bg": "#2b2c2f",
+    "context_menu_fg": "#e2e0e6",
+    "context_menu_active_bg": "#2d436e",
+    "context_menu_active_fg": "#e2e0e6",
     "text_color": "#2c3e50",
 }
