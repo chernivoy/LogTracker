@@ -203,13 +203,13 @@ class ErrorWindow:
         self.root.minsize(300, min_height_logical)
 
     def bind_events(self):
-        """Прив'язує всі події до віджетів."""
+        """Прив'язує події до віджетів: ресайз — на root (bind_resize_events),
+        переміщення за заголовок — напряму на file_label і main_frame."""
         WindowHandler.round_corners(self.root, 30)
         WindowHandler.bind_resize_events(self.root)
-        # У майбутньому, цей метод буде більш повним
+
         self.file_label.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.file_label.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
-        # self.file_label.bind("<Double-Button-1>", lambda event: TrayManager.minimize_to_tray(self.root, self.app))
 
         self.main_frame.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
         self.main_frame.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
