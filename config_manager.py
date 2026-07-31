@@ -10,6 +10,31 @@ CONFIG_FILE_WINDOW = PathUtils.resource_path(os.path.join("src", "window_config.
 
 class ConfigManager:
     @staticmethod
+    def save_atomic(config, config_file):
+        """Пише конфіг атомарно: у тимчасовий .part і підміняє через os.replace().
+
+        Прямий open(config_file, 'w') одразу обрізає файл до нуля. Краш чи
+        os._exit(0), яким завершується on_closing, між truncate і кінцем
+        запису лишав би порожній або напівзаписаний ini — той самий клас
+        пошкодження, від якого копіювання логів захищено .part-ом. Тут той
+        самий прийом (див. file_handler.copy_file_without_waiting): реальний
+        конфіг лишається цілим, доки нова версія не запишеться повністю. При
+        збої запису прибираємо недороблений .part, щоб він не накопичувався.
+        """
+        temp_file = config_file + '.part'
+        try:
+            with open(temp_file, 'w') as configfile:
+                config.write(configfile)
+            os.replace(temp_file, config_file)
+        except OSError:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except OSError:
+                pass
+            raise
+
+    @staticmethod
     def load_config(config_file):
         config = configparser.ConfigParser()
         if not os.path.exists(config_file):
@@ -17,8 +42,7 @@ class ConfigManager:
             # Дефолтні X і Y тут мають бути ЛОГІЧНИМИ для початку,
             # оскільки root.geometry() їх компенсує
             config['Window'] = {'width': '800', 'height': '600', 'x': '100', 'y': '100'}
-            with open(config_file, 'w') as configfile:
-                config.write(configfile)
+            ConfigManager.save_atomic(config, config_file)
             return config
 
         config.read(config_file)
@@ -33,5 +57,4 @@ class ConfigManager:
 
         config[section][key] = str(value)
 
-        with open(config_file, 'w') as configfile:
-            config.write(configfile)
+        ConfigManager.save_atomic(config, config_file)

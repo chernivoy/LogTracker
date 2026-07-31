@@ -68,8 +68,7 @@ class WindowHandler:
         config[section]['x'] = str(x)  # ФІЗИЧНИЙ X
         config[section]['y'] = str(y)  # ФІЗИЧНИЙ Y
 
-        with open(CONFIG_FILE_WINDOW, 'w') as configfile:
-            config.write(configfile)
+        ConfigManager.save_atomic(config, CONFIG_FILE_WINDOW)
 
     @staticmethod
     def save_window_params(section, x=None, y=None, width=None, height=None):
@@ -83,8 +82,7 @@ class WindowHandler:
         config[section]['width'] = str(width) if width is not None else "300"
         config[section]['height'] = str(height) if height is not None else "300"
 
-        with open(CONFIG_FILE_WINDOW, 'w') as configfile:
-            config.write(configfile)
+        ConfigManager.save_atomic(config, CONFIG_FILE_WINDOW)
 
     @staticmethod
     def _window_scale(root):

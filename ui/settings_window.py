@@ -1,5 +1,6 @@
 import customtkinter as ctk
 
+from config_manager import ConfigManager
 from ui.ui_assets import HEADER_ICON_PATH
 from ui.window_handler import WindowHandler
 
@@ -145,8 +146,7 @@ class SettingsWindow:
 
         # Уникаємо циклічного імпорту, імпортуючи config_path тут
         from constants import CONFIG_PATH
-        with open(CONFIG_PATH, 'w') as configfile:
-            app.config.write(configfile)
+        ConfigManager.save_atomic(app.config, CONFIG_PATH)
 
         app.source_directory = source_directory
         app.destination_directory = destination_directory
