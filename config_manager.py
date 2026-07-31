@@ -23,7 +23,12 @@ class ConfigManager:
         """
         temp_file = config_file + '.part'
         try:
-            with open(temp_file, 'w') as configfile:
+            # encoding='utf-8' явно: без нього береться локальна кодова
+            # сторінка (тут cp1251). Шляхи source/destination користувач
+            # вводить вручну — вони бувають з кирилицею чи юнікодом, і символ
+            # поза кодовою сторінкою кинув би UnicodeEncodeError по кнопці Save
+            # або мовчки спотворив шлях. Читання (config.read) — теж utf-8.
+            with open(temp_file, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
             os.replace(temp_file, config_file)
         except OSError:
@@ -46,7 +51,7 @@ class ConfigManager:
             return config
 
         try:
-            config.read(config_file)
+            config.read(config_file, encoding='utf-8')
         except (configparser.Error, OSError) as e:
             # Пошкоджений ini (напр. обірваний посеред запису) не має класти
             # застосунок: load_config кличеться на старті, і виняток тут не
