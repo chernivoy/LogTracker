@@ -21,7 +21,7 @@ class _PathTooltip:
 
     def __init__(self, entry, font):
         self._entry = entry
-        self._font = font
+        self._base_font = font  # темовий спек у пунктах — лише як фолбек
         self._tip = None
         entry.bind("<Enter>", self._show, add="+")
         entry.bind("<Leave>", self._hide, add="+")
@@ -44,10 +44,27 @@ class _PathTooltip:
         tk.Label(
             tip, text=text, justify="left",
             background="#1e1e1e", foreground="#f5f5f5",
-            relief="solid", borderwidth=1, font=self._font,
+            relief="solid", borderwidth=1, font=self._resolve_font(),
             padx=6, pady=3,
         ).pack()
         self._tip = tip
+
+    def _resolve_font(self):
+        """Спек шрифту для нативного tk.Label, узгоджений з DPI.
+
+        Плаский кортеж ('Inter', 13) — це ПУНКТИ, і Tk під DPI-awareness сам
+        домножує їх на масштаб дисплея → на high-DPI текст виходив завеликим.
+        Беремо вже масштабований CTk спек прямо з внутрішнього поля
+        (cget('font') віддає піксельний розмір, напр. 'Inter -26'), тож тултіп
+        збігається з текстом поля за кеглем і DPI. Фолбек відтворює формулу CTk
+        вручну: піксельний (від'ємний) розмір = -round(base * scale).
+        """
+        try:
+            return self._entry._entry.cget("font")
+        except Exception:
+            scale = WindowHandler._window_scale(self._entry)
+            fam, size = self._base_font[0], self._base_font[1]
+            return (fam, -round(abs(size) * scale), *self._base_font[2:])
 
     def _hide(self, _event=None):
         if self._tip is not None:
