@@ -29,11 +29,16 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+# One-file збірка: бінарники + дані вкладені прямо в EXE (без COLLECT),
+# тож на виході один самодостатній dist/logger.exe. У рантаймі PyInstaller
+# розпаковує все у %TEMP%\_MEIxxxxx і ставить туди sys._MEIPASS — сідування
+# конфігів (PathUtils.user_config_path) і resource_path працюють без змін.
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='logger',
     debug=False,
     bootloader_ignore_signals=False,
@@ -42,16 +47,10 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
     icon=os.path.join('src', 'Header.ico'),
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='logger'
 )

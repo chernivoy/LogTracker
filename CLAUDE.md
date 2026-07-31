@@ -20,8 +20,8 @@ pip install -r requirements.txt
 # Запуск
 python logger.py
 
-# Збірка через spec-файл
-pyinstaller logger.spec        # → dist/logger/logger.exe
+# Збірка через spec-файл (one-file)
+pyinstaller logger.spec        # → dist/logger.exe (один самодостатній файл)
 
 # Збірка через GUI (варіант із README, дав поточний output/logger/)
 pip install auto-py-to-exe
@@ -198,13 +198,13 @@ CustomTkinter сам множить розміри в `root.geometry()` на с�
 - `datas` — глоб по `src/*` (іконки + ini) у цільову теку `'src'`;
 - `hiddenimports` — глоб по `themes/*_theme.py`. **Обов'язковий**: `ThemeManager.load_theme` тягне теми через `importlib.import_module`, статичний аналіз PyInstaller такий імпорт не бачить. Без цього exe падає на старті з `ModuleNotFoundError: No module named 'themes'`.
 
-Збірка windowed (`console=False`), іконка exe — `src/Header.ico`.
+Збірка **one-file** і windowed: `EXE` вкладає `a.binaries` + `a.datas` прямо в себе (без `COLLECT`), тож на виході **один** `dist/logger.exe` (~18 МБ), а не тека `dist/logger/` з `_internal`. `console=False`, іконка exe — `src/Header.ico`. У рантаймі PyInstaller розпаковує вкладене в тимчасову `%TEMP%\_MEIxxxxx\` і ставить туди `sys._MEIPASS`; ця тека створюється на старті й видаляється при виході (тому старт +1–3 с проти onedir). Усе записуване (конфіги, лог) навмисно виноситься в `%LOCALAPPDATA%` — див. нижче.
 
 **Куди пишуться конфіги в зібраному вигляді.** Записувані конфіги (`config.ini`, `window_config.ini`) у зібраному вигляді лежать **не** поруч з exe, а в `%LOCALAPPDATA%\LogTracker\` — поряд із логом (`rthook_logfile`). Шлях будує `PathUtils.user_config_path(filename)`: якщо `sys.frozen` — віддає `%LOCALAPPDATA%\LogTracker\<filename>`, інакше (dev, `python logger.py`) — старий `src/<filename>`, який у git. `constants.CONFIG_PATH`, `config_manager.CONFIG_FILE_WINDOW`, `window_handler.CONFIG_FILE_WINDOW` і `theme_manager.config_path` усі йдуть через цей хелпер.
 
-**Сідування.** При першій появі (файлу ще нема в `%LOCALAPPDATA%`) `user_config_path` копіює bundled-версію з ресурсів (`sys._MEIPASS\src\<filename>`) у записувану теку, щоб дефолти (`word`, `file_extension`, теми) не загубилися. Ресурси всередині `_internal\src\` лишаються **read-only еталоном** — застосунок їх більше не переписує.
+**Сідування.** При першій появі (файлу ще нема в `%LOCALAPPDATA%`) `user_config_path` копіює bundled-версію з ресурсів (`sys._MEIPASS\src\<filename>`) у записувану теку, щоб дефолти (`word`, `file_extension`, теми) не загубилися. Розпаковані в `%TEMP%\_MEIxxxxx\src\` ресурси лишаються **read-only еталоном** — застосунок їх не переписує (та й не було б сенсу: ОС прибирає цю теку при виході).
 
-Причина переносу: раніше `sys._MEIPASS` (однотечна `COLLECT`-збірка) вказував на `dist/logger/_internal`, тобто конфіг лежав **усередині теки встановлення**. Під `C:\Program Files` запис туди впав би без адмін-прав, а перевстановлення затерло б налаштування користувача. `%LOCALAPPDATA%` записуваний завжди й переживає перевстановлення.
+Причина переносу: `sys._MEIPASS` у зібраному вигляді — **не** постійне місце. У колишній однотечній (`COLLECT`) збірці він указував на `dist/logger/_internal` усередині теки встановлення — під `C:\Program Files` запис туди впав би без адмін-прав, а перевстановлення затерло б налаштування. У теперішній one-file збірці він указує на тимчасову `%TEMP%\_MEIxxxxx`, яку ОС видаляє при виході, — писати конфіги туди означало б **втрачати їх щозапуску**. `%LOCALAPPDATA%` записуваний завжди, спільний для обох режимів і переживає перевстановлення.
 
 ### Логування в зібраному вигляді
 
@@ -237,6 +237,18 @@ CustomTkinter сам множить розміри в `root.geometry()` на с�
 `is_window_open` — прапорець стану; коли він `False` і приходить нова помилка, `on_error_found` сам піднімає вікно з трею.
 
 Меню трея будується заново при кожному згортанні (`minimize_to_tray`), запускається через `run_detached()`.
+
+### Підвищення іконки трея (Win11 «always show»)
+
+`utils/tray_promote.py` → `promote_tray_icon()` виставляє іконку застосунку в треї як **завжди видиму**, а не сховану в overflow (зона за шевроном `^`, куди Windows 11 кладе іконки нових застосунків за замовчуванням). Викликається **один раз** на старті в `logger.py` → `run()`, **до** першого `minimize_to_tray` — тоді прапорець уже стоїть, коли Explorer додає іконку.
+
+Офіційного API для цього немає — Microsoft віддає рішення користувачу. Механізм **недокументований**: Explorer тримає стан кожної іконки в `HKCU\Control Panel\NotifyIconSettings\<id>`, серед значень — `ExecutablePath` і `IsPromoted` (DWORD: `1` = завжди показувати, `0`/відсутнє = overflow). Функція обходить підключі, знаходить свій за збігом `ExecutablePath` із `sys.executable` (`normcase`) і ставить `IsPromoted=1`. Усе в `try/except`, будь-який збій — тихий no-op.
+
+Свідомі обмеження (не «баги» — не «виправляти»):
+
+- **Тільки frozen + Win11.** У dev (`sys.executable == python.exe`) і на Win10 (там ключ інший — зашифрований блоб `IconStreams`) — тихо нічого не робить.
+- **Найперший запуск нового exe — ще в overflow.** Підключ `<id>` — хеш від Explorer, наперед його не відтворити; він з'являється лише **після** першого показу іконки. З 2-го запуску й далі — завжди видима.
+- **Прив'язка до шляху exe.** Перенесення/перезбірка exe в іншу теку = для Windows новий застосунок, видимість скидається. Тому підвищуємо **щоразу** на старті — код сам «лікує» новий шлях. Наслідок: якщо користувач свідомо сховає іконку через налаштування, наступний запуск поверне її.
 
 ## Windows-only
 

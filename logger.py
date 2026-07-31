@@ -16,6 +16,7 @@ from ui.error_window import ErrorWindow
 from ui.image_manager import ImageManager
 from ui.window_handler import WindowHandler
 from utils import rdp
+from utils.tray_promote import promote_tray_icon
 import sys
 import ctypes
 
@@ -109,6 +110,11 @@ class LogTrackerApp:
         # Тут повторний виклик був би зайвим (результат усе одно ігнорувався).
 
     def run(self):
+        # Win11: підвищуємо іконку трея до «always show», поки її ще не додали
+        # (перший minimize_to_tray). Недокументований механізм, best-effort —
+        # див. utils/tray_promote. No-op у dev і на Win10.
+        promote_tray_icon()
+
         self.observer = Observer()
         self.observer.schedule(self.event_handler, self.destination_directory, recursive=False)
         self.observer.start()
