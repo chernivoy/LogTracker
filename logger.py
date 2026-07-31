@@ -174,7 +174,7 @@ class LogTrackerApp:
                     self.root.geometry(f"+{nx}+{ny}")
                     self.root.lift()
                     self.root.attributes('-topmost', True)
-                    print(f"[on-screen guard] вікно було поза екраном ({x},{y}) → ({nx},{ny})")
+                    print(f"[on-screen guard] window was off-screen ({x},{y}) -> ({nx},{ny})")
 
                 target_alpha = self.theme_manager.current_theme_data.get("window_alpha")
                 if target_alpha is not None:
@@ -182,7 +182,7 @@ class LogTrackerApp:
                         current_alpha = float(self.root.attributes('-alpha'))
                         if abs(current_alpha - float(target_alpha)) > 0.01:
                             self.root.attributes('-alpha', target_alpha)
-                            print(f"[on-screen guard] відновлено alpha теми {current_alpha} → {target_alpha}")
+                            print(f"[on-screen guard] restored theme alpha {current_alpha} -> {target_alpha}")
                     except (tk.TclError, ValueError):
                         pass
         except Exception as e:

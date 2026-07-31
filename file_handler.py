@@ -48,16 +48,16 @@ class FileHandler:
             elif os.name == 'posix':  # macOS, Linux
                 subprocess.call(('xdg-open', file_path))
         except Exception as e:
-            print(f"Не удалось открыть файл {file_path}: {e}")
+            print(f"Cannot open file {file_path}: {e}")
 
     @staticmethod
     def create_directory_if_not_exists(directory):
         if not os.path.exists(directory):
             try:
                 os.makedirs(directory)
-                print(f"Создана директория: {directory}")
+                print(f"Created directory: {directory}")
             except Exception as e:
-                print(f"Ошибка при создании директории {directory}: {e}")
+                print(f"Error creating directory {directory}: {e}")
 
     @staticmethod
     def is_file_closed(file_path):
@@ -80,7 +80,7 @@ class FileHandler:
                 pass
             return True
         except Exception as e:
-            print(f"Не удалось прочитать файл {file_path}: {e}")
+            print(f"Cannot read file {file_path}: {e}")
             return False
 
     @staticmethod
@@ -200,23 +200,23 @@ class FileHandler:
         try:
             if os.name == 'nt':  # Для Windows
                 subprocess.run(['clip'], input=file_path.encode('utf-8'), check=True, shell=True)
-                print(f"Шлях до файлу '{file_path}' скопійовано в буфер обміну.")
+                print(f"File path '{file_path}' copied to clipboard.")
             elif os.name == 'posix':  # Для macOS і Linux
                 try:
                     subprocess.run(['xclip', '-selection', 'clipboard'], input=file_path.encode('utf-8'), check=True)
-                    print(f"Шлях до файлу '{file_path}' скопійовано в буфер обміну (Linux).")
+                    print(f"File path '{file_path}' copied to clipboard (Linux).")
                 except FileNotFoundError:
                     try:
                         subprocess.run(['pbcopy'], input=file_path.encode('utf-8'), check=True)
-                        print(f"Шлях до файлу '{file_path}' скопійовано в буфер обміну (macOS).")
+                        print(f"File path '{file_path}' copied to clipboard (macOS).")
                     except FileNotFoundError:
-                        print("Інструмент для роботи з буфером обміну (xclip/pbcopy) не знайдено.")
+                        print("Clipboard tool (xclip/pbcopy) not found.")
             else:
-                print("Копіювання в буфер обміну не підтримується на цій операційній системі.")
+                print("Clipboard copy is not supported on this operating system.")
         except subprocess.CalledProcessError as e:
-            print(f"Помилка виконання команди для буфера обміну: {e}")
+            print(f"Clipboard command failed: {e}")
         except Exception as e:
-            print(f"Не вдалося скопіювати шлях до файлу в буфер обміну: {e}")
+            print(f"Cannot copy file path to clipboard: {e}")
 
     @staticmethod
     def reveal_in_file_explorer(file_path):
@@ -235,14 +235,14 @@ class FileHandler:
                 # породжувала CalledProcessError і фальшиве повідомлення про
                 # помилку при кожному вдалому виклику.
                 subprocess.run(['explorer', '/select,', abs_path])
-                print(f"Файл '{file_path}' відкрито у Провіднику Windows.")
+                print(f"File '{file_path}' revealed in Windows Explorer.")
 
             elif os.name == 'posix':
                 # macOS та Linux використовують різні команди
                 if subprocess.run(['uname'], capture_output=True, text=True).stdout.strip() == 'Darwin':
                     # macOS: `open -R`
                     subprocess.run(['open', '-R', abs_path], check=True)
-                    print(f"Файл '{file_path}' відкрито у Finder.")
+                    print(f"File '{file_path}' revealed in Finder.")
                 else:  # Linux
                     # Спроба використання стандартних команд для різних DE
                     # xdg-open зазвичай відкриває папку, але не виділяє файл
@@ -251,22 +251,22 @@ class FileHandler:
                     # Спочатку спробуємо nautilus (GNOME)
                     try:
                         subprocess.run(['nautilus', '--select', abs_path], check=True)
-                        print(f"Файл '{file_path}' відкрито у Nautilus.")
+                        print(f"File '{file_path}' revealed in Nautilus.")
                     except FileNotFoundError:
                         # Якщо nautilus не знайдено, спробуємо dolphin (KDE)
                         try:
                             subprocess.run(['dolphin', '--select', abs_path], check=True)
-                            print(f"Файл '{file_path}' відкрито у Dolphin.")
+                            print(f"File '{file_path}' revealed in Dolphin.")
                         except FileNotFoundError:
                             # Якщо нічого не підходить, просто відкриємо папку
                             subprocess.run(['xdg-open', os.path.dirname(abs_path)], check=True)
-                            print(f"Папку з файлом '{file_path}' відкрито.")
+                            print(f"Opened folder containing '{file_path}'.")
             else:
-                print("Операція не підтримується на поточній системі.")
+                print("Operation is not supported on this system.")
 
         except FileNotFoundError:
-            print(f"Помилка: Команда для відкриття провідника не знайдена.")
+            print("Error: file explorer command not found.")
         except subprocess.CalledProcessError as e:
-            print(f"Помилка при виконанні команди: {e}")
+            print(f"Command execution error: {e}")
         except Exception as e:
-            print(f"Не вдалося відкрити файл у провіднику: {e}")
+            print(f"Cannot open file in explorer: {e}")

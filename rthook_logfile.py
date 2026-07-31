@@ -40,7 +40,7 @@ class _CappedWriter:
                     self._stream.write(text)
                     self._written += len(text)
                     if self._written >= MAX_BYTES:
-                        self._stream.write(f"\n--- досягнуто ліміт {MAX_BYTES} Б, запис лога зупинено ---\n")
+                        self._stream.write(f"\n--- reached limit of {MAX_BYTES} B, log writing stopped ---\n")
                         self._stream.flush()
                         self._stopped = True
                 except Exception:

@@ -94,7 +94,7 @@ class TrayManager:
         try:
             icon_image = Image.open(icon_file_path)
         except FileNotFoundError:
-            print(f"Помилка: Файл іконки не знайдено за шляхом: {icon_file_path}. Використовуємо стандартну іконку.")
+            print(f"Error: icon file not found at path: {icon_file_path}. Using default icon.")
             icon_image = TrayManager.create_image(64, 64, 'black', 'blue')
 
         app.tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)

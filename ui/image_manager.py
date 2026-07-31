@@ -35,7 +35,7 @@ class ImageManager:
             print(f"INFO: Loaded and cached new CTk image for path: {full_path}")
             return ctk_image
         except FileNotFoundError:
-            print(f"Помилка: Файл іконки не знайдено за шляхом: {full_path}")
+            print(f"Error: icon file not found at path: {full_path}")
             return None
 
     def get_tk_photo_image(self, path: str, base_size: tuple, force_reload: bool = False,
@@ -82,8 +82,8 @@ class ImageManager:
             print(f"INFO: Loaded and cached new Tk PhotoImage for path: {full_path}")
             return tk_photo
         except FileNotFoundError:
-            print(f"Помилка: Файл іконки Tkinter PhotoImage не знайдено за шляхом: {full_path}")
+            print(f"Error: Tkinter PhotoImage icon file not found at path: {full_path}")
             return None
         except Exception as e:
-            print(f"Помилка завантаження tk.PhotoImage з {full_path}: {e}")
+            print(f"Error loading tk.PhotoImage from {full_path}: {e}")
             return None
