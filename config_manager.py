@@ -45,7 +45,19 @@ class ConfigManager:
             ConfigManager.save_atomic(config, config_file)
             return config
 
-        config.read(config_file)
+        try:
+            config.read(config_file)
+        except (configparser.Error, OSError) as e:
+            # Пошкоджений ini (напр. обірваний посеред запису) не має класти
+            # застосунок: load_config кличеться на старті, і виняток тут не
+            # ловився ніде вище. Повертаємо ПОРОЖНІЙ конфіг — усі читачі йдуть
+            # через .get(..., fallback=...) / getint(..., fallback=...), тож
+            # підхопляться дефолти, а наступний save_atomic перепише файл
+            # коректно. config.read міг лишити config частково заповненим,
+            # тому віддаємо свіжий екземпляр, а не цей.
+            print(f"Config {config_file} unreadable, falling back to defaults: {e}")
+            return configparser.ConfigParser()
+
         return config
 
     @staticmethod
