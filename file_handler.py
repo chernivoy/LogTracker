@@ -101,10 +101,18 @@ class FileHandler:
             FileHandler().create_directory_if_not_exists(dest_directory)
             copied = False
             for filename in os.listdir(source_directory):
-                if filename.endswith(file_extension):
-                    source_file = os.path.join(source_directory, filename)
-                    dest_file = os.path.join(dest_directory, filename)
+                if not filename.endswith(file_extension):
+                    continue
+                source_file = os.path.join(source_directory, filename)
+                dest_file = os.path.join(dest_directory, filename)
 
+                # Обробку кожного файлу ізолюємо: os.path.getmtime нижче падає,
+                # якщо файл зник між listdir і зверненням (гонка з застосунком,
+                # що ротує логи). Раніше такий OSError ловив лише зовнішній
+                # except — і решта файлів у тіку не оброблялася зовсім.
+                # Тепер пропускаємо саме проблемний файл, наступний тік
+                # повторить.
+                try:
                     # Заблокований файл просто пропускаємо. Раніше тут стояв
                     # wait_for_file(), який блокував головний потік Tk до 2 с
                     # на файл — при 56 файлах тік, розрахований на секунду,
@@ -130,11 +138,20 @@ class FileHandler:
 
                             if managed_files is not None:
                                 managed_files.add(filename)
+                except OSError as e:
+                    print(f"Skip source {filename}: {e}")
+                    continue
 
             for filename in os.listdir(dest_directory):
-                if filename.endswith(file_extension):
-                    dest_file = os.path.join(dest_directory, filename)
-                    source_file = os.path.join(source_directory, filename)
+                if not filename.endswith(file_extension):
+                    continue
+                dest_file = os.path.join(dest_directory, filename)
+                source_file = os.path.join(source_directory, filename)
+
+                # Так само ізолюємо видалення: os.remove/os.path.exists можуть
+                # спіткнутися об файл, який зник під ногами, а зривати через це
+                # весь прохід синхронізації не можна.
+                try:
                     if os.path.exists(source_file):
                         continue
 
@@ -149,6 +166,9 @@ class FileHandler:
                     print(
                         f'File {filename} removed from {dest_directory},  because it does not exist in {source_directory}')
                     copied = True
+                except OSError as e:
+                    print(f"Skip dest {filename}: {e}")
+                    continue
             if copied:
                 print(f'Finished copying from {source_directory} to {dest_directory}.')
             # Явний return: раніше при copied=False функція просто добігала
