@@ -1,6 +1,7 @@
 import sys
 import configparser
 import os
+import time
 import ctypes
 from utils.path import PathUtils
 
@@ -9,6 +10,27 @@ CONFIG_FILE_WINDOW = PathUtils.user_config_path("window_config.ini")
 
 
 class ConfigManager:
+    # os.replace на Windows зрідка падає з ERROR_ACCESS_DENIED (5) або
+    # ERROR_SHARING_VIOLATION (32) — обидва мапляться в PermissionError —
+    # коли антивірус/індексатор Windows Search/клієнт синхронізації на мить
+    # тримає ціль або щойно записаний .part. Конфіг тут пишеться часто (кожна
+    # зміна геометрії/теми з дебаунсом), тож така колізія реальна. Кілька
+    # коротких повторів прибирають перехідний лок; справжня відмова (read-only,
+    # брак прав) переживе всі спроби й підніметься до викликача.
+    _REPLACE_RETRIES = 5
+    _REPLACE_BACKOFF = 0.06  # с; сумарно до ~0.3 с у рідкісному контендженому випадку
+
+    @staticmethod
+    def _replace_with_retry(temp_file, config_file):
+        for attempt in range(ConfigManager._REPLACE_RETRIES):
+            try:
+                os.replace(temp_file, config_file)
+                return
+            except PermissionError:
+                if attempt == ConfigManager._REPLACE_RETRIES - 1:
+                    raise
+                time.sleep(ConfigManager._REPLACE_BACKOFF)
+
     @staticmethod
     def save_atomic(config, config_file):
         """Пише конфіг атомарно: у тимчасовий .part і підміняє через os.replace().
@@ -30,7 +52,7 @@ class ConfigManager:
             # або мовчки спотворив шлях. Читання (config.read) — теж utf-8.
             with open(temp_file, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
-            os.replace(temp_file, config_file)
+            ConfigManager._replace_with_retry(temp_file, config_file)
         except OSError:
             try:
                 if os.path.exists(temp_file):

@@ -267,7 +267,15 @@ class LogTrackerApp:
 
     def _save_geometry_now(self):
         self._geometry_save_job = None
-        WindowHandler.save_window_size('Window', self.root)
+        # Best-effort: os.replace у save_atomic зрідка падає на перехідному
+        # локі конфіга (антивірус/індексатор), а це лише дебаунсний тік у
+        # Tk-колбеку. Ретраї в save_atomic покривають майже все, але навіть
+        # стійкий лок не має роняти UI необробленим винятком Tkinter —
+        # наступний рух вікна чи вихід збереже геометрію знову.
+        try:
+            WindowHandler.save_window_size('Window', self.root)
+        except OSError as e:
+            print(f"WARNING: could not save window geometry: {e}")
 
     def toggle_theme(self, theme_name: str):
         self.theme_manager.load_theme(theme_name)
