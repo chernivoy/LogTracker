@@ -9,6 +9,7 @@
 
 import os
 import sys
+import threading
 
 MAX_BYTES = 5 * 1024 * 1024
 
@@ -19,31 +20,39 @@ class _CappedWriter:
     Потрібен, бо WindowHandler.do_resize друкує ~6 рядків на кожну подію руху
     миші — без обмеження лог росте необмежено. Після ліміту запис тихо
     припиняється, застосунок продовжує працювати.
+
+    Захищений блокуванням: print() кличуть і головний потік Tk, і потік
+    watchdog (див. FileChangeHandler). Без замка їхні write() перемежовували б
+    байти в одному рядку, а self._written += ... (не атомарний) міг би
+    недорахувати ліміт. Замок робить кожен write/flush цілісним.
     """
 
     def __init__(self, stream):
         self._stream = stream
         self._written = 0
         self._stopped = False
+        self._lock = threading.Lock()
 
     def write(self, text):
-        if not self._stopped:
-            try:
-                self._stream.write(text)
-                self._written += len(text)
-                if self._written >= MAX_BYTES:
-                    self._stream.write(f"\n--- досягнуто ліміт {MAX_BYTES} Б, запис лога зупинено ---\n")
-                    self._stream.flush()
+        with self._lock:
+            if not self._stopped:
+                try:
+                    self._stream.write(text)
+                    self._written += len(text)
+                    if self._written >= MAX_BYTES:
+                        self._stream.write(f"\n--- досягнуто ліміт {MAX_BYTES} Б, запис лога зупинено ---\n")
+                        self._stream.flush()
+                        self._stopped = True
+                except Exception:
                     self._stopped = True
-            except Exception:
-                self._stopped = True
         return len(text)
 
     def flush(self):
-        try:
-            self._stream.flush()
-        except Exception:
-            pass
+        with self._lock:
+            try:
+                self._stream.flush()
+            except Exception:
+                pass
 
     def isatty(self):
         return False
