@@ -38,7 +38,8 @@ class ImageManager:
             print(f"Помилка: Файл іконки не знайдено за шляхом: {full_path}")
             return None
 
-    def get_tk_photo_image(self, path: str, base_size: tuple, force_reload: bool = False) -> tk.PhotoImage | None:
+    def get_tk_photo_image(self, path: str, base_size: tuple, force_reload: bool = False,
+                           scale: float | None = None) -> tk.PhotoImage | None:
         """
         Завантажує та масштабує зображення для нативних Tkinter віджетів (напр., Menu).
 
@@ -46,9 +47,19 @@ class ImageManager:
         на кожне відкриття, і без кешу кожен клік знову читав би PNG з диска й
         гнав LANCZOS-resize. Ключ включає DPI, тож зміна масштабу (реконект RDP)
         дає новий запис, а не стару картинку. force_reload обходить кеш.
+
+        scale — DPI-множник ЯВНО. Викликач (context_menu) передає сюди той самий
+        масштаб CTk, яким масштабується шрифт меню (WindowHandler._window_scale),
+        щоб розмір іконки й кегль тексту бралися з ОДНОГО джерела й не розходились.
+        Це ще й уникає Win32-виклику get_windows_dpi_scale на кожне відкриття меню.
+        Якщо None — запасний варіант: власний запит DPI монітора (Win32).
+
+        Джерело тепер зберігається у високій роздільності (128×128), тож 16*scale
+        завжди ЗМЕНШує його (навіть при 200% DPI → 32 px) — LANCZOS-зменшення дає
+        чіткість на всіх DPI, на відміну від колишнього збільшення 16→32.
         """
         full_path = Path.PathUtils.resource_path(path)
-        dpi_scale_factor = rdp.get_windows_dpi_scale(self.root)
+        dpi_scale_factor = scale if scale is not None else rdp.get_windows_dpi_scale(self.root)
         cache_key = (full_path, "tk", base_size, dpi_scale_factor)
 
         if not force_reload and cache_key in self._cache:

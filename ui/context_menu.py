@@ -104,7 +104,14 @@ class ContextMenu:
         self.menu.add_command(label="Exit", command=self.app.on_closing, **_img("exit"))
 
     def _load_icons(self):
+        # base_icon_size — ЛОГІЧНИЙ розмір (16×16); get_tk_photo_image домножить
+        # його на scale до фізичного. Джерельні PNG зберігаються у 128×128, тож
+        # це завжди ЗМЕНШення (крізь LANCZOS) — чітко на будь-якому DPI.
         base_icon_size = (16, 16)
+        # Той самий масштаб CTk, яким масштабується шрифт меню (_error_field_font):
+        # беремо розмір іконки й кегль тексту з ОДНОГО джерела, щоб не розходились.
+        # Кешоване значення CTk, без Win32-виклику на кожне відкриття меню.
+        scale = WindowHandler._window_scale(self.root)
         icon_paths = {
             'settings': SETTINGS_ICON_PATH,
             'exit': EXIT_ICON_PATH,
@@ -120,7 +127,7 @@ class ContextMenu:
             # відкриття меню, тож force_reload не потрібен — PNG читається один раз.
             for name, path in icon_paths.items():
                 self._icons[name] = self.image_manager.get_tk_photo_image(
-                    path, base_icon_size)
+                    path, base_icon_size, scale=scale)
         except Exception as e:
             print(f"Error when loading menu icons: {e}")
 
