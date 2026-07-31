@@ -1,4 +1,5 @@
 import os
+import tkinter as tk
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -7,6 +8,51 @@ from config_manager import ConfigManager
 from ui.ui_assets import HEADER_ICON_PATH
 from ui.window_handler import WindowHandler
 from utils import rdp
+
+
+class _PathTooltip:
+    """Підказка з повним вмістом поля при наведенні курсора.
+
+    CustomTkinter не має вбудованих тултіпів, тож малюємо власний
+    overrideredirect-Toplevel під полем зі СВІЖИМ текстом (entry.get() читаємо
+    при кожному наведенні, бо шлях міг змінитися через Browse). Порожнє поле
+    підказки не показує. Ховаємо на виході курсора, кліку та знищенні поля.
+    """
+
+    def __init__(self, entry, font):
+        self._entry = entry
+        self._font = font
+        self._tip = None
+        entry.bind("<Enter>", self._show, add="+")
+        entry.bind("<Leave>", self._hide, add="+")
+        entry.bind("<ButtonPress>", self._hide, add="+")
+        entry.bind("<Destroy>", self._hide, add="+")
+
+    def _show(self, _event=None):
+        if self._tip is not None:
+            return
+        text = self._entry.get().strip()
+        if not text:
+            return  # порожнє поле — показувати нічого
+        x = self._entry.winfo_rootx() + 8
+        y = self._entry.winfo_rooty() + self._entry.winfo_height() + 4
+
+        tip = tk.Toplevel(self._entry)
+        tip.wm_overrideredirect(True)
+        tip.attributes("-topmost", True)
+        tip.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            tip, text=text, justify="left",
+            background="#1e1e1e", foreground="#f5f5f5",
+            relief="solid", borderwidth=1, font=self._font,
+            padx=6, pady=3,
+        ).pack()
+        self._tip = tip
+
+    def _hide(self, _event=None):
+        if self._tip is not None:
+            self._tip.destroy()
+            self._tip = None
 
 
 class SettingsWindow:
@@ -53,8 +99,17 @@ class SettingsWindow:
         app._settings_window = window
 
         SettingsWindow._apply_deferred_icon(window)
+
+        # Розмір фіксований у мінімальному: min == max + resizable(False).
+        # Вікно вміщає весь контент і розтягувати його нема сенсу — ресайз лише
+        # плутав би. Обмеження ставимо ДО геометрії, тож навіть якщо в ini лежить
+        # старий (більший) розмір, Tk одразу затисне його до фіксованого;
+        # позицію (де користувач лишив вікно) при цьому зберігаємо.
+        w, h = SettingsWindow._DEFAULT_WIDTH, SettingsWindow._DEFAULT_HEIGHT
+        window.minsize(w, h)
+        window.maxsize(w, h)
+        window.resizable(False, False)
         SettingsWindow._apply_geometry(window)
-        window.minsize(SettingsWindow._DEFAULT_WIDTH, SettingsWindow._DEFAULT_HEIGHT)
         window.grab_set()  # Заблокувати інші вікна до закриття цього
 
         source_entry = SettingsWindow._add_labeled_entry(
@@ -120,6 +175,10 @@ class SettingsWindow:
             text_color=theme["settings_button_text_color"],
             font=theme["settings_font"],
         ).pack(side="left", padx=(6, 0))
+
+        # Повний шлях часто ширший за поле (300px) — показуємо його підказкою
+        # при наведенні, щоб було видно «хвіст» без прокрутки поля.
+        _PathTooltip(entry, theme["settings_font"])
 
         return entry
 
