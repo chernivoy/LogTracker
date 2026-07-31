@@ -3,7 +3,6 @@ from PIL import Image, ImageDraw
 
 from ui.ui_assets import BUG_ICON_PATH
 from ui.window_handler import WindowHandler
-from utils import rdp
 from utils.path import PathUtils
 
 
@@ -25,16 +24,58 @@ class TrayManager:
         root.after(0, app.on_closing)
 
     @staticmethod
+    def _stop_icon(root, app):
+        """Зупиняє поточну detached-іконку трея і прибирає посилання.
+
+        Ідемпотентний: якщо іконки нема — no-op. Посилання `app.tray_icon`
+        обнуляємо ОДРАЗУ, щоб паралельний шлях відновлення (напр. нова
+        помилка під час згортання) не спробував зупинити той самий об'єкт
+        двічі й не побачив «живу» іконку, якої вже нема.
+
+        `icon.stop()` маршалимо в головний цикл через root.after — так само,
+        як це робив увесь тутешній код: метод викликається і з головного
+        потоку (minimize/on_error_found), і з потоку pystray (on_open),
+        а відкладення уникає зупинки циклу pystray зсередини його ж callback.
+        """
+        icon = app.tray_icon
+        if icon is None:
+            return
+        app.tray_icon = None
+
+        def _stop():
+            try:
+                icon.stop()
+            except Exception as e:
+                print(f"Error stopping tray icon: {e}")
+
+        root.after(0, _stop)
+
+    @staticmethod
     def minimize_to_tray(root, app):
+        # Захист від повторного входу. Кнопка «в трей», WM_DELETE і їхня гонка
+        # можуть викликати цей метод повторно, коли вікно вже згорнуте. Без
+        # guard кожен виклик створював би НОВУ pystray.Icon + run_detached-потік
+        # і перезаписував app.tray_icon — попередня іконка ставала осиротілою
+        # (посилання втрачене, зупинити неможливо), а потоки накопичувались.
+        if not app.is_window_open:
+            return
+
         app.is_window_open = False
+
+        # Підстрахування від витоку: якщо з якоїсь причини лишилась стара
+        # detached-іконка (напр. відновлення через нову помилку лише ховало її,
+        # не зупиняючи), прибираємо її перед створенням нової.
+        TrayManager._stop_icon(root, app)
 
         WindowHandler.save_window_size('Window', root)
 
         def on_open(icon, item):
-            root.after(0, icon.stop)
+            # Уся Tk-робота + зупинка іконки — усередині потокобезпечного
+            # restore_window (маршалить через root.after). Тут нічого з Tk
+            # напряму не чіпаємо: колбек виконується в потоці pystray.
             TrayManager.restore_window(root, app)
 
-        # Визначаємо локальний словник з дефолтними значеннями (логічними)
+        # Дефолтні значення — ЛОГІЧНІ (симетрично з load/save window size).
         defaults = {
             'x': 100,
             'y': 100,
@@ -43,9 +84,11 @@ class TrayManager:
         }
 
         def on_restore_defaults(icon, item):
-            # Цей колбек виконується в потоці pystray. Файловий запис і чисті
-            # ctypes-обчислення тут безпечні, але всі операції з Tk-вікном
-            # маршалимо в головний цикл через root.after (правило потоків).
+            # Колбек у потоці pystray. Файловий запис дефолтів тут безпечний;
+            # усе, що стосується Tk-вікна, робить restore_window (маршалить у
+            # головний цикл). Пишемо дефолти в ini, а тоді відновлюємо звичайним
+            # шляхом — load_window_size прочитає саме ці значення й піджене
+            # позицію у видиму область. Так уся Tk-логіка живе в одному місці.
             WindowHandler.save_window_params(
                 'Window',
                 x=defaults['x'],
@@ -53,34 +96,7 @@ class TrayManager:
                 width=defaults['width'],
                 height=defaults['height']
             )
-
-            # Дефолтні width/height — ЛОГІЧНІ (симетрично з load/save):
-            # передаємо в geometry() як є, CTk домножить їх до фізичних сам.
-            scale = WindowHandler._window_scale(root)
-
-            # Позицію підганяємо у видиму область; для clamp потрібна ФІЗИЧНА
-            # оцінка розміру, тож логічні розміри множимо на масштаб.
-            x_geo, y_geo = rdp.clamp_to_visible(
-                defaults['x'], defaults['y'],
-                int(defaults['width'] * scale), int(defaults['height'] * scale)
-            )
-
-            def _apply():
-                root.geometry(f"{defaults['width']}x{defaults['height']}+{x_geo}+{y_geo}")
-                # Одразу показуємо вікно, а не лишаємо в треї до окремого кліку
-                # «Open»: сенс пункту — витягнути зникле вікно в один крок.
-                root.deiconify()
-                app.is_window_open = True
-                root.lift()
-                root.attributes('-topmost', True)
-                if root.overrideredirect():
-                    root.update_idletasks()
-                    WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
-
-            root.after(0, icon.stop)
-            root.after(0, _apply)
-            if app.tray_icon:
-                app.tray_icon.visible = False
+            TrayManager.restore_window(root, app)
 
         menu = (
             pystray.MenuItem('Open', on_open, default=True),
@@ -93,31 +109,56 @@ class TrayManager:
         icon_file_path = PathUtils.resource_path(BUG_ICON_PATH)
         try:
             icon_image = Image.open(icon_file_path)
-        except FileNotFoundError:
-            print(f"Error: icon file not found at path: {icon_file_path}. Using default icon.")
+        except Exception as e:
+            # Не лише FileNotFoundError: побитий/не-картинка файл кине
+            # UnidentifiedImageError/OSError, і без фолбеку впав би весь
+            # minimize_to_tray — вікно вже withdraw, іконки нема, застосунок
+            # фактично зник з очей. Будь-який збій → згенерована заглушка.
+            print(f"Error: could not load tray icon at {icon_file_path}: {e}. Using default icon.")
             icon_image = TrayManager.create_image(64, 64, 'black', 'blue')
 
-        app.tray_icon = pystray.Icon("test", icon_image, "LogTracker for ADAICA", menu)
+        app.tray_icon = pystray.Icon("LogTracker", icon_image, "LogTracker for ADAICA", menu)
 
         root.withdraw()
         app.tray_icon.run_detached()
 
     @staticmethod
     def restore_window(root, app):
-        # load_window_size ПОВЕРТАЄ рядок геометрії (з уже підігнаною у видиму
-        # область позицією) — його треба ЗАСТОСУВАТИ. Раніше результат
-        # ігнорувався, тож відновлення не перепозиціонувало вікно, і зникле за
-        # межами екрана вікно так і лишалось невидимим.
-        geometry_string = WindowHandler.load_window_size('Window', root)
-        if geometry_string:
-            root.geometry(geometry_string)
+        """Показує вікно з трея й зупиняє detached-потік іконки.
 
-        root.deiconify()
-        app.is_window_open = True  # Обновляем состояние окна
-        root.lift()
-        root.attributes('-topmost', True)  # overrideredirect-вікно легко втрачає topmost
-        if app.tray_icon:
-            app.tray_icon.visible = False
+        Потокобезпечний: викликається і з головного потоку (on_error_found),
+        і з потоку pystray (on_open/on_restore_defaults), тож усі Tk-операції
+        маршаляться в головний цикл через root.after (правило потоків).
+
+        Іконку саме ЗУПИНЯЄМО (stop), а не лише ховаємо (visible=False):
+        інакше detached-потік pystray лишався б живим, а наступний
+        minimize_to_tray створював би ще один — витік потоків за цикл
+        «згорнув ↔ прийшла помилка ↔ згорнув».
+        """
+        TrayManager._stop_icon(root, app)
+
+        def _apply():
+            # load_window_size ПОВЕРТАЄ рядок геометрії (з уже підігнаною у
+            # видиму область позицією) — його треба ЗАСТОСУВАТИ. Раніше результат
+            # ігнорувався, тож відновлення не перепозиціонувало вікно, і зникле за
+            # межами екрана вікно так і лишалось невидимим.
+            geometry_string = WindowHandler.load_window_size('Window', root)
+            if geometry_string:
+                root.geometry(geometry_string)
+
+            root.deiconify()
+            app.is_window_open = True  # Обновляем состояние окна
+            root.lift()
+            root.attributes('-topmost', True)  # overrideredirect-вікно легко втрачає topmost
+            # Перебудовуємо округлий регіон під фактичний фізичний розмір: якщо
+            # DPI змінився, поки вікно було в треї (реконект RDP), регіон від
+            # старого масштабу обрізав би кути. update_idletasks спершу застосує
+            # geometry, щоб winfo_* були актуальні.
+            if root.overrideredirect():
+                root.update_idletasks()
+                WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
+
+        root.after(0, _apply)
 
     @staticmethod
     def toggle_pin(root):
