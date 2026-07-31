@@ -1,8 +1,11 @@
+import os
+
 import customtkinter as ctk
 
 from config_manager import ConfigManager
 from ui.ui_assets import HEADER_ICON_PATH
 from ui.window_handler import WindowHandler
+from utils import rdp
 
 
 class SettingsWindow:
@@ -16,13 +19,29 @@ class SettingsWindow:
     відкрите, неможливо — живого оновлення стилю не потрібно.
     """
 
+    # Колір повідомлення про помилку валідації. Фіксований, а не з теми: це
+    # службовий індикатор стану, а не частина палітри, і читається на фоні
+    # всіх трьох тем (світлій, темній, graphite). Заводити заради нього ключ
+    # у theme-контракт (довелося б додати в кожну тему) не варто.
+    _ERROR_COLOR = "#e06c75"
+
     @staticmethod
     def open_settings_window(app):
         """Відкриває вікно налаштувань для шляхів, стилізоване під поточну тему."""
+        # Guard від другого вікна: обидва роблять grab_set() і стекалися б,
+        # перехоплюючи фокус одне в одного. Наявне — просто піднімаємо.
+        existing = getattr(app, "_settings_window", None)
+        if existing is not None and existing.winfo_exists():
+            existing.deiconify()
+            existing.lift()
+            existing.focus_force()
+            return
+
         theme = app.theme_manager.current_theme_data
 
         window = ctk.CTkToplevel(app.root, fg_color=theme["settings_bg"])
         window.title("Path settings")
+        app._settings_window = window
 
         SettingsWindow._apply_deferred_icon(window)
         SettingsWindow._apply_geometry(window)
@@ -34,14 +53,25 @@ class SettingsWindow:
         destination_entry = SettingsWindow._add_labeled_entry(
             window, theme, "Path to destination directory:", app.destination_directory)
 
-        SettingsWindow._add_button(
-            window, theme, "Save", pady=10,
-            command=lambda: SettingsWindow.save_settings(
-                app, window, source_entry.get(), destination_entry.get()))
+        # Рядок для повідомлень валідації: доти порожній і місця майже не
+        # займає. save_settings пише сюди текст замість мовчазного закриття.
+        status_label = ctk.CTkLabel(
+            window, text="", text_color=SettingsWindow._ERROR_COLOR,
+            font=theme["settings_font"], wraplength=360, justify="center")
+        status_label.pack(pady=(4, 0))
+        window._status_label = status_label
+
+        def _save():
+            SettingsWindow.save_settings(
+                app, window, source_entry.get(), destination_entry.get())
+
+        SettingsWindow._add_button(window, theme, "Save", pady=10, command=_save)
         SettingsWindow._add_button(
             window, theme, "Cancel", pady=5, command=window.destroy)
 
         SettingsWindow._bind_geometry_autosave(window)
+        SettingsWindow._bind_keyboard(window, _save)
+        source_entry.focus_set()
 
     # ---- Побудова стилізованих під тему віджетів ----
 
@@ -80,7 +110,7 @@ class SettingsWindow:
             font=theme["settings_font"],
         ).pack(pady=pady)
 
-    # ---- Вікно: іконка, геометрія, автозбереження позиції ----
+    # ---- Вікно: іконка, геометрія, автозбереження позиції, клавіатура ----
 
     @staticmethod
     def _apply_deferred_icon(window):
@@ -103,8 +133,16 @@ class SettingsWindow:
         geometry_string = WindowHandler.load_window_size('Window_path', window)
         if geometry_string:
             window.geometry(geometry_string)
-        else:
-            window.geometry('400x270+668+661')  # Дефолтні розміри та позиція
+            return
+
+        # Дефолт: позицію клампимо у видимий екран так само, як load_window_size.
+        # Хардкод +668+661 на іншій конфігурації моніторів (RDP-реконект з
+        # іншою роздільністю) міг опинитися поза екраном — і модальне вікно
+        # було б невидиме, тоді як grab_set блокує решту UI. Розмір логічний
+        # (400x270), у фізичну оцінку для клампа переводимо через масштаб CTk.
+        scale = WindowHandler._window_scale(window)
+        x, y = rdp.clamp_to_visible(668, 661, int(400 * scale), int(270 * scale))
+        window.geometry(f'400x270+{x}+{y}')
 
     @staticmethod
     def _bind_geometry_autosave(window):
@@ -130,10 +168,55 @@ class SettingsWindow:
         window.bind("<Configure>", _on_configure)
 
     @staticmethod
+    def _bind_keyboard(window, save_command):
+        """Enter — зберегти, Escape — закрити. Модальний діалог має реагувати
+        на клавіатуру, а не лише на кліки по кнопках."""
+        window.bind("<Return>", lambda _e: save_command())
+        window.bind("<Escape>", lambda _e: window.destroy())
+
+    # ---- Валідація і збереження ----
+
+    @staticmethod
+    def _validate(source_directory, destination_directory):
+        """Повертає текст помилки або None, якщо шляхи придатні.
+
+        Раніше поля писалися в config як є: порожній рядок, друкарська
+        помилка чи source == destination тихо ламали копіювання аж до
+        наступного перегляду налаштувань. Тепер відмова видима, а некоректні
+        значення взагалі не зберігаються.
+        """
+        if not source_directory:
+            return "Source directory is required."
+        if not destination_directory:
+            return "Destination directory is required."
+        if not os.path.isdir(source_directory):
+            return "Source directory does not exist."
+        if os.path.normcase(os.path.abspath(source_directory)) == \
+                os.path.normcase(os.path.abspath(destination_directory)):
+            return "Source and destination must differ."
+        # Неіснуючу теку призначення дозволяємо — застосунок її створить
+        # (create_directory_if_not_exists). Але наявний ФАЙЛ за цим шляхом
+        # текою стати не може.
+        if os.path.exists(destination_directory) and \
+                not os.path.isdir(destination_directory):
+            return "Destination path is not a directory."
+        return None
+
+    @staticmethod
     def save_settings(app, settings_window, source_directory, destination_directory):
-        """
-        Зберігає налаштування шляхів та закриває вікно налаштувань.
-        """
+        """Валідує, зберігає шляхи, застосовує їх наживо і закриває вікно."""
+        # .strip() прибирає випадкові пробіли, .strip('"') — лапки навколо
+        # вставленого з провідника шляху; і те, й те інакше мовчки ламало б шлях.
+        source_directory = source_directory.strip().strip('"')
+        destination_directory = destination_directory.strip().strip('"')
+
+        error = SettingsWindow._validate(source_directory, destination_directory)
+        if error:
+            status = getattr(settings_window, "_status_label", None)
+            if status is not None and status.winfo_exists():
+                status.configure(text=error)
+            return  # Вікно лишається відкритим — користувач виправляє ввід.
+
         # ConfigManager.load_config при відсутньому файлі створює його лише
         # з секцією [Window] — байдуже, який це конфіг. Тож на свіжій
         # інсталяції (немає src/config.ini) секції [Settings] не існувало,
@@ -148,8 +231,9 @@ class SettingsWindow:
         from constants import CONFIG_PATH
         ConfigManager.save_atomic(app.config, CONFIG_PATH)
 
-        app.source_directory = source_directory
-        app.destination_directory = destination_directory
+        # Застосувати наживо. Без цього зміна теки призначення діяла б лише
+        # після перезапуску: її тримають закешованою обробник і watchdog.
+        app.apply_directory_settings(source_directory, destination_directory)
 
         WindowHandler.save_window_size('Window_path', settings_window)
         settings_window.destroy()
