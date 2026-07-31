@@ -200,9 +200,11 @@ CustomTkinter сам множить розміри в `root.geometry()` на с�
 
 Збірка windowed (`console=False`), іконка exe — `src/Header.ico`.
 
-**Куди пишуться конфіги в зібраному вигляді.** Збірка однотечна (`COLLECT`), тому `sys._MEIPASS` вказує на `dist/logger/_internal` — постійну теку поруч з exe, а не на тимчасову (тимчасова була б лише при `--onefile`). Перевірено: після запуску exe `_internal/src/window_config.ini` оновлюється і зміни переживають перезапуск.
+**Куди пишуться конфіги в зібраному вигляді.** Записувані конфіги (`config.ini`, `window_config.ini`) у зібраному вигляді лежать **не** поруч з exe, а в `%LOCALAPPDATA%\LogTracker\` — поряд із логом (`rthook_logfile`). Шлях будує `PathUtils.user_config_path(filename)`: якщо `sys.frozen` — віддає `%LOCALAPPDATA%\LogTracker\<filename>`, інакше (dev, `python logger.py`) — старий `src/<filename>`, який у git. `constants.CONFIG_PATH`, `config_manager.CONFIG_FILE_WINDOW`, `window_handler.CONFIG_FILE_WINDOW` і `theme_manager.config_path` усі йдуть через цей хелпер.
 
-Наслідок інший: конфіг лежить усередині теки встановлення. Під `C:\Program Files` запис впаде без прав адміністратора, а перевстановлення застосунку затре налаштування користувача.
+**Сідування.** При першій появі (файлу ще нема в `%LOCALAPPDATA%`) `user_config_path` копіює bundled-версію з ресурсів (`sys._MEIPASS\src\<filename>`) у записувану теку, щоб дефолти (`word`, `file_extension`, теми) не загубилися. Ресурси всередині `_internal\src\` лишаються **read-only еталоном** — застосунок їх більше не переписує.
+
+Причина переносу: раніше `sys._MEIPASS` (однотечна `COLLECT`-збірка) вказував на `dist/logger/_internal`, тобто конфіг лежав **усередині теки встановлення**. Під `C:\Program Files` запис туди впав би без адмін-прав, а перевстановлення затерло б налаштування користувача. `%LOCALAPPDATA%` записуваний завжди й переживає перевстановлення.
 
 ### Логування в зібраному вигляді
 

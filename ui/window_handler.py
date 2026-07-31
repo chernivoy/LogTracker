@@ -9,7 +9,7 @@ from config_manager import ConfigManager
 from utils.path import PathUtils
 from utils import rdp
 
-CONFIG_FILE_WINDOW = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
+CONFIG_FILE_WINDOW = PathUtils.user_config_path("window_config.ini")
 
 # --- ctypes: типи Win32-викликів округлення кутів -------------------------
 # Без явних restype 64-бітні HWND/HRGN зрізаються до 32 біт (типовий restype

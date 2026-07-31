@@ -1,4 +1,3 @@
-import os
 from utils.path import PathUtils
 
-CONFIG_PATH = PathUtils.resource_path(os.path.join("src", "config.ini"))
+CONFIG_PATH = PathUtils.user_config_path("config.ini")

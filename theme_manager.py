@@ -1,12 +1,11 @@
 import importlib
-import os
 
 import customtkinter as ctk
 
 from config_manager import ConfigManager
 from utils.path import PathUtils
 
-config_path = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
+config_path = PathUtils.user_config_path("window_config.ini")
 
 
 DEFAULT_THEME = 'dark'

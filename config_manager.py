@@ -5,7 +5,7 @@ import ctypes
 from utils.path import PathUtils
 
 # Указываем путь к файлу конфигурации
-CONFIG_FILE_WINDOW = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
+CONFIG_FILE_WINDOW = PathUtils.user_config_path("window_config.ini")
 
 
 class ConfigManager:
