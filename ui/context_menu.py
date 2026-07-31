@@ -5,7 +5,7 @@ import tkinter as tk
 from ui.settings_window import SettingsWindow
 from ui.ui_assets import (
     EXIT_ICON_PATH, SETTINGS_ICON_PATH, THEME_ICON_PATH,
-    DARK_THEME_ICON_PATH, LIGHT_THEME_ICON_PATH, CUSTOM_THEME_ICON_PATH
+    DARK_THEME_ICON_PATH, LIGHT_THEME_ICON_PATH, GRAPHITE_THEME_ICON_PATH
 )
 from ui.window_handler import WindowHandler
 
@@ -104,10 +104,7 @@ class ContextMenu:
         theme_menu.add_separator(background=sep_bg)
         theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"), **_img("light_theme"))
         theme_menu.add_separator(background=sep_bg)
-        theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"), **_img("custom_theme"))
-        theme_menu.add_separator(background=sep_bg)
-        theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"),
-                               **_img("light_theme"))
+        theme_menu.add_command(label="Graphite", command=lambda: self.app.toggle_theme("graphite"), **_img("graphite_theme"))
 
         self.menu.add_cascade(label="Theme", menu=theme_menu, **_img("theme"))
         self.menu.add_separator(background=sep_bg)
@@ -131,7 +128,7 @@ class ContextMenu:
             'theme': THEME_ICON_PATH,
             'dark_theme': DARK_THEME_ICON_PATH,
             'light_theme': LIGHT_THEME_ICON_PATH,
-            'custom_theme': CUSTOM_THEME_ICON_PATH,
+            'graphite_theme': GRAPHITE_THEME_ICON_PATH,
         }
 
         self._icons = {}

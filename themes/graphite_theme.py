@@ -1,5 +1,8 @@
-# themes/custom_theme.py
-# Налаштування для кастомної теми
+# themes/graphite_theme.py
+# Графітова тема: суцільний непрозорий фон #383b40 (світліший за near-black
+# dark), ті самі акценти, що й dark. На відміну від dark (main_frame прозорий →
+# показує gray14), тут фон — конкретний колір, тож settings_bg/context_menu_bg
+# дорівнюють саме йому.
 THEME_SETTINGS = {
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
