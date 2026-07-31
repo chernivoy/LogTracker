@@ -11,12 +11,36 @@ from utils import rdp
 
 CONFIG_FILE_WINDOW = PathUtils.resource_path(os.path.join("src", "window_config.ini"))
 
+# --- ctypes: типи Win32-викликів округлення кутів -------------------------
+# Без явних restype 64-бітні HWND/HRGN зрізаються до 32 біт (типовий restype
+# ctypes — c_int), і зіпсований дескриптор регіону міг би піти далі в
+# SetWindowRgn. Ці функції кличе лише window_handler (і мертвий pin.py), тож
+# налаштування на кешованому windll стороннього коду не зачіпає. RedrawWindow
+# теж типізуємо — інакше передача 64-бітного hwnd у нетипізовану функцію дала б
+# OverflowError на великому вказівнику.
+_user32 = ctypes.windll.user32
+_gdi32 = ctypes.windll.gdi32
+_user32.GetParent.restype = ctypes.c_void_p
+_user32.GetParent.argtypes = (ctypes.c_void_p,)
+_gdi32.CreateRoundRectRgn.restype = ctypes.c_void_p
+_gdi32.CreateRoundRectRgn.argtypes = (ctypes.c_int,) * 6
+_user32.SetWindowRgn.restype = ctypes.c_int
+_user32.SetWindowRgn.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_bool)
+_gdi32.DeleteObject.restype = ctypes.c_int
+_gdi32.DeleteObject.argtypes = (ctypes.c_void_p,)
+_user32.RedrawWindow.restype = ctypes.c_int
+_user32.RedrawWindow.argtypes = (
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint,
+)
+
 
 class WindowHandler:
     """
     Відповідає за налаштування та поведінку вікна:
     зміна розміру, переміщення та округлення кутів.
     """
+
+    CORNER_RADIUS = 30  # радіус округлення у ЛОГІЧНИХ px (масштабується за DPI)
 
     @staticmethod
     def save_window_size(section, root):
@@ -131,22 +155,39 @@ class WindowHandler:
         return f'{width}x{height}+{x}+{y}'
 
     @staticmethod
+    def _set_corner_region(hwnd, width, height, radius, redraw=True):
+        """Створює округлий регіон width×height (ФІЗИЧНІ px) і віддає його
+        вікну hwnd. Повертає True на успіх.
+
+        SetWindowRgn ПЕРЕБИРАЄ володіння регіоном і сам видаляє попередній,
+        тож на успіху окремий DeleteObject не потрібен. На ЗБОЇ ОС регіон НЕ
+        приймає — володіння лишається за нами, тому звільняємо його вручну,
+        інакше кожен збій = витік GDI-об'єкта.
+        """
+        hrgn = _gdi32.CreateRoundRectRgn(0, 0, width, height, radius, radius)
+        if not hrgn:
+            return False
+        if _user32.SetWindowRgn(hwnd, hrgn, redraw) == 0:
+            _gdi32.DeleteObject(hrgn)
+            return False
+        return True
+
+    @staticmethod
     def round_corners(window, radius):
-        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        """Накладає округлий регіон на все вікно. `radius` — у ЛОГІЧНИХ px:
+        множимо на масштаб CTk, бо winfo_width/height повертають ФІЗИЧНІ px, і
+        без масштабу при DPI 200% кути виглядали б удвічі гострішими за задум
+        (border і minsize масштабуються так само).
 
-        # Використовуємо розміри вікна напряму, без ручного масштабування
-        width = window.winfo_width()
-        height = window.winfo_height()
-
-        hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
-            0, 0, width, height, radius, radius
-        )
-
-        # round_corners викликається в кінці КОЖНОГО ресайзу і при відновленні
-        # з трея, тож друкуємо лише на збої — інакше success-рядок спамив би
-        # logger.log (у windowed-збірці файл має ліміт MAX_BYTES).
-        result = ctypes.windll.user32.SetWindowRgn(hwnd, hrgn, True)
-        if result == 0:
+        Викликається в кінці КОЖНОГО ресайзу і при відновленні з трея, тож
+        друкуємо лише на збої — інакше success-рядок спамив би logger.log
+        (у windowed-збірці файл має ліміт MAX_BYTES).
+        """
+        hwnd = _user32.GetParent(window.winfo_id())
+        radius = int(radius * WindowHandler._window_scale(window))
+        if not WindowHandler._set_corner_region(
+            hwnd, window.winfo_width(), window.winfo_height(), radius
+        ):
             print("[round_corners] SetWindowRgn failed")
 
     @staticmethod
@@ -347,9 +388,11 @@ class WindowHandler:
             return
         # --- КІНЕЦЬ НОВОЇ ЛОГІКИ ---
 
-        # Тимчасово скасовуємо округлення (щоб не обрізало кути під час ресайзу)
+        # Округлення НЕ скидаємо: регіон тепер тримається живим і
+        # перераховується щокадру в _apply_resize_frame під новий розмір, тож
+        # кути лишаються скругленими протягом усього жесту. (Раніше тут стояв
+        # SetWindowRgn(hwnd, 0) — квадратні кути аж до stop_resize.)
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
-        ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
 
         root._resize_hwnd = hwnd     # кешуємо hwnd на весь жест (для перемальовки)
         root._resize_scale = scale  # масштаб зафіксовано на весь жест ресайзу
@@ -473,6 +516,17 @@ class WindowHandler:
 
         hwnd = getattr(root, "_resize_hwnd", None)
         if hwnd:
+            # Тримаємо округлення ЖИВИМ під час ресайзу: регіон перераховуємо
+            # під новий ФІЗИЧНИЙ розмір щокадру (після update_idletasks winfo_*
+            # уже оновлені), тож він завжди збігається з вікном і кутів не
+            # обрізає. bRedraw=False — тут не малюємо, це зробить наступний
+            # RedrawWindow (одна перемальовка на кадр, без подвійної).
+            scale = getattr(root, "_resize_scale", None) or 1.0
+            WindowHandler._set_corner_region(
+                hwnd, root.winfo_width(), root.winfo_height(),
+                int(WindowHandler.CORNER_RADIUS * scale), redraw=False,
+            )
+
             RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
             flags = RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW
             # ERASE — лише для заходу/півночі, де рухається початок вікна:
@@ -525,6 +579,7 @@ class WindowHandler:
         root._resize_pending = None
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
 
-        # Повертаємо округлення після завершення ресайзу
+        # Повертаємо округлення після завершення ресайзу (фінальний чистий
+        # регіон під точний кінцевий розмір; під час жесту воно вже було живе)
         if root.overrideredirect():
-            WindowHandler.round_corners(root, 30)
+            WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)

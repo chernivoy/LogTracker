@@ -208,7 +208,7 @@ class ErrorWindow:
     def bind_events(self):
         """Прив'язує події до віджетів: ресайз — на root (bind_resize_events),
         переміщення за заголовок — напряму на file_label і main_frame."""
-        WindowHandler.round_corners(self.root, 30)
+        WindowHandler.round_corners(self.root, WindowHandler.CORNER_RADIUS)
         WindowHandler.bind_resize_events(self.root)
 
         self.file_label.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))

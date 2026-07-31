@@ -75,7 +75,7 @@ class TrayManager:
                 root.attributes('-topmost', True)
                 if root.overrideredirect():
                     root.update_idletasks()
-                    WindowHandler.round_corners(root, 30)
+                    WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
 
             root.after(0, icon.stop)
             root.after(0, _apply)
