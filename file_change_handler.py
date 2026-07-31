@@ -48,6 +48,12 @@ class FileChangeHandler(FileSystemEventHandler):
         self.track_files()
 
     def track_files(self):
+        # Перший запуск без налаштувань: теки призначення ще нема (порожній або
+        # неіснуючий шлях). Тихо пропускаємо — os.listdir на такому шляху лише
+        # кинув би виняток. track_files повторять при зміні налаштувань.
+        if not self.destination_directory or not os.path.isdir(self.destination_directory):
+            print(f"Destination not available yet, tracking skipped: {self.destination_directory!r}")
+            return
         print(f"Tracking files with {self.file_extension} extension in the directory:", self.destination_directory)
         try:
             for file_name in os.listdir(self.destination_directory):

@@ -87,6 +87,7 @@ class LogTrackerApp:
         self.observer = None
         self.is_window_open = True
         self.tray_icon = None
+        self._settings_window = None  # відкрите вікно налаштувань (guard від дублювання)
         self._geometry_save_job = None
         self._header_file_path = None  # поточний файл у заголовку (для вписування імені)
 
@@ -115,14 +116,19 @@ class LogTrackerApp:
         # див. utils/tray_promote. No-op у dev і на Win10.
         promote_tray_icon()
 
+        # observer стартує навіть без жодного watch — це коректно. Watch на
+        # теку призначення додає _watch_destination, і лише якщо тека валідна:
+        # на першому запуску без налаштувань (порожній/неіснуючий шлях) планувати
+        # watchdog не можна — емітер ReadDirectoryChangesW впав би на CreateFileW.
         self.observer = Observer()
-        self.observer.schedule(self.event_handler, self.destination_directory, recursive=False)
         self.observer.start()
+        self._watch_destination()
 
-        # Спершу синхронізація, щоб у теці призначення вже лежали свіжі
-        # копії, і лише потім пошук найсвіжішої відомої помилки.
-        self.event_handler.sync_files_and_check(self.source_directory)
-        self.show_latest_known_error()
+        # Перший запуск на новій машині: шляхи можуть бути не налаштовані
+        # (порожні) або вказувати на теки, яких тут нема. _refresh_startup_view
+        # сам вибере, що показати — підказку про налаштування чи найсвіжішу
+        # відому помилку, — і не полізе копіювати з неіснуючого джерела.
+        self._refresh_startup_view()
 
         self.process_queue()
         self.periodic_sync()
@@ -216,6 +222,105 @@ class LogTrackerApp:
         self.event_handler.sync_files_and_check(self.source_directory)
         self.root.after(1000, self.periodic_sync)
 
+    def apply_directory_settings(self, source_directory, destination_directory):
+        """Застосовує нові шляхи з вікна налаштувань БЕЗ перезапуску.
+
+        source_directory підхоплюється сам: periodic_sync щотіка читає
+        self.source_directory, тож досить оновити атрибут. А от теку
+        призначення тримають закешованою ДВА місця — FileChangeHandler
+        (передана в конструкторі) і watchdog-observer, запланований на стару
+        теку. Тож зміну призначення проводимо вручну, інакше застосунок далі
+        копіює і стежить за старою текою.
+
+        Викликається з головного потоку Tk (кнопка Save), тож звертатися до
+        обробника й черги тут безпечно — той самий потік, що й periodic_sync.
+        Шляхи вже провалідовані у SettingsWindow (джерело існує, призначення
+        непорожнє й не файл).
+        """
+        self.source_directory = source_directory
+
+        if destination_directory != self.destination_directory:
+            self.destination_directory = destination_directory
+            handler = self.event_handler
+            handler.destination_directory = destination_directory
+            FileHandler().create_directory_if_not_exists(destination_directory)
+
+            # Стан трекінгу прив'язаний до СТАРОЇ теки — скидаємо повністю.
+            # managed_files стартує порожнім свідомо (як на старті застосунку):
+            # чужі .log у новій теці видаляти не можна, лише власні майбутні копії.
+            handler.file_paths = {}
+            handler.managed_files = set()
+            handler.last_error_file = None
+            handler.track_files()
+
+            self._watch_destination()
+
+        # Оновити вміст вікна під нові шляхи: найсвіжіша помилка з нової теки
+        # або (якщо помилок ще нема) чисте поле замість старого вмісту/підказки.
+        self._refresh_startup_view()
+
+    def _watch_destination(self):
+        """(Пере)планує watchdog на поточну теку призначення, якщо вона придатна.
+
+        Порожній або неіснуючий шлях (перший запуск без налаштувань) НЕ
+        плануємо: емітер ReadDirectoryChangesW відкрив би CreateFileW на
+        порожньому шляху і впав. observer стартує в run() навіть без жодного
+        watch — це коректно, а watch додається/замінюється тут, коли тека вже
+        валідна. unschedule_all на щойно стартованому observer — безпечний no-op.
+        """
+        if not self.observer:
+            return
+        try:
+            self.observer.unschedule_all()
+            if self.destination_directory and os.path.isdir(self.destination_directory):
+                self.observer.schedule(
+                    self.event_handler, self.destination_directory, recursive=False)
+        except Exception as e:
+            print(f"Could not watch {self.destination_directory!r}: {e}")
+
+    def _paths_configured(self):
+        """Чи задані шляхи настільки, щоб застосунку було що робити.
+
+        Джерело мусить існувати — з нього копіюємо; порожнє або неіснуюче
+        (напр. шлях з чужої машини у зашитому config.ini) означає «не
+        налаштовано». Теку призначення досить мати непорожньою: якщо її ще
+        нема, застосунок її створить.
+        """
+        return (bool(self.source_directory) and os.path.isdir(self.source_directory)
+                and bool(self.destination_directory))
+
+    def _refresh_startup_view(self):
+        """Вирішує, що показати у вікні, коли власної нової помилки ще нема:
+        підказку про налаштування (шляхи не задані/недоступні) або найсвіжішу
+        вже відому помилку. Викликається на старті і після зміни налаштувань.
+        """
+        if not self._paths_configured():
+            self._show_setup_hint()
+            return
+
+        # Спершу синхронізація, щоб у теці призначення вже лежали свіжі копії,
+        # і лише потім пошук найсвіжішої відомої помилки (alert=False — вікно
+        # з трею не спливає, це відновлення стану, а не нова подія).
+        self.event_handler.sync_files_and_check(self.source_directory)
+        if not self.show_latest_known_error():
+            # Налаштовано, але помилок ще нема — прибираємо стару підказку/вміст.
+            self._set_error_text("")
+
+    def _show_setup_hint(self):
+        """Підказка для першого запуску на новій машині, коли теки не задані.
+        Без неї вікно лишалося б порожнім і незрозуміло, що робити далі."""
+        self._set_error_text(
+            'Paths are not set. Open "Path settings" from the menu (top-right) '
+            'and choose the source and destination folders.')
+
+    def _set_error_text(self, text):
+        """Ставить текст у поле помилки (порожній рядок — очистити поле)."""
+        self.error_text_widget.configure(state=tk.NORMAL)
+        self.error_text_widget.delete(1.0, tk.END)
+        if text:
+            self.error_text_widget.insert(tk.END, text + "\n")
+        self.error_text_widget.configure(state=tk.DISABLED)
+
     def on_closing(self):
         def _safe_closing():
             try:
@@ -299,16 +404,17 @@ class LogTrackerApp:
         Без цього поле лишається порожнім аж до першої нової помилки:
         офсети на старті стоять на кінці файлів, тож усе вже записане
         вважається переглянутим. alert=False — це стан, а не подія, тож
-        вікно з трею не піднімаємо.
+        вікно з трею не піднімаємо. Повертає True, якщо було що показати.
         """
         latest = self.event_handler.find_latest_existing_error()
         if latest is None:
             print("No existing errors found in tracked files")
-            return
+            return False
 
         _, file_path, error_line = latest
         self.event_handler.last_error_file = file_path
         self.on_error_found(file_path, error_line, alert=False)
+        return True
 
     def on_error_found(self, file_path, error_line, alert=True):
         """Показує найсвіжішу помилку тіку — одну, з будь-якого файлу.

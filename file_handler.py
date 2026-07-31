@@ -52,6 +52,10 @@ class FileHandler:
 
     @staticmethod
     def create_directory_if_not_exists(directory):
+        # Порожній шлях (перший запуск без налаштувань) — не тека: os.makedirs('')
+        # лише кинув би FileNotFoundError і засмітив би лог на старті.
+        if not directory:
+            return
         if not os.path.exists(directory):
             try:
                 os.makedirs(directory)
@@ -97,6 +101,15 @@ class FileHandler:
         '.log', тож зміна file_extension давала розбіжність: застосунок
         стежив за одним розширенням, а копіював інше.
         """
+        # Перший запуск без налаштувань: порожнє/неіснуюче джерело — нема що
+        # копіювати. Без цього os.listdir(source) на порожньому шляху кидає
+        # (Windows) або мовчки лістить робочу теку (POSIX), а порожнє
+        # призначення обернуло б os.path.join на відносний шлях — копіювання
+        # опинилося б у поточній робочій теці процесу.
+        if not source_directory or not os.path.isdir(source_directory):
+            return False
+        if not dest_directory:
+            return False
         try:
             FileHandler().create_directory_if_not_exists(dest_directory)
             copied = False
