@@ -1,7 +1,6 @@
-# themes/dark_theme.py
+# themes/custom_theme.py
 # Налаштування для кастомної теми
 THEME_SETTINGS = {
-    "name": "custom_dark",
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
     "main_frame_fg_color": "#383b40",
@@ -10,10 +9,7 @@ THEME_SETTINGS = {
     "window_alpha": 0.9,
     #Стиль для header_label
     "header_label_text_color": "#5f8dfc",
-    "header_label_font": ("Inter", 13),
-    #Стиль для button
-    "button_text_color": "#ce885f",
-    "button_font": ("Inter", 12),
+    "header_label_font": ("Inter", 13, "bold"),
     #Стиль для to_tray_button
     "to_tray_button_text_color": "#ce885f",
     "to_tray_button_font": ("Inter", 11, "bold"),
@@ -35,7 +31,6 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
-    "error_text_color": "#b4b361",
     #Стиль для context_menu
     "context_menu_bg": "#383b40",
     "context_menu_fg": "#e2e0e6",
@@ -52,5 +47,4 @@ THEME_SETTINGS = {
     "settings_button_fg_color": "#2d436e",
     "settings_button_hover_color": "#375a94",
     "settings_button_text_color": "#e2e0e6",
-    "text_color": "#e2e0e6",
 }

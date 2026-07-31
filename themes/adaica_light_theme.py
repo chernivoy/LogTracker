@@ -1,7 +1,6 @@
 # themes/adaica_light_theme.py
 # Налаштування для світлої теми
 THEME_SETTINGS = {
-    "name": "adaica_light",
     "ctk_appearance_mode": "Light",
     "default_color_theme": "blue",
     "main_frame_fg_color": "#2b2c2f",
@@ -11,9 +10,6 @@ THEME_SETTINGS = {
     #Стиль для header_label
     "header_label_text_color": "#1c3c6f",
     "header_label_font": ("Inter", 13, "bold"),
-    #Стиль для button
-    "button_text_color": "#9b59b6",
-    "button_font": ("Inter", 13),
     #Стиль для to_tray_button
     "to_tray_button_text_color": "#ce885f",
     "to_tray_button_font": ("Inter", 11, "bold"),
@@ -35,7 +31,6 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 10,
-    "error_text_color": "#2c3e50",
     #Стиль для context_menu
     # Збігається з фоном вікна теми (main_frame_fg_color = #2b2c2f), світлий текст.
     "context_menu_bg": "#2b2c2f",
@@ -53,5 +48,4 @@ THEME_SETTINGS = {
     "settings_button_fg_color": "#2d436e",
     "settings_button_hover_color": "#375a94",
     "settings_button_text_color": "#e2e0e6",
-    "text_color": "#2c3e50",
 }

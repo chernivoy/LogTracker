@@ -1,7 +1,6 @@
 # themes/dark_theme.py
 # Налаштування для темної теми
 THEME_SETTINGS = {
-    "name": "dark",
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
     "main_frame_fg_color": "transparent",
@@ -11,9 +10,6 @@ THEME_SETTINGS = {
     #Стиль для header_label
     "header_label_text_color": "#5f8dfc",
     "header_label_font": ("Inter", 13, "bold"),
-    #Стиль для button
-    "button_text_color": "#ce885f",
-    "button_font": ("Inter", 12),
     #Стиль для to_tray_button
     "to_tray_button_text_color": "#ce885f",
     "to_tray_button_font": ("Inter", 11, "bold"),
@@ -37,7 +33,6 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
-    "error_text_color": "#b4b361",
     #Стиль для context_menu
     # Та сама пастка, що й у settings_bg: у dark main_frame_fg_color="transparent",
     # тож головне вікно показує ДЕФОЛТНИЙ фон вікна CTk для Dark — gray14 (#242424).
@@ -62,5 +57,4 @@ THEME_SETTINGS = {
     "settings_button_fg_color": "#2d436e",
     "settings_button_hover_color": "#375a94",
     "settings_button_text_color": "#e2e0e6",
-    "text_color": "#e2e0e6",
 }

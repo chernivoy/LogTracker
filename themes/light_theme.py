@@ -1,7 +1,6 @@
 # themes/light_theme.py
 # Налаштування для світлої теми
 THEME_SETTINGS = {
-    "name": "light",
     "ctk_appearance_mode": "Light",
     "default_color_theme": "blue",
     "main_frame_fg_color": "white",
@@ -10,10 +9,7 @@ THEME_SETTINGS = {
     "window_alpha": 1,
     #Стиль для header_label
     "header_label_text_color": "#1c3c6f",
-    "header_label_font": ("Inter", 13),
-    #Стиль для button
-    "button_text_color": "#9b59b6",
-    "button_font": ("Inter", 13),
+    "header_label_font": ("Inter", 13, "bold"),
     #Стиль для to_tray_button
     "to_tray_button_text_color": "#ce885f",
     "to_tray_button_font": ("Inter", 11, "bold"),
@@ -35,7 +31,6 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
-    "error_text_color": "#2c3e50",
     #Стиль для context_menu
     "context_menu_bg": "white",
     "context_menu_fg": "#333333",
@@ -52,5 +47,4 @@ THEME_SETTINGS = {
     "settings_button_fg_color": "#1c3c6f",
     "settings_button_hover_color": "#2d5490",
     "settings_button_text_color": "white",
-    "text_color": "#2c3e50",
 }
