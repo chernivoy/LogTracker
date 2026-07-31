@@ -39,8 +39,11 @@ THEME_SETTINGS = {
     "error_textbox_corner_radius": 1,
     "error_text_color": "#b4b361",
     #Стиль для context_menu
-    # Суцільний темний під примарний (transparent) фон вікна теми.
-    "context_menu_bg": "#2b2c2f",
+    # Та сама пастка, що й у settings_bg: у dark main_frame_fg_color="transparent",
+    # тож головне вікно показує ДЕФОЛТНИЙ фон вікна CTk для Dark — gray14 (#242424).
+    # Меню має збігатися саме з ним, а не з context_menu_bg #2b2c2f (світлішим) —
+    # інакше меню помітно світліше за вікно, з якого воно відкрите.
+    "context_menu_bg": "#242424",
     "context_menu_fg": "#e2e0e6",
     "context_menu_active_bg": "#2d436e",
     "context_menu_active_fg": "#e2e0e6",

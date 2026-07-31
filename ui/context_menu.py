@@ -33,15 +33,20 @@ class ContextMenu:
         self._load_icons()
 
         # Кольори меню беремо з теми (context_menu_*). Фон навмисно збігається з
-        # фоном вікна теми (main_frame_fg_color) — див. значення в themes/*.
+        # тим, що РЕНДЕРИТЬ головне вікно (див. значення в themes/*), щоб меню
+        # читалось як частина того ж вікна.
         menu_colors = {
             "bg": current_theme["context_menu_bg"],
             "fg": current_theme["context_menu_fg"],
             "activebackground": current_theme["context_menu_active_bg"],
             "activeforeground": current_theme["context_menu_active_fg"],
         }
+        # borderwidth=0 + relief=flat прибирає 3D-рамку, але цього НЕ досить:
+        # activeborderwidth дефолтом = 1 і малює світлий 1px бордер по периметру
+        # меню й навколо активного пункту (на темному фоні виглядає білим). Тому
+        # явно 0 — меню стає пласким кольоровим блоком без світлої облямівки.
         self.menu = tk.Menu(self.root, tearoff=0, font=menu_font,
-                            borderwidth=0, relief="flat", **menu_colors)
+                            borderwidth=0, activeborderwidth=0, relief="flat", **menu_colors)
 
         self._populate_menu(menu_font, menu_colors)
 
@@ -85,22 +90,30 @@ class ContextMenu:
         def _img(key):
             return {"image": icons[key], "compound": "left"} if icons else {}
 
+        # Сепаратори МАЮТЬ явний background = фон меню. Порожній background
+        # змушував Tk на Windows брати системний СВІТЛИЙ колір (SystemButtonFace,
+        # майже білий) як базу для 3D-гравірованої лінії — звідси біла смуга на
+        # темному фоні. Похідна від темного фону лінія стає делікатним
+        # розділювачем у колір теми, а не білою (кути меню все одно прямі —
+        # native tk.Menu не дає їх заокруглити).
+        sep_bg = menu_colors["bg"]
+
         theme_menu = tk.Menu(self.menu, tearoff=0, font=menu_font,
-                             borderwidth=0, relief="flat", **menu_colors)
+                             borderwidth=0, activeborderwidth=0, relief="flat", **menu_colors)
         theme_menu.add_command(label="Dark", command=lambda: self.app.toggle_theme("dark"), **_img("dark_theme"))
-        theme_menu.add_separator()
+        theme_menu.add_separator(background=sep_bg)
         theme_menu.add_command(label="Light", command=lambda: self.app.toggle_theme("light"), **_img("light_theme"))
-        theme_menu.add_separator()
+        theme_menu.add_separator(background=sep_bg)
         theme_menu.add_command(label="Custom", command=lambda: self.app.toggle_theme("custom"), **_img("custom_theme"))
-        theme_menu.add_separator()
+        theme_menu.add_separator(background=sep_bg)
         theme_menu.add_command(label="ADAICA Light", command=lambda: self.app.toggle_theme("adaica_light"),
                                **_img("light_theme"))
 
         self.menu.add_cascade(label="Theme", menu=theme_menu, **_img("theme"))
-        self.menu.add_separator()
+        self.menu.add_separator(background=sep_bg)
         self.menu.add_command(label="Path settings",
                               command=lambda: SettingsWindow.open_settings_window(self.app), **_img("settings"))
-        self.menu.add_separator()
+        self.menu.add_separator(background=sep_bg)
         self.menu.add_command(label="Exit", command=self.app.on_closing, **_img("exit"))
 
     def _load_icons(self):
