@@ -143,6 +143,18 @@ class FileHandler:
                     continue
 
             for filename in os.listdir(dest_directory):
+                # Осиротілі .part від копіювань, обірваних крашем. os.replace у
+                # copy_file_without_waiting атомарний, тож у нормальному потоці
+                # .part не лишається — усе, що тут є, це слід аварійного виходу.
+                # Прибирати їх більше нікому: обхід нижче фільтрує за
+                # file_extension (.log), тож .part проскакував і копився вічно.
+                if filename.endswith('.part'):
+                    try:
+                        os.remove(os.path.join(dest_directory, filename))
+                        print(f"Removed stale temp file: {filename}")
+                    except OSError:
+                        pass
+                    continue
                 if not filename.endswith(file_extension):
                     continue
                 dest_file = os.path.join(dest_directory, filename)
