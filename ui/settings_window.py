@@ -1,4 +1,5 @@
 import os
+from tkinter import filedialog
 
 import customtkinter as ctk
 
@@ -85,7 +86,8 @@ class SettingsWindow:
 
     @staticmethod
     def _add_labeled_entry(window, theme, label_text, value):
-        """Підпис + поле вводу під ним, обидва в стилі теми. Повертає поле."""
+        """Підпис + рядок «поле вводу + кнопка вибору теки», у стилі теми.
+        Повертає поле вводу."""
         ctk.CTkLabel(
             window,
             text=label_text,
@@ -93,8 +95,12 @@ class SettingsWindow:
             font=theme["settings_font"],
         ).pack(pady=10)
 
+        # Поле і кнопка Browse — в одному прозорому рядку, поруч.
+        row = ctk.CTkFrame(window, fg_color="transparent")
+        row.pack(pady=5)
+
         entry = ctk.CTkEntry(
-            window,
+            row,
             width=300,
             fg_color=theme["settings_entry_fg_color"],
             text_color=theme["settings_text_color"],
@@ -102,8 +108,51 @@ class SettingsWindow:
             font=theme["settings_font"],
         )
         entry.insert(0, value)
-        entry.pack(pady=5)
+        entry.pack(side="left")
+
+        ctk.CTkButton(
+            row,
+            text="Browse",
+            width=70,
+            command=lambda: SettingsWindow._browse_directory(window, entry),
+            fg_color=theme["settings_button_fg_color"],
+            hover_color=theme["settings_button_hover_color"],
+            text_color=theme["settings_button_text_color"],
+            font=theme["settings_font"],
+        ).pack(side="left", padx=(6, 0))
+
         return entry
+
+    @staticmethod
+    def _browse_directory(window, entry):
+        """Відкриває нативний діалог вибору теки і вписує результат у поле.
+
+        Стартуємо з теки, яка вже в полі (якщо вона існує). grab_set на вікні
+        тимчасово знімаємо: нативний діалог вибору теки на Windows — окреме
+        вікно ОС, і локальний grab батька може перехопити в нього фокус.
+        Порожній результат означає скасування — поле не чіпаємо.
+        """
+        current = entry.get().strip().strip('"')
+        kwargs = {"parent": window, "title": "Select folder"}
+        if os.path.isdir(current):
+            kwargs["initialdir"] = current
+
+        try:
+            window.grab_release()
+        except Exception:
+            pass
+        try:
+            path = filedialog.askdirectory(**kwargs)
+        finally:
+            try:
+                if window.winfo_exists():
+                    window.grab_set()
+            except Exception:
+                pass
+
+        if path:  # '' = користувач скасував діалог
+            entry.delete(0, "end")
+            entry.insert(0, os.path.normpath(path))
 
     @staticmethod
     def _add_button(window, theme, text, command, pady):
