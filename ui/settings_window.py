@@ -25,6 +25,14 @@ class SettingsWindow:
     # у theme-контракт (довелося б додати в кожну тему) не варто.
     _ERROR_COLOR = "#e06c75"
 
+    # Дефолтний ЛОГІЧНИЙ розмір вікна (CTk домножить на масштаб DPI сам).
+    # Висота підібрана так, щоб уся вертикальна розмітка — дві пари
+    # підпис+поле, рядок статусу валідації і дві кнопки — уміщалась, і Save/
+    # Cancel були повністю видні на мінімальному розмірі. Використовується і
+    # для minsize, і для дефолтної геометрії, щоб вони не розходились.
+    _DEFAULT_WIDTH = 400
+    _DEFAULT_HEIGHT = 310
+
     @staticmethod
     def open_settings_window(app):
         """Відкриває вікно налаштувань для шляхів, стилізоване під поточну тему."""
@@ -45,7 +53,7 @@ class SettingsWindow:
 
         SettingsWindow._apply_deferred_icon(window)
         SettingsWindow._apply_geometry(window)
-        window.minsize(400, 270)
+        window.minsize(SettingsWindow._DEFAULT_WIDTH, SettingsWindow._DEFAULT_HEIGHT)
         window.grab_set()  # Заблокувати інші вікна до закриття цього
 
         source_entry = SettingsWindow._add_labeled_entry(
@@ -138,11 +146,12 @@ class SettingsWindow:
         # Дефолт: позицію клампимо у видимий екран так само, як load_window_size.
         # Хардкод +668+661 на іншій конфігурації моніторів (RDP-реконект з
         # іншою роздільністю) міг опинитися поза екраном — і модальне вікно
-        # було б невидиме, тоді як grab_set блокує решту UI. Розмір логічний
-        # (400x270), у фізичну оцінку для клампа переводимо через масштаб CTk.
+        # було б невидиме, тоді як grab_set блокує решту UI. Розмір логічний,
+        # у фізичну оцінку для клампа переводимо через масштаб CTk.
+        w, h = SettingsWindow._DEFAULT_WIDTH, SettingsWindow._DEFAULT_HEIGHT
         scale = WindowHandler._window_scale(window)
-        x, y = rdp.clamp_to_visible(668, 661, int(400 * scale), int(270 * scale))
-        window.geometry(f'400x270+{x}+{y}')
+        x, y = rdp.clamp_to_visible(668, 661, int(w * scale), int(h * scale))
+        window.geometry(f'{w}x{h}+{x}+{y}')
 
     @staticmethod
     def _bind_geometry_autosave(window):
