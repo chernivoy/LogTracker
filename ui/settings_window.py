@@ -5,7 +5,7 @@ from tkinter import filedialog
 import customtkinter as ctk
 
 from config_manager import ConfigManager
-from ui.ui_assets import HEADER_ICON_PATH
+from ui.ui_assets import APP_ICO_PATH
 from ui.window_handler import WindowHandler
 from utils import rdp
 
@@ -255,7 +255,7 @@ class SettingsWindow:
         """
         def _apply():
             try:
-                window.iconbitmap(HEADER_ICON_PATH)
+                window.iconbitmap(APP_ICO_PATH)
             except Exception as e:
                 print(f"INFO: settings window icon not set: {e}")
 

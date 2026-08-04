@@ -2,7 +2,7 @@ import customtkinter as ctk
 
 from tray_manager import TrayManager
 from ui.context_menu import ContextMenu
-from ui.ui_assets import BUG_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH, HEADER_ICON_PATH
+from ui.ui_assets import APP_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH, APP_ICO_PATH
 from ui.window_handler import WindowHandler
 
 
@@ -34,7 +34,7 @@ class ErrorWindow:
         self.root.wm_attributes('-transparentcolor', transparent_color)
         self.root.attributes('-alpha', current_theme["window_alpha"])
         self.root.title("ADAICA: Log Tracker")
-        self.root.iconbitmap(HEADER_ICON_PATH)
+        self.root.iconbitmap(APP_ICO_PATH)
         # minsize виставляється в create_widgets → apply_dynamic_min_height
         # (динамічна висота під заголовок). Ранній фіксований minsize тут був
         # зайвий: вікно не показується до mainloop, а до того minsize ні на що
@@ -45,7 +45,10 @@ class ErrorWindow:
         # Тримаємо посилання на self (ErrorWindow), а не на app: іконки потрібні
         # лише цьому вікну, а живе воно стільки ж, скільки app.error_window, тож
         # від GC вони захищені так само — без засмічення простору імен app.
-        self.app_icon = self.image_manager.get_ctk_image(path=BUG_ICON_PATH, size=(16, 16))
+        # size=(16,16) — ЛОГІЧНИЙ розмір; CTkImage домножує його на масштаб
+        # вікна (DPI) при малюванні. Джерело app_icon.png — 256px, тож на
+        # будь-якому DPI це чітке ЗМЕНШення, а не розмите збільшення.
+        self.app_icon = self.image_manager.get_ctk_image(path=APP_ICON_PATH, size=(16, 16))
         self.close_icon = self.image_manager.get_ctk_image(path=CLOSE_ICON_PATH, size=(11, 11))
         self.burger_menu_icon = self.image_manager.get_ctk_image(path=BURGER_MENU_ICON_PATH, size=(11, 11))
 

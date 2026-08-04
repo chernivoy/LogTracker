@@ -1,7 +1,7 @@
 import pystray
 from PIL import Image, ImageDraw
 
-from ui.ui_assets import BUG_ICON_PATH
+from ui.ui_assets import APP_ICON_PATH
 from ui.window_handler import WindowHandler
 from utils.path import PathUtils
 
@@ -106,7 +106,7 @@ class TrayManager:
 
         )
 
-        icon_file_path = PathUtils.resource_path(BUG_ICON_PATH)
+        icon_file_path = PathUtils.resource_path(APP_ICON_PATH)
         try:
             icon_image = Image.open(icon_file_path)
         except Exception as e:

@@ -212,14 +212,21 @@ CustomTkinter сам множить розміри в `root.geometry()` на с�
 
 ### Ресурси і PyInstaller
 
-`PathUtils.resource_path()` (`utils/path.py`) резолвить шляхи через `sys._MEIPASS` у зібраному вигляді і `os.path.abspath(".")` у dev. У `ui/ui_assets.py` є **дубль** тієї самої функції; там же `HEADER_ICON_PATH` уже резолвнутий, а решта констант — відносні шляхи, які резолвляться вже у викликачів (`ImageManager`, `TrayManager`). Непослідовно, але саме так це працює.
+`PathUtils.resource_path()` (`utils/path.py`) резолвить шляхи через `sys._MEIPASS` у зібраному вигляді і `os.path.abspath(".")` у dev. У `ui/ui_assets.py` є **дубль** тієї самої функції; там же `APP_ICO_PATH` уже резолвнутий, а решта констант — відносні шляхи, які резолвляться вже у викликачів (`ImageManager`, `TrayManager`). Непослідовно, але саме так це працює.
+
+**Спільна іконка застосунку.** Один дизайн («жук», акцентний синій `#5f8dfc` на прозорому) слугує всім чотирьом місцям, у двох форматах із одного джерела (`ui_assets.APP_ICON_PATH` / `APP_ICO_PATH`):
+
+- `src/app_icon.png` — **256×256** майстер. Іде в шапку вікна (`ErrorWindow` → `get_ctk_image(size=(16,16))`) і в іконку трея (`TrayManager`). Обидва **самі зменшують** його під DPI (CTkImage множить логічний розмір на масштаб вікна; трей віддає Windows), тож джерело навмисно високороздільне — зменшення LANCZOS чітке на будь-якому DPI, тоді як старий 16×16 `bug2.png` на 150–200% розмивався (та сама пастка, що з іконками меню).
+- `src/app_icon.ico` — **мультирозмірний** (16, 20, 24, 32, 40, 48, 64, 128, 256). Іде в `iconbitmap` (головне вікно + `SettingsWindow`, там відкладено через `after`) і в іконку `.exe` (`logger.spec`). Windows сам бере потрібний розмір під DPI таскбара/alt-tab. Кожен кадр — окреме LANCZOS-зменшення з високого супер-семплу, файл у стандартному layout (малі BMP, 256 PNG), який Tk `iconbitmap` приймає.
+
+Обидва файли генерує `tools/generate_app_icon.py` (не рантайм-код застосунку) — малює жука з 8× супер-семплом і зменшує LANCZOS. Щоб перемалювати іконку — правити дизайн у цьому скрипті й запустити `python tools/generate_app_icon.py`: він перезапише обидва формати з одного майстра. Замінюючи майстер-PNG вручну, тримай його **≥128px** (краще 256), інакше повернеться розмиття на high-DPI.
 
 `logger.spec` виводить два списки глобами, тож нові файли підхоплюються самі:
 
 - `datas` — глоб по `src/*` (іконки + ini) у цільову теку `'src'`;
 - `hiddenimports` — глоб по `themes/*_theme.py`. **Обов'язковий**: `ThemeManager.load_theme` тягне теми через `importlib.import_module`, статичний аналіз PyInstaller такий імпорт не бачить. Без цього exe падає на старті з `ModuleNotFoundError: No module named 'themes'`.
 
-Збірка **one-file** і windowed: `EXE` вкладає `a.binaries` + `a.datas` прямо в себе (без `COLLECT`), тож на виході **один** `dist/logger.exe` (~18 МБ), а не тека `dist/logger/` з `_internal`. `console=False`, іконка exe — `src/Header.ico`. У рантаймі PyInstaller розпаковує вкладене в тимчасову `%TEMP%\_MEIxxxxx\` і ставить туди `sys._MEIPASS`; ця тека створюється на старті й видаляється при виході (тому старт +1–3 с проти onedir). Усе записуване (конфіги, лог) навмисно виноситься в `%LOCALAPPDATA%` — див. нижче.
+Збірка **one-file** і windowed: `EXE` вкладає `a.binaries` + `a.datas` прямо в себе (без `COLLECT`), тож на виході **один** `dist/logger.exe` (~18 МБ), а не тека `dist/logger/` з `_internal`. `console=False`, іконка exe — `src/app_icon.ico`. У рантаймі PyInstaller розпаковує вкладене в тимчасову `%TEMP%\_MEIxxxxx\` і ставить туди `sys._MEIPASS`; ця тека створюється на старті й видаляється при виході (тому старт +1–3 с проти onedir). Усе записуване (конфіги, лог) навмисно виноситься в `%LOCALAPPDATA%` — див. нижче.
 
 **Куди пишуться конфіги в зібраному вигляді.** Записувані конфіги (`config.ini`, `window_config.ini`) у зібраному вигляді лежать **не** поруч з exe, а в `%LOCALAPPDATA%\LogTracker\` — поряд із логом (`rthook_logfile`). Шлях будує `PathUtils.user_config_path(filename)`: якщо `sys.frozen` — віддає `%LOCALAPPDATA%\LogTracker\<filename>`, інакше (dev, `python logger.py`) — старий `src/<filename>`, який у git. `constants.CONFIG_PATH`, `config_manager.CONFIG_FILE_WINDOW`, `window_handler.CONFIG_FILE_WINDOW` і `theme_manager.config_path` усі йдуть через цей хелпер.
 
