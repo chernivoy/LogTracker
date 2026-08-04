@@ -108,6 +108,7 @@ class LogTrackerApp:
         # Ctrl+клік специфічніший за <ButtonPress-1> (перетягування вікна) з
         # ErrorWindow.bind_events, тож Tk обирає саме його і вікно не «їде».
         self.file_label.bind("<Control-Button-1>", self.on_file_label_ctrl_click)
+        self.error_text_widget.bind("<Control-Button-1>", self.on_error_text_ctrl_click)
         self.root.bind("<Configure>", self.on_window_resize)
 
         # Геометрію вже застосував ErrorWindow.setup_window() → _load_window_geometry().
@@ -414,7 +415,22 @@ class LogTrackerApp:
             return
 
         copied = FileHandler.copy_file_to_clipboard(target)
-        self.error_window.toast.show("Copied!" if copied else "Copy failed")
+        self.error_window.toast.show_in_header("Copied!" if copied else "Copy failed")
+
+    def on_error_text_ctrl_click(self, event):
+        """Ctrl+клік по полю помилки — копіює його ТЕКСТ у буфер обміну
+        і підтверджує це плашкою по центру поля.
+
+        Симетрично до Ctrl+кліку по заголовку, але копіюється саме показаний
+        рядок, а не файл: у полі лежить одна конкретна помилка, і найчастіше
+        потрібна вона сама — вставити в тікет чи в чат.
+        """
+        text = self.error_text_widget.get("1.0", tk.END).strip()
+        if not text:
+            return  # порожнє поле (ще нема помилок) — копіювати нема чого
+
+        copied = FileHandler.copy_text_to_clipboard(text)
+        self.error_window.toast.show_in_field("Copied!" if copied else "Copy failed")
 
     def on_window_resize(self, event):
         """Зберігає геометрію з дебаунсом.

@@ -13,11 +13,18 @@ class Toast:
     разом із застосунком і не обрізалося його межами. Оверлей же належить
     вікну — їде з ним, ховається з ним у трей і не може опинитися «поруч».
 
-    Місце — у смузі заголовка, ОДРАЗУ ЗА іменем файла: підтвердження стоїть
-    там, куди користувач щойно клікнув, і не накриває текст помилки, який він
-    читає (той друкується з лівого верхнього краю поля й переноситься вниз).
-    Контейнер тому `main_frame`, а не контент-фрейм. Наслідок для згасання
-    приємний: фон під плашкою — рівно фон, який рендерить сам заголовок.
+    Місць два — за числом дій, які плашка підтверджує, і кожна показується
+    ТАМ, КУДИ КОРИСТУВАЧ КЛІКНУВ:
+
+    - `show_in_header()` — у смузі заголовка, одразу за іменем файла (Ctrl+клік
+      по заголовку копіює файл). Тексту помилки не накриває, бо той друкується
+      з лівого верхнього краю поля й переноситься вниз;
+    - `show_in_field()` — по центру поля помилки (Ctrl+клік по полю копіює його
+      текст). Тут накривати нема чого: текст щойно скопійований, а плашка
+      живе 1.4 с.
+
+    Контейнером кожного разу є той віджет, у якому плашка стоїть, тож фон під
+    нею — рівно той, що цей віджет рендерить (важливо для згасання).
 
     **DPI.** Тут майже нема ручного масштабування: `place`/`grid` CustomTkinter
     самі множать `x`/`y`/`padx`/`pady` на масштаб віджетів, а шрифт із теми
@@ -49,38 +56,55 @@ class Toast:
     # випадати з теми), тож саме рамка окреслює її як окрему поверхню.
     _BORDER_WIDTH = 1
 
-    def __init__(self, root, theme_manager, parent, anchor, right_edge, bind_move=None):
-        """`parent` — контейнер заголовка, `anchor` — мітка з іменем файла
-        (стаємо одразу за нею), `right_edge` — перший віджет праворуч
-        (кнопки), далі якого залазити не можна.
+    def __init__(self, root, theme_manager, header_anchor, header_limit, field,
+                 bind_move=None):
+        """Віджети, відносно яких плашка стає, задаються один раз тут — щоб
+        викликачу лишалося тільки сказати, ЯКУ дію він підтверджує.
+
+        `header_anchor` — мітка з іменем файла (у заголовку стаємо одразу за
+        нею), `header_limit` — перший віджет праворуч (кнопки), далі якого
+        залазити не можна, `field` — поле помилки (у ньому центруємось).
 
         `bind_move` — необов'язковий колбек, яким власник вікна вішає на
         плашку ті самі прив'язки перетягування, що й на решту заголовка:
         уся смуга заголовка є зоною переміщення вікна, і плашка не повинна
-        робити в ній «мертвий» прямокутник на час показу.
+        робити в ній «мертвий» прямокутник на час показу. Для плашки в полі
+        помилки він не потрібен — поле вікна не рухає.
         """
         self._root = root
         self._theme_manager = theme_manager
-        self._parent = parent
-        self._anchor = anchor
-        self._right_edge = right_edge
+        self._header_anchor = header_anchor
+        self._header_limit = header_limit
+        self._field = field
         self._bind_move = bind_move
         self._frame = None
         self._label = None
         self._job = None
 
-    def show(self, text):
-        """Показує плашку `text` у заголовку, одразу за іменем файла.
+    def show_in_header(self, text):
+        """Плашка в смузі заголовка, одразу за іменем файла."""
+        # Контейнер — той самий, у якому лежить мітка: так плашка стає з нею
+        # в один рядок, а координати обох відлічуються від спільного початку.
+        self._show(text, self._header_anchor.master, self._header_placement,
+                   draggable=True)
+
+    def show_in_field(self, text):
+        """Плашка по центру поля помилки."""
+        self._show(text, self._field, self._center_placement)
+
+    def _show(self, text, parent, placement, draggable=False):
+        """Спільна побудова плашки: `placement` віддає аргументи place().
 
         Повторний виклик перебиває попередню плашку (нове натискання скидає
-        таймер), а не громадить другу поверх неї.
+        таймер), а не громадить другу поверх неї — байдуже, у якому з двох
+        місць вона стояла.
         """
         self.hide()
         try:
             theme = self._theme_manager.current_theme_data
 
             self._frame = ctk.CTkFrame(
-                self._parent,
+                parent,
                 fg_color=theme["toast_bg"],
                 border_color=theme["toast_border_color"],
                 border_width=self._BORDER_WIDTH,
@@ -97,15 +121,15 @@ class Toast:
             # Розмір потрібен ДО place: за ним рахуємо, чи влазить плашка між
             # іменем файла і кнопками. До update_idletasks reqwidth ще нульовий.
             self._frame.update_idletasks()
-            self._frame.place(**self._placement())
+            self._frame.place(**placement())
             # Плашка створена після решти віджетів, але lift() робить порядок
             # явним — інакше він залежав би від черговості створення.
             self._frame.lift()
 
-            # Плашка стоїть у смузі заголовка, тобто в зоні перетягування
-            # вікна: без цих прив'язок вона робила б у ній «мертвий»
-            # прямокутник, за який вікно не рухається.
-            if self._bind_move is not None:
+            # У заголовку плашка стоїть у зоні перетягування вікна: без цих
+            # прив'язок вона робила б у ній «мертвий» прямокутник, за який
+            # вікно не рухається.
+            if draggable and self._bind_move is not None:
                 self._bind_move(self._frame)
                 self._bind_move(self._label)
 
@@ -132,7 +156,16 @@ class Toast:
             self._frame = None
             self._label = None
 
-    def _placement(self):
+    def _center_placement(self):
+        """Аргументи place(): точний центр контейнера.
+
+        Суто відносні координати — ані розміру плашки, ані масштабу DPI тут
+        не треба: центр лишається центром при будь-якому розмірі вікна, тож
+        плашка сама тримається посередині й під час ресайзу.
+        """
+        return {"relx": 0.5, "rely": 0.5, "anchor": "center"}
+
+    def _header_placement(self):
         """Аргументи place(): одразу за іменем файла, по центру заголовка.
 
         Ліва межа — правий край мітки з іменем плюс зазор. Ширина мітки
@@ -151,14 +184,15 @@ class Toast:
         масштабує й не мусить, а масштаб у частці скорочується, бо winfo_*
         фізичні і зверху, і знизу. Зазор заданий логічним, тому множимо його.
         """
-        parent_w = max(1, self._parent.winfo_width())
-        parent_h = max(1, self._parent.winfo_height())
+        anchor, parent = self._header_anchor, self._header_anchor.master
+        parent_w = max(1, parent.winfo_width())
+        parent_h = max(1, parent.winfo_height())
         gap = self._GAP * WindowHandler._window_scale(self._root)
 
-        x = self._anchor.winfo_x() + self._anchor.winfo_width() + gap
-        limit = self._right_edge.winfo_x() - gap - self._frame.winfo_reqwidth()
+        x = anchor.winfo_x() + anchor.winfo_width() + gap
+        limit = self._header_limit.winfo_x() - gap - self._frame.winfo_reqwidth()
         x = max(0, min(x, limit))
-        y = self._anchor.winfo_y() + self._anchor.winfo_height() / 2
+        y = anchor.winfo_y() + anchor.winfo_height() / 2
 
         return {"relx": x / parent_w, "rely": y / parent_h, "anchor": "w"}
 
