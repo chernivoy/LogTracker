@@ -58,10 +58,12 @@ THEME_SETTINGS = {
     "settings_button_fg_color": "#4F46E5",
     "settings_button_hover_color": "#4338CA",
     "settings_button_text_color": "#FFFFFF",
-    #Стиль для toast (плашка «Copied!» над заголовком)
-    # Той самий індиго-акцент, що й кнопки, з білим текстом: щільна кольорова
-    # плашка впевнено читається і на паперовому фоні, і на білій картці поля.
-    "toast_bg": "#4F46E5",
-    "toast_text_color": "#FFFFFF",
+    #Стиль для toast (плашка «Copied!» у заголовку, одразу за іменем файла)
+    # Та сама багатошаровість, що й у контенті: біла картка на паперовому фоні
+    # заголовка (#F5F4F1) з волосяною лінією по краю — точно як error_frame.
+    # Колір несе текст, і то той самий індиго, що в імені файла поруч.
+    "toast_bg": "#FFFFFF",
+    "toast_border_color": "#E6E4DF",
+    "toast_text_color": "#4F46E5",
     "toast_font": ("Inter", 12, "bold"),
 }

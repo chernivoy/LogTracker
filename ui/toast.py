@@ -45,6 +45,9 @@ class Toast:
     _PAD_Y = 2
     _GAP = 8  # зазор між іменем файла і плашкою (і до кнопок праворуч)
     _CORNER_RADIUS = 10
+    # Волосяна рамка: фон плашки навмисно близький до фону заголовка (щоб не
+    # випадати з теми), тож саме рамка окреслює її як окрему поверхню.
+    _BORDER_WIDTH = 1
 
     def __init__(self, root, theme_manager, parent, anchor, right_edge, bind_move=None):
         """`parent` — контейнер заголовка, `anchor` — мітка з іменем файла
@@ -79,6 +82,8 @@ class Toast:
             self._frame = ctk.CTkFrame(
                 self._parent,
                 fg_color=theme["toast_bg"],
+                border_color=theme["toast_border_color"],
+                border_width=self._BORDER_WIDTH,
                 corner_radius=self._CORNER_RADIUS,
             )
             self._label = ctk.CTkLabel(
@@ -162,8 +167,9 @@ class Toast:
 
         Прозорості в окремого віджета Tk немає (`-alpha` є лише у вікна, і
         чіпати її не можна — це альфа ВСЬОГО вікна з теми), тож згасання
-        робимо змішуванням кольорів із фоном контейнера. Текст веземо разом із
-        фоном: інакше плашка розчинилася б, а напис лишився б висіти чітким.
+        робимо змішуванням кольорів із фоном контейнера. Ведемо ВСІ три
+        кольори плашки — фон, рамку і текст: інакше поверхня розчинилася б, а
+        контур і напис лишилися б висіти чіткими.
 
         Якщо фон визначити не вдалося (нетиповий колір теми) — просто ховаємо
         без анімації: це косметика, вона не варта ризику.
@@ -174,7 +180,9 @@ class Toast:
             return
 
         theme = self._theme_manager.current_theme_data
-        start_bg, start_fg = theme["toast_bg"], theme["toast_text_color"]
+        start_bg = theme["toast_bg"]
+        start_fg = theme["toast_text_color"]
+        start_border = theme["toast_border_color"]
         started = time.perf_counter()
 
         def step():
@@ -187,7 +195,12 @@ class Toast:
             # удвічі проти заявленого. Так тривалість витримується, а кадрів
             # просто менше.
             ratio = min(1.0, (time.perf_counter() - started) * 1000 / self._FADE_OUT_MS)
-            self._frame.configure(fg_color=self._mix(start_bg, backdrop, ratio))
+            # Рамку веземо разом з фоном: інакше плашка розчинилася б, а
+            # контур лишився б висіти в заголовку до самого кінця.
+            self._frame.configure(
+                fg_color=self._mix(start_bg, backdrop, ratio),
+                border_color=self._mix(start_border, backdrop, ratio),
+            )
             self._label.configure(text_color=self._mix(start_fg, backdrop, ratio))
             if ratio < 1.0:
                 self._job = self._root.after(self._FRAME_MS, step)
