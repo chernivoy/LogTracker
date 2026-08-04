@@ -1,6 +1,29 @@
+import ctypes
 import os
 import shutil
 import subprocess
+
+
+class _DROPFILES(ctypes.Structure):
+    """Заголовок блоку CF_HDROP — формату, яким Windows передає в буфері
+    обміну САМІ ФАЙЛИ (те, що вставляється в Провідник, пошту, чат), а не
+    текст їхніх шляхів.
+
+    Розкладка задана Win32 (shlobj.h): DWORD + POINT + BOOL + BOOL = 20 байт.
+    Типи беремо явні фіксованої ширини (а не ctypes.wintypes), щоб модуль
+    лишався імпортовним поза Windows — тут є posix-гілки, а wintypes на
+    не-Windows не імпортується.
+
+    Одразу за цим заголовком у тому самому блоці пам'яті лежить список імен
+    (UTF-16), розділених '\\0' і завершених ще одним '\\0'.
+    """
+    _fields_ = [
+        ("pFiles", ctypes.c_uint32),  # зсув від початку блоку до списку імен
+        ("pt_x", ctypes.c_int32),     # POINT точки «кидання» — для вставки
+        ("pt_y", ctypes.c_int32),     # з буфера не використовується
+        ("fNC", ctypes.c_int32),      # BOOL: координати в неклієнтській зоні
+        ("fWide", ctypes.c_int32),    # BOOL: імена в UTF-16, а не ANSI
+    ]
 
 
 class FileHandler:
@@ -230,6 +253,101 @@ class FileHandler:
             print(f"Clipboard command failed: {e}")
         except Exception as e:
             print(f"Cannot copy file path to clipboard: {e}")
+
+    @staticmethod
+    def copy_file_to_clipboard(file_path):
+        """Кладе в буфер обміну САМ ФАЙЛ (Windows, формат CF_HDROP).
+
+        Тобто після Ctrl+V у Провіднику/пошті/чаті з'явиться файл, а не рядок
+        зі шляхом (для шляху є copy_file_path_to_clipboard). Повертає True
+        лише при повному успіху — викликач за цим вирішує, чи показувати
+        підтвердження користувачу.
+
+        Робимо через ctypes, а не pywin32: зайва залежність у requirements і
+        в hiddenimports збірки заради двох викликів не потрібна. `clip.exe`
+        тут теж не годиться — він уміє лише текст.
+
+        Володіння пам'яттю: після успішного SetClipboardData блок належить
+        БУФЕРУ (система звільнить його сама, і він переживає вихід із
+        застосунку), тож звільняти його нам не можна. А на будь-якому збої
+        володіння лишається за нами — тоді GlobalFree обов'язковий, інакше
+        кожна невдала спроба тече.
+        """
+        if os.name != 'nt':
+            # CF_HDROP — суто Windows. На posix найближчий аналог (uri-list у
+            # X11) залежить від DE й буферної утиліти, тож чесніше не вдавати
+            # підтримку: викликач отримає False і не покаже підтвердження.
+            print("Copying a file object to clipboard is supported on Windows only.")
+            return False
+
+        try:
+            abs_path = os.path.abspath(file_path)
+            if not os.path.exists(abs_path):
+                print(f"Cannot copy to clipboard, file is gone: {abs_path}")
+                return False
+
+            CF_HDROP = 15
+            GMEM_MOVEABLE = 0x0002
+
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            # Явні типи обов'язкові: типовий restype ctypes — c_int, тож
+            # 64-бітні дескриптори (HGLOBAL, вказівник із GlobalLock)
+            # зрізалися б до 32 біт і пішли б у буфер зіпсованими.
+            kernel32.GlobalAlloc.restype = ctypes.c_void_p
+            kernel32.GlobalAlloc.argtypes = (ctypes.c_uint, ctypes.c_size_t)
+            kernel32.GlobalLock.restype = ctypes.c_void_p
+            kernel32.GlobalLock.argtypes = (ctypes.c_void_p,)
+            kernel32.GlobalUnlock.argtypes = (ctypes.c_void_p,)
+            kernel32.GlobalFree.restype = ctypes.c_void_p
+            kernel32.GlobalFree.argtypes = (ctypes.c_void_p,)
+            user32.OpenClipboard.argtypes = (ctypes.c_void_p,)
+            user32.SetClipboardData.restype = ctypes.c_void_p
+            user32.SetClipboardData.argtypes = (ctypes.c_uint, ctypes.c_void_p)
+
+            # Подвійний '\0' у кінці: один завершує ім'я, другий — увесь список.
+            names = (abs_path + "\0\0").encode("utf-16-le")
+            header = _DROPFILES(pFiles=ctypes.sizeof(_DROPFILES), fWide=1)
+            total = ctypes.sizeof(_DROPFILES) + len(names)
+
+            h_mem = kernel32.GlobalAlloc(GMEM_MOVEABLE, total)
+            if not h_mem:
+                print("Clipboard: GlobalAlloc failed")
+                return False
+
+            pointer = kernel32.GlobalLock(h_mem)
+            if not pointer:
+                kernel32.GlobalFree(h_mem)
+                print("Clipboard: GlobalLock failed")
+                return False
+            try:
+                ctypes.memmove(pointer, ctypes.byref(header), ctypes.sizeof(header))
+                ctypes.memmove(pointer + ctypes.sizeof(header), names, len(names))
+            finally:
+                kernel32.GlobalUnlock(h_mem)
+
+            # Буфер обміну — глобальний ресурс: ним у цей момент може володіти
+            # інший процес, і тоді OpenClipboard просто не вдасться. Не чекаємо
+            # і не крутимо ретраї — це головний потік Tk, підвисати в ньому не
+            # можна; користувач повторить кліком.
+            if not user32.OpenClipboard(None):
+                kernel32.GlobalFree(h_mem)
+                print("Clipboard: OpenClipboard failed (busy?)")
+                return False
+            try:
+                user32.EmptyClipboard()
+                if not user32.SetClipboardData(CF_HDROP, ctypes.c_void_p(h_mem)):
+                    kernel32.GlobalFree(h_mem)
+                    print("Clipboard: SetClipboardData failed")
+                    return False
+            finally:
+                user32.CloseClipboard()
+
+            print(f"File '{abs_path}' copied to clipboard.")
+            return True
+        except Exception as e:
+            print(f"Cannot copy file to clipboard: {e}")
+            return False
 
     @staticmethod
     def reveal_in_file_explorer(file_path):

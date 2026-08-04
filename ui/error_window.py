@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 from tray_manager import TrayManager
 from ui.context_menu import ContextMenu
+from ui.toast import Toast
 from ui.ui_assets import APP_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH, APP_ICO_PATH
 from ui.window_handler import WindowHandler
 
@@ -12,6 +13,7 @@ class ErrorWindow:
         self.root = root
         self.image_manager = image_manager
         self.context_menu = ContextMenu(self.root, self.app, self.image_manager)
+        self.toast = None  # створюється в create_widgets, коли є контейнер
         self.widgets_to_update = {}
 
         self.setup_window()
@@ -166,6 +168,15 @@ class ErrorWindow:
         self.error_frame.grid_rowconfigure(0, weight=1)
         self.error_frame.grid_columnconfigure(0, weight=1)
 
+        # Плашка-підтвердження ('Copied!') — оверлей ВСЕРЕДИНІ вікна, тож
+        # створюється тут, коли всі три віджети заголовка вже є: контейнер
+        # (main_frame), мітка, за якою плашка стає, і кнопка, далі якої їй
+        # не можна. Один екземпляр на вікно — він сам прибирає попередню
+        # плашку при показі, тож повторні натискання не громадять їх.
+        self.toast = Toast(self.root, self.app.theme_manager, self.main_frame,
+                           self.file_label, self.burger_button,
+                           bind_move=self._bind_move)
+
         # Зберігаємо віджети, які потрібно оновлювати, у словник
         self.widgets_to_update = {
             "main_frame": self.main_frame,
@@ -214,9 +225,15 @@ class ErrorWindow:
         WindowHandler.round_corners(self.root, WindowHandler.CORNER_RADIUS)
         WindowHandler.bind_resize_events(self.root)
 
-        self.file_label.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
-        self.file_label.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
-
-        self.main_frame.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
-        self.main_frame.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))
+        self._bind_move(self.file_label)
+        self._bind_move(self.main_frame)
         self.root.protocol("WM_DELETE_WINDOW", lambda: TrayManager.minimize_to_tray(self.root, self.app))
+
+    def _bind_move(self, widget):
+        """Робить віджет «ручкою» для перетягування вікна.
+
+        Окремий метод, бо ту саму пару прив'язок отримує не лише статичний
+        заголовок, а й плашка Toast, яка з'являється в ньому на час показу.
+        """
+        widget.bind("<ButtonPress-1>", lambda event: WindowHandler.start_move(event, self.root))
+        widget.bind("<B1-Motion>", lambda event: WindowHandler.do_move(event, self.root))

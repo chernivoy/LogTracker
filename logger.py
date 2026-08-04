@@ -105,6 +105,9 @@ class LogTrackerApp:
         # Привязка событий
         self.error_text_widget.bind("<Double-Button-1>", self.on_error_double_click)
         self.file_label.bind("<Double-Button-1>", self.on_file_label_double_click)
+        # Ctrl+клік специфічніший за <ButtonPress-1> (перетягування вікна) з
+        # ErrorWindow.bind_events, тож Tk обирає саме його і вікно не «їде».
+        self.file_label.bind("<Control-Button-1>", self.on_file_label_ctrl_click)
         self.root.bind("<Configure>", self.on_window_resize)
 
         # Геометрію вже застосував ErrorWindow.setup_window() → _load_window_geometry().
@@ -353,10 +356,65 @@ class LogTrackerApp:
         if self.event_handler.last_error_file:
             FileHandler.open_file(self.event_handler.last_error_file)
 
+    def _source_log_path(self):
+        """Шлях до ОРИГІНАЛУ поточного лога в теці джерела ('' якщо недоступний).
+
+        У заголовку стоїть ім'я файла з теки призначення (там працює трекер),
+        але користувачу в обох діях із заголовком потрібен оригінал: копія
+        службова, її перезаписує кожен тік синхронізації. Ім'я при копіюванні
+        не змінюється, тож оригінал знаходимо за basename у source_directory.
+        """
+        error_file = self.event_handler.last_error_file
+        if not error_file or not self.source_directory:
+            return ''
+
+        candidate = os.path.join(self.source_directory, os.path.basename(error_file))
+        return candidate if os.path.exists(candidate) else ''
+
     def on_file_label_double_click(self, event):
-        """Копіює шлях до файлу в буфер обміну, якщо подія сталася на мітці."""
-        if self.event_handler.last_error_file:
-            FileHandler.reveal_in_file_explorer(self.event_handler.last_error_file)
+        """Подвійний клік по заголовку — показати лог у Провіднику, саме в
+        теці ДЖЕРЕЛА (див. _source_log_path), а не в копії.
+
+        Фолбеки, щоб подвійний клік не лишався без реакції: якщо оригінал
+        зник (лог могли прибрати з джерела) — відкриваємо саму теку джерела;
+        якщо й вона недоступна (шляхи ще не задані, мережа відвалилась) —
+        показуємо копію, як було раніше.
+        """
+        error_file = self.event_handler.last_error_file
+        if not error_file:
+            return
+
+        source_file = self._source_log_path()
+        if source_file:
+            FileHandler.reveal_in_file_explorer(source_file)
+        elif self.source_directory and os.path.isdir(self.source_directory):
+            FileHandler.open_file(self.source_directory)
+        else:
+            FileHandler.reveal_in_file_explorer(error_file)
+
+    def on_file_label_ctrl_click(self, event):
+        """Ctrl+клік по заголовку — кладе САМ ФАЙЛ лога в буфер обміну
+        (CF_HDROP: Ctrl+V у Провіднику/пошті дасть файл) і підтверджує це
+        плашкою над заголовком.
+
+        Копіюємо оригінал із джерела — узгоджено з подвійним кліком; на копію
+        з теки призначення падаємо лише коли оригінал недоступний, щоб дія
+        взагалі спрацювала.
+        """
+        # Заголовок — зона переміщення вікна: під Ctrl спрацьовує саме цей
+        # обробник (Tk обирає прив'язку з модифікатором як специфічнішу), тож
+        # <ButtonPress-1> з WindowHandler.start_move НЕ виконується. Але
+        # <B1-Motion> лишається прив'язаним, і якщо користувач посуне мишу, не
+        # відпустивши кнопку, do_move порахував би зсув від СТАРОЇ точки й
+        # смикнув вікно. Тому опорну точку виставляємо самі.
+        WindowHandler.start_move(event, self.root)
+
+        target = self._source_log_path() or self.event_handler.last_error_file
+        if not target:
+            return
+
+        copied = FileHandler.copy_file_to_clipboard(target)
+        self.error_window.toast.show("Copied!" if copied else "Copy failed")
 
     def on_window_resize(self, event):
         """Зберігає геометрію з дебаунсом.

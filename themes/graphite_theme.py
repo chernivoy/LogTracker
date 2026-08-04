@@ -50,4 +50,9 @@ THEME_SETTINGS = {
     "settings_button_fg_color": "#2d436e",
     "settings_button_hover_color": "#375a94",
     "settings_button_text_color": "#e2e0e6",
+    #Стиль для toast (плашка «Copied!» над заголовком)
+    # Ті самі акценти, що й у dark: плашка = акцентна поверхня теми.
+    "toast_bg": "#2d436e",
+    "toast_text_color": "#e2e0e6",
+    "toast_font": ("Inter", 12, "bold"),
 }
