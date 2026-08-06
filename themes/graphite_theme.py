@@ -38,11 +38,18 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
-    #Стиль для context_menu
-    "context_menu_bg": "#383b40",
+    #Стиль для context_menu (бургер-меню — власний попап, ui/context_menu.py)
+    # Та сама логіка, що в dark: меню висить над вікном, тож його фон — піднята
+    # поверхня, на крок світліша за фон вікна (#383b40), як і в плашки Toast.
+    "context_menu_bg": "#42464d",
     "context_menu_fg": "#e2e0e6",
     "context_menu_active_bg": "#2d436e",
     "context_menu_active_fg": "#e2e0e6",
+    "context_menu_border_color": "#4a4d52",
+    "context_menu_separator_color": "#4a4d52",
+    "context_menu_accent_color": "#5f8dfc",
+    "context_menu_muted_fg": "#9b9aa3",
+    "context_menu_font": ("Inter", 13),
     #Стиль для settings_window (модальне вікно Path settings)
     # Стиль співпадає з головним вікном: фон як у вікна теми (main_frame_fg_color),
     # текст нейтральний, поля темніші за фон, кнопки — синій акцент.

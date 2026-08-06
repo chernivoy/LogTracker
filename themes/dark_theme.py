@@ -39,15 +39,25 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 1,
-    #Стиль для context_menu
-    # Та сама пастка, що й у settings_bg: у dark main_frame_fg_color="transparent",
-    # тож головне вікно показує ДЕФОЛТНИЙ фон вікна CTk для Dark — gray14 (#242424).
-    # Меню має збігатися саме з ним, а не з context_menu_bg #2b2c2f (світлішим) —
-    # інакше меню помітно світліше за вікно, з якого воно відкрите.
-    "context_menu_bg": "#242424",
+    #Стиль для context_menu (бургер-меню — власний попап, ui/context_menu.py)
+    # Меню — ПІДНЯТА поверхня, як і плашка Toast: воно висить над вікном, має
+    # власний контур і скруглені кути, тож фон тут на крок світліший за той, що
+    # рендерить вікно (#242424), а не дорівнює йому. (Правило «дочірня поверхня
+    # = фон вікна» лишається чинним для settings_bg: те вікно пласке й без
+    # контуру, і збіг фонів — єдине, що прив'язує його до головного.)
+    "context_menu_bg": "#2b2c2f",
     "context_menu_fg": "#e2e0e6",
     "context_menu_active_bg": "#2d436e",
     "context_menu_active_fg": "#e2e0e6",
+    # Контур картки і лінія сепаратора — колір бордера полів, той самий, яким
+    # окреслені вікно і плашка.
+    "context_menu_border_color": "#3a3d42",
+    "context_menu_separator_color": "#3a3d42",
+    # Позначка «✓» поточної теми — акцент теми (той самий, що в імені файла).
+    "context_menu_accent_color": "#5f8dfc",
+    # Стрілка «›» підменю: службовий гліф, приглушений відносно тексту.
+    "context_menu_muted_fg": "#8b8a94",
+    "context_menu_font": ("Inter", 13),
     #Стиль для settings_window (модальне вікно Path settings)
     # Стиль співпадає з головним вікном. У dark main_frame_fg_color="transparent",
     # тож усі шари головного вікна прозорі й воно показує ДЕФОЛТНИЙ фон вікна CTk

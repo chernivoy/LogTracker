@@ -175,6 +175,11 @@ class WindowHandler:
         _apply_widget_scaling. DrawEngine ще й округлює результат (round), тож
         round тут — не «приблизно», а точно те число, що лягає на канву.
 
+        ЛОГІЧНИЙ радіус береться з `root._outline_radius`, якщо він виставлений
+        поруч із `_outline_frame`. Так само округляє собі кути попап бургер-меню
+        (ui/context_menu.py), а картка меню менша за вікно й радіус має свій.
+        Обидва числа лишаються парою на одному вікні, тож розійтися не можуть.
+
         Раніше радіус рахувався як CORNER_RADIUS * _window_scale(root), тобто з
         ВІКОННОГО масштабу CTk. У сталому стані він дорівнює віджетному (обидва
         = window_dpi_scaling_dict[root]), але читаються вони в РІЗНІ моменти й
@@ -185,13 +190,14 @@ class WindowHandler:
         фону вікна без жодної межі.
         """
         frame = getattr(root, "_outline_frame", None)
+        logical = getattr(root, "_outline_radius", WindowHandler.CORNER_RADIUS)
         scaler = getattr(frame, "_apply_widget_scaling", None)
         if callable(scaler):
             try:
-                return max(0, round(scaler(WindowHandler.CORNER_RADIUS)))
+                return max(0, round(scaler(logical)))
             except Exception:
                 pass
-        return max(0, round(WindowHandler.CORNER_RADIUS * WindowHandler._window_scale(root)))
+        return max(0, round(logical * WindowHandler._window_scale(root)))
 
     @staticmethod
     def _set_corner_region(hwnd, width, height, radius, redraw=True):
@@ -229,6 +235,10 @@ class WindowHandler:
         Викликається в кінці КОЖНОГО ресайзу і при відновленні з трея, тож
         друкуємо лише на збої — інакше success-рядок спамив би logger.log
         (у windowed-збірці файл має ліміт MAX_BYTES).
+
+        Годиться для будь-якого безрамкового вікна застосунку, а не лише для
+        головного: попап бургер-меню кладе на себе ті самі `_outline_frame` /
+        `_outline_radius` і кличе цей же метод.
         """
         hwnd = _user32.GetParent(window.winfo_id())
         radius = WindowHandler._outline_radius_px(window)

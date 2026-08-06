@@ -47,13 +47,21 @@ THEME_SETTINGS = {
     "error_textbox_font": ("Inter", 13),
     "error_textbox_border_width": 0,
     "error_textbox_corner_radius": 8,
-    #Стиль для context_menu
-    # Фон меню = паперовий фон головного вікна (конвенція «дочірні поверхні
-    # дорівнюють тому, що рендерить вікно»). Ховер — м'який індиго-акцент.
-    "context_menu_bg": "#F5F4F1",
+    #Стиль для context_menu (бургер-меню — власний попап, ui/context_menu.py)
+    # Та сама багатошаровість, що в контенті: біла картка над паперовим фоном
+    # вікна, з контуром по краю. Ховер — м'який індиго-акцент.
+    "context_menu_bg": "#FFFFFF",
     "context_menu_fg": "#1C1C1E",
     "context_menu_active_bg": "#DEE3FB",
     "context_menu_active_fg": "#1C1C1E",
+    # Контур картки — сходинка драбини рамок, темніша за лінію сепаратора:
+    # меню лягає на довільний вміст екрана, і його межа має читатись певніше
+    # за внутрішній розділювач.
+    "context_menu_border_color": "#D6D4CD",
+    "context_menu_separator_color": "#E6E4DF",
+    "context_menu_accent_color": "#4F46E5",
+    "context_menu_muted_fg": "#8A8880",
+    "context_menu_font": ("Inter", 13),
     #Стиль для settings_window (модальне вікно Path settings)
     # Фон = паперовий фон вікна, поля — чисті білі, кнопки — індиго-акцент.
     "settings_bg": "#F5F4F1",
