@@ -1,3 +1,5 @@
+import math
+
 import customtkinter as ctk
 
 from tray_manager import TrayManager
@@ -5,6 +7,19 @@ from ui.context_menu import ContextMenu
 from ui.toast import Toast
 from ui.ui_assets import APP_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH, APP_ICO_PATH
 from ui.window_handler import WindowHandler
+
+# Відступ контенту від краю вікна у ЛОГІЧНИХ px.
+#
+# Рамку вікна малює main_frame по своєму corner_radius, але канва будь-якого
+# дочірнього віджета непрозора: віджет, що дістає до кута, просто зафарбовує
+# рамку саме там, де вона найпотрібніша. Дуга радіуса R відступає від кута по
+# діагоналі на R*(1 - 1/√2) ≈ 0.293*R; +1 на саму рамку. Для R=15 виходить 6.
+#
+# Заголовку відступ не потрібен: мітка стоїть на padx=10 / pady=5, кнопки — на
+# padx=5, і в цю зону дуга не заходить. А от error_frame розтягнутий на всю
+# ширину аж до низу, тож нижні кути закривав саме він — звідси й баг, коли на
+# білому тлі нижні кути світлої теми не мали жодної видимої межі.
+_CONTENT_INSET = math.ceil(WindowHandler.CORNER_RADIUS * (1 - 1 / math.sqrt(2))) + 1
 
 
 class ErrorWindow:
@@ -73,7 +88,17 @@ class ErrorWindow:
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
-        self.main_frame = ctk.CTkFrame(self.root, fg_color=current_theme["main_frame_fg_color"])
+        # main_frame — не просто фон, а ОБОЛОНКА вікна: він єдиний дістає до всіх
+        # чотирьох країв, тож контур безрамкового вікна може намалювати лише він.
+        # corner_radius дорівнює радіусу Win32-регіону (WindowHandler.CORNER_RADIUS),
+        # щоб намальована дуга лягла точно на межу обрізання, а не поруч із нею.
+        self.main_frame = ctk.CTkFrame(
+            self.root,
+            fg_color=current_theme["main_frame_fg_color"],
+            corner_radius=WindowHandler.CORNER_RADIUS,
+            border_width=current_theme["window_border_width"],
+            border_color=current_theme["window_border_color"],
+        )
         self.main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
         # НАЛАШТОВУЄМО GRID ДЛЯ main_frame:
@@ -136,7 +161,11 @@ class ErrorWindow:
             border_color=current_theme["error_frame_border_color"],
             border_width=current_theme["error_frame_border_width"]
         )
-        self.error_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=1, pady=1)
+        # Знизу й з боків відступаємо на _CONTENT_INSET, щоб картка не налізала
+        # на дуги нижніх кутів і не ховала контур вікна. Зверху лишається 1:
+        # там межа з заголовком, а не з краєм вікна.
+        self.error_frame.grid(row=1, column=0, columnspan=3, sticky="nsew",
+                              padx=_CONTENT_INSET, pady=(1, _CONTENT_INSET))
 
         # Верх контент-фрейму = нижня межа заголовка. WindowHandler бере це,
         # щоб уся смуга заголовка над контентом рухала вікно, а не ресайзила.
@@ -214,9 +243,11 @@ class ErrorWindow:
         try:
             scale = WindowHandler._window_scale(self.root)
             header_logical = int(WindowHandler._header_bottom(self.root) / scale)
-            min_height_logical = max(100, header_logical + 95)
+            # + _CONTENT_INSET: рівно стільки картка віддала нижньому відступу,
+            # тож без цієї добавки запас під текст став би на стільки ж меншим.
+            min_height_logical = max(100, header_logical + 95 + _CONTENT_INSET)
         except Exception:
-            min_height_logical = 135
+            min_height_logical = 135 + _CONTENT_INSET
         self.root._min_height_logical = min_height_logical
         self.root.minsize(300, min_height_logical)
 

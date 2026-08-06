@@ -7,6 +7,10 @@ THEME_SETTINGS = {
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
     "main_frame_fg_color": "#383b40",
+    # Контур самого вікна — колір бордера полів цієї теми, на крок світліший за
+    # фон вікна (#383b40). Логіка та сама, що в dark.
+    "window_border_color": "#4a4d52",
+    "window_border_width": 1,
     # Window Transparency
     "transparent_color": "#000001",
     "window_alpha": 0.9,

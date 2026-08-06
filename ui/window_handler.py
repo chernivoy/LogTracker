@@ -40,7 +40,17 @@ class WindowHandler:
     зміна розміру, переміщення та округлення кутів.
     """
 
-    CORNER_RADIUS = 30  # радіус округлення у ЛОГІЧНИХ px (масштабується за DPI)
+    # Радіус округлення кутів вікна у ЛОГІЧНИХ px (масштабується за DPI).
+    #
+    # 15 — це РЕАЛЬНИЙ радіус. CreateRoundRectRgn приймає не радіус, а РОЗМІР
+    # ЕЛІПСА кута (тобто діаметр), тож _set_corner_region подвоює значення перед
+    # викликом. Раніше тут стояло 30 і йшло у Win32 як є — фактичне округлення
+    # усе одно виходило 15, просто константа брехала вдвічі. Вигляд вікна від
+    # виправлення не змінився, зате число тепер чесне, і рівно його ж дістає
+    # main_frame як corner_radius: намальована CTk рамка вікна має лягти ТОЧНО
+    # на межу регіону, інакше між дугою CTk і дугою регіону лишається видимий
+    # клин фону канви.
+    CORNER_RADIUS = 15
 
     @staticmethod
     def save_window_size(section, root):
@@ -155,14 +165,19 @@ class WindowHandler:
     @staticmethod
     def _set_corner_region(hwnd, width, height, radius, redraw=True):
         """Створює округлий регіон width×height (ФІЗИЧНІ px) і віддає його
-        вікну hwnd. Повертає True на успіх.
+        вікну hwnd. `radius` — ФІЗИЧНИЙ радіус кута. Повертає True на успіх.
+
+        Останні два аргументи CreateRoundRectRgn — це РОЗМІР ЕЛІПСА кута
+        (діаметр), а не радіус, тому *2. Без подвоєння фактичне округлення
+        вдвічі менше за задане, і рамка, яку CTk малює по corner_radius (де те
+        саме число означає саме радіус), проходила б не по межі регіону.
 
         SetWindowRgn ПЕРЕБИРАЄ володіння регіоном і сам видаляє попередній,
         тож на успіху окремий DeleteObject не потрібен. На ЗБОЇ ОС регіон НЕ
         приймає — володіння лишається за нами, тому звільняємо його вручну,
         інакше кожен збій = витік GDI-об'єкта.
         """
-        hrgn = _gdi32.CreateRoundRectRgn(0, 0, width, height, radius, radius)
+        hrgn = _gdi32.CreateRoundRectRgn(0, 0, width, height, radius * 2, radius * 2)
         if not hrgn:
             return False
         if _user32.SetWindowRgn(hwnd, hrgn, redraw) == 0:
@@ -183,9 +198,13 @@ class WindowHandler:
         """
         hwnd = _user32.GetParent(window.winfo_id())
         radius = int(radius * WindowHandler._window_scale(window))
-        if not WindowHandler._set_corner_region(
-            hwnd, window.winfo_width(), window.winfo_height(), radius
-        ):
+        width, height = window.winfo_width(), window.winfo_height()
+        if WindowHandler._set_corner_region(hwnd, width, height, radius):
+            # Розмір, під який регіон реально накладено, — його звіряє
+            # _sync_corner_region, щоб не смикати Win32 на кожен <Configure>
+            # (вони йдуть і на переміщення вікна, де розмір не змінюється).
+            window._corner_region_size = (width, height)
+        else:
             print("[round_corners] SetWindowRgn failed")
 
     @staticmethod
@@ -239,6 +258,40 @@ class WindowHandler:
         # Прив'язуємо події ресайзу безпосередньо до кореневого вікна.
         for event_type, handler_func in resize_handlers:
             root.bind(event_type, handler_func)
+
+        # add="+" ОБОВ'ЯЗКОВИЙ: <Configure> на root вішає ще й LogTrackerApp
+        # (дебаунс збереження геометрії). Прив'язка без add= стирає всі
+        # попередні, тож обидві сторони мусять додавати, а не заміщати.
+        root.bind("<Configure>", WindowHandler._sync_corner_region, add="+")
+
+    @staticmethod
+    def _sync_corner_region(event: tk.Event):
+        """Тримає округлий регіон у розмір вікна на БУДЬ-ЯКІЙ зміні геометрії.
+
+        Регіон — це жорсткий кліп фіксованого розміру, тож щойно вікно змінює
+        розмір без нового SetWindowRgn, форма розходиться з вікном: більше вікно
+        обрізається по старій межі (прямий зріз без кутів), менше — лишається з
+        квадратними кутами, а поверх них видно фон канви CTk (у light це gray92,
+        помітно сіріший за паперовий фон) — ті самі «порожні кути».
+
+        Раніше регіон оновлювали лише три місця: побудова вікна, кінець ресайзу
+        і відновлення з трея. Геометрію ж міняють і інші: `_reapply_saved_geometry`
+        (запобіжник від «замалого вікна» на старті) і сам CTk у `check_dpi_scaling`
+        при зміні DPI — головний сценарій цього застосунку (реконект RDP). Після
+        них регіон лишався від попереднього розміру.
+        """
+        root = event.widget
+        if not isinstance(root, ctk.CTk) or not root.overrideredirect():
+            return
+        # Під час жесту регіон веде _apply_resize_frame — щокадру, разом із
+        # перемальовкою. Другий SetWindowRgn на ту саму подію лише додав би
+        # роботи на кожен рух миші.
+        if getattr(root, "_resize_dir", None):
+            return
+        size = (root.winfo_width(), root.winfo_height())
+        if size == getattr(root, "_corner_region_size", None):
+            return  # <Configure> сипле і на переміщення — там регіон не чіпаємо
+        WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
 
     @staticmethod
     def _header_bottom(root):
@@ -499,42 +552,80 @@ class WindowHandler:
         ресайзі змінюється лише їхня ПОЗИЦІЯ, а не розмір. CTk перемальовує
         віджет тільки на зміні РОЗМІРУ (`_update_dimensions_event`), тож
         пересунуті кнопки самі не перемальовуються — на шаруватому вікні вони
-        зникають/стрибають. `update_idletasks` спершу застосовує відкладений
-        re-layout (пересуває HWND кнопок), але не обробляє `WM_PAINT`, тому далі
+        зникають/стрибають. `update()` спершу забирає ConfigureNotify і застосовує
+        re-layout (пересуває HWND кнопок), але `WM_PAINT` не обробляє, тому далі
         явно кличемо `RedrawWindow(...UPDATENOW)` — синхронний `WM_PAINT` усім
         дочірнім HWND на вже коректних позиціях.
         """
+        # Реентрантність: root.update() нижче прокручує чергу подій, і звідти
+        # може прилетіти новий <B1-Motion> → do_resize → знову сюди. Прапорець
+        # робить вкладений виклик no-op: він лише оновить _resize_pending, а
+        # намалює його зовнішній кадр — і намалює вже НОВІШУ ціль.
+        if getattr(root, "_resize_painting", False):
+            return
         pending = getattr(root, "_resize_pending", None)
         if not pending:
             return
         geometry_string, dir = pending
-
-        root.geometry(geometry_string)
-        root.update_idletasks()
-
+        # Кадр коштує повного синхронного перемалювання шаруватого вікна, тож
+        # не платимо за нього, коли ціль та сама: миша сипле подіями і на
+        # тремтінні в межах пікселя, а трейлінг-таймер приходить із тим самим
+        # рядком, який щойно намалював leading edge.
+        if geometry_string == getattr(root, "_resize_applied", None):
+            return
         hwnd = getattr(root, "_resize_hwnd", None)
-        if hwnd:
-            # Тримаємо округлення ЖИВИМ під час ресайзу: регіон перераховуємо
-            # під новий ФІЗИЧНИЙ розмір щокадру (після update_idletasks winfo_*
-            # уже оновлені), тож він завжди збігається з вікном і кутів не
-            # обрізає. bRedraw=False — тут не малюємо, це зробить наступний
-            # RedrawWindow (одна перемальовка на кадр, без подвійної).
-            scale = getattr(root, "_resize_scale", None) or 1.0
-            WindowHandler._set_corner_region(
-                hwnd, root.winfo_width(), root.winfo_height(),
-                int(WindowHandler.CORNER_RADIUS * scale), redraw=False,
-            )
 
-            RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
-            flags = RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW
-            # ERASE — лише для заходу/півночі, де рухається початок вікна:
-            # там контент їде екраном і майже-чорні згладжені краї тексту хедера
-            # (не keyʼяться в прозорість ключем "#000001") лишають слід на
-            # старому місці; стирання фону його прибирає. На сході/півдні
-            # початок не рухається — зайвий erase лише додав би мерехтіння.
-            if "w" in dir or "n" in dir:
-                flags |= RDW_ERASE
-            ctypes.windll.user32.RedrawWindow(hwnd, None, None, flags)
+        root._resize_applied = geometry_string
+        root._resize_painting = True
+        try:
+            root.geometry(geometry_string)
+            # update(), а НЕ update_idletasks(): про новий розмір Tk дізнається
+            # з ConfigureNotify, а це ЗВИЧАЙНА подія, не idle-таск. Забрати її
+            # може лише update(). З update_idletasks Tk ще не переклав дітей під
+            # новий розмір, і кадр малювався зі СТАРОЮ розкладкою на вже новому
+            # вікні: намальований контур вікна й кнопки відставали від справжнього
+            # краю на кадр — «привид» контуру, що тягнеться за курсором. Поки
+            # рамки не було, відставання ховав однорідний фон; з контуром по
+            # самому краю воно стало помітним. Ще один наслідок: winfo_width/
+            # height нижче теж були б застарілі, тобто й РЕГІОН ліг би під
+            # старий розмір.
+            root.update()
+
+            if hwnd:
+                # Тримаємо округлення ЖИВИМ під час ресайзу: регіон перераховуємо
+                # під новий ФІЗИЧНИЙ розмір щокадру (після update() winfo_* уже
+                # оновлені), тож він завжди збігається з вікном і кутів не
+                # обрізає. bRedraw=False — тут не малюємо, це зробить наступний
+                # RedrawWindow (одна перемальовка на кадр, без подвійної).
+                scale = getattr(root, "_resize_scale", None) or 1.0
+                WindowHandler._set_corner_region(
+                    hwnd, root.winfo_width(), root.winfo_height(),
+                    int(WindowHandler.CORNER_RADIUS * scale), redraw=False,
+                )
+
+                RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
+                flags = RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW
+                # ERASE — лише для заходу/півночі, де рухається початок вікна:
+                # там контент їде екраном і майже-чорні згладжені краї тексту
+                # хедера (не keyʼяться в прозорість ключем "#000001") лишають
+                # слід на старому місці; стирання фону його прибирає. На сході/
+                # півдні початок не рухається — зайвий erase лише додав би
+                # мерехтіння (виміряно: з ним кадр не стає чистішим).
+                if "w" in dir or "n" in dir:
+                    flags |= RDW_ERASE
+                ctypes.windll.user32.RedrawWindow(hwnd, None, None, flags)
+
+                # RedrawWindow(...UPDATENOW) лише РОЗСИЛАЄ WM_PAINT; Tk перетворює
+                # його на свою подію Expose і малює вже у власному циклі подій.
+                # Без прокрутки циклу кадр лишався НЕДОМАЛЬОВАНИМ: край вікна
+                # виходив без рамки, а нижній/правий кут — без округлення, і
+                # домальовувалось воно лише наступним оборотом циклу, тобто
+                # «наздоганяло» курсор. Вимірювання (кадр ресайзу проти чесної
+                # повної перемальовки того самого розміру): без цього update()
+                # ~272k відмінних пікселів за 20 кадрів, з ним — рівно 0.
+                root.update()
+        finally:
+            root._resize_painting = False
 
     @staticmethod
     def stop_resize(event: tk.Event):
@@ -575,6 +666,7 @@ class WindowHandler:
         root._resize_scale = None
         root._resize_hwnd = None
         root._resize_pending = None
+        root._resize_applied = None  # наступний жест починає рахунок кадрів заново
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
 
         # Повертаємо округлення після завершення ресайзу (фінальний чистий

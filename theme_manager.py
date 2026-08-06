@@ -66,7 +66,13 @@ class ThemeManager:
         ctk.set_default_color_theme(theme_data["default_color_theme"])
 
         # ПРЯМЕ ОНОВЛЕННЯ СТИЛІВ ДЛЯ КОЖНОГО ВІДЖЕТА ЗІ СЛОВНИКА
-        widgets_to_update["main_frame"].configure(fg_color=theme_data["main_frame_fg_color"])
+        # main_frame несе не лише фон, а й КОНТУР вікна (див. ErrorWindow) —
+        # без цих двох ключів перемикання теми лишало б рамку кольором старої.
+        widgets_to_update["main_frame"].configure(
+            fg_color=theme_data["main_frame_fg_color"],
+            border_color=theme_data["window_border_color"],
+            border_width=theme_data["window_border_width"]
+        )
 
         widgets_to_update["file_label"].configure(
             text_color=theme_data["header_label_text_color"],

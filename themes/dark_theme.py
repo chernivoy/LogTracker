@@ -4,6 +4,12 @@ THEME_SETTINGS = {
     "ctk_appearance_mode": "Dark",
     "default_color_theme": "blue",
     "main_frame_fg_color": "transparent",
+    # Контур самого вікна — той самий колір, що бордер полів: на крок світліший
+    # за те, що вікно реально рендерить (gray14 #242424). У dark вікно й так
+    # контрастує з будь-яким світлим тлом, тож роль контуру тут скромніша —
+    # окреслити округлені кути, щоб вони читались як край вікна, а не як зріз.
+    "window_border_color": "#3a3d42",
+    "window_border_width": 1,
     # Window Transparency
     "transparent_color": "#000001",
     "window_alpha": 0.9,

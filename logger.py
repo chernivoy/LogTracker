@@ -109,7 +109,11 @@ class LogTrackerApp:
         # ErrorWindow.bind_events, тож Tk обирає саме його і вікно не «їде».
         self.file_label.bind("<Control-Button-1>", self.on_file_label_ctrl_click)
         self.error_text_widget.bind("<Control-Button-1>", self.on_error_text_ctrl_click)
-        self.root.bind("<Configure>", self.on_window_resize)
+        # add="+" ОБОВ'ЯЗКОВИЙ: на <Configure> root уже висить
+        # WindowHandler._sync_corner_region (тримає округлий регіон у розмір
+        # вікна). Прив'язка без add= стерла б її, і кути «пливли» б після
+        # кожної зміни геометрії поза жестом ресайзу.
+        self.root.bind("<Configure>", self.on_window_resize, add="+")
 
         # Геометрію вже застосував ErrorWindow.setup_window() → _load_window_geometry().
         # Тут повторний виклик був би зайвим (результат усе одно ігнорувався).
