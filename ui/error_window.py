@@ -92,6 +92,9 @@ class ErrorWindow:
         # чотирьох країв, тож контур безрамкового вікна може намалювати лише він.
         # corner_radius дорівнює радіусу Win32-регіону (WindowHandler.CORNER_RADIUS),
         # щоб намальована дуга лягла точно на межу обрізання, а не поруч із нею.
+        # Сам регіон більше не рахує радіус окремо: він бере його з ЦЬОГО віджета
+        # (root._outline_frame нижче) через _outline_radius_px, тож обидві дуги —
+        # одне число за побудовою, навіть коли DPI змінюється на льоту.
         self.main_frame = ctk.CTkFrame(
             self.root,
             fg_color=current_theme["main_frame_fg_color"],
@@ -100,6 +103,12 @@ class ErrorWindow:
             border_color=current_theme["window_border_color"],
         )
         self.main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+        # Віджет, який малює контур вікна. WindowHandler бере з нього ФІЗИЧНИЙ
+        # радіус дуги (_outline_radius_px), щоб накласти Win32-регіон рівно по
+        # ній. Тримаємо на root, як і _content_frame нижче: window_handler —
+        # статичний і прямих посилань на віджети не має.
+        self.root._outline_frame = self.main_frame
 
         # НАЛАШТОВУЄМО GRID ДЛЯ main_frame:
         # row 0 (заголовок і кнопки) має weight 0
@@ -254,7 +263,7 @@ class ErrorWindow:
     def bind_events(self):
         """Прив'язує події до віджетів: ресайз — на root (bind_resize_events),
         переміщення за заголовок — напряму на file_label і main_frame."""
-        WindowHandler.round_corners(self.root, WindowHandler.CORNER_RADIUS)
+        WindowHandler.round_corners(self.root)
         WindowHandler.bind_resize_events(self.root)
 
         self._bind_move(self.file_label)

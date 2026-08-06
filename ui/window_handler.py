@@ -163,6 +163,37 @@ class WindowHandler:
         return f'{width}x{height}+{x}+{y}'
 
     @staticmethod
+    def _outline_radius_px(root):
+        """ФІЗИЧНИЙ радіус кута, яким CTk РЕАЛЬНО малює контур вікна.
+
+        Форму вікна задають ДВА незалежні малювальники: Win32-регіон (жорсткий
+        зріз) і рамка, яку CTk малює на main_frame по своєму corner_radius. Щоб
+        між ними не лишалось видимого клина, радіус мусить бути тим самим
+        числом — тож беремо його не власним перерахунком, а тим самим віджетом
+        і тією самою функцією масштабування, якими CTk малює дугу:
+        root._outline_frame (його ставить ErrorWindow.create_widgets) і
+        _apply_widget_scaling. DrawEngine ще й округлює результат (round), тож
+        round тут — не «приблизно», а точно те число, що лягає на канву.
+
+        Раніше радіус рахувався як CORNER_RADIUS * _window_scale(root), тобто з
+        ВІКОННОГО масштабу CTk. У сталому стані він дорівнює віджетному (обидва
+        = window_dpi_scaling_dict[root]), але читаються вони в РІЗНІ моменти й
+        оновлюються РІЗНИМИ подіями, тож розходяться при зміні DPI: у полі
+        спіймано регіон з радіусом 15 при намальованій дузі 30 (масштаб 1.0
+        проти 2.0). Видно це як ДВІ дуги в кожному куті — жорсткий зріз регіону
+        по малому радіусу і намальована рамка по великому, а між ними смуга
+        фону вікна без жодної межі.
+        """
+        frame = getattr(root, "_outline_frame", None)
+        scaler = getattr(frame, "_apply_widget_scaling", None)
+        if callable(scaler):
+            try:
+                return max(0, round(scaler(WindowHandler.CORNER_RADIUS)))
+            except Exception:
+                pass
+        return max(0, round(WindowHandler.CORNER_RADIUS * WindowHandler._window_scale(root)))
+
+    @staticmethod
     def _set_corner_region(hwnd, width, height, radius, redraw=True):
         """Створює округлий регіон width×height (ФІЗИЧНІ px) і віддає його
         вікну hwnd. `radius` — ФІЗИЧНИЙ радіус кута. Повертає True на успіх.
@@ -186,24 +217,30 @@ class WindowHandler:
         return True
 
     @staticmethod
-    def round_corners(window, radius):
-        """Накладає округлий регіон на все вікно. `radius` — у ЛОГІЧНИХ px:
-        множимо на масштаб CTk, бо winfo_width/height повертають ФІЗИЧНІ px, і
-        без масштабу при DPI 200% кути виглядали б удвічі гострішими за задум
-        (border і minsize масштабуються так само).
+    def round_corners(window):
+        """Накладає округлий регіон на все вікно.
+
+        Радіус не параметр: його дає _outline_radius_px — те саме число, яким
+        CTk малює контур на main_frame. Доки обидва беруться звідти, зріз
+        регіону і намальована дуга збігаються ЗА ПОБУДОВОЮ, а не завдяки збігу
+        двох незалежних перерахунків масштабу (саме він і розсинхронізувався
+        при зміні DPI — див. _outline_radius_px).
 
         Викликається в кінці КОЖНОГО ресайзу і при відновленні з трея, тож
         друкуємо лише на збої — інакше success-рядок спамив би logger.log
         (у windowed-збірці файл має ліміт MAX_BYTES).
         """
         hwnd = _user32.GetParent(window.winfo_id())
-        radius = int(radius * WindowHandler._window_scale(window))
+        radius = WindowHandler._outline_radius_px(window)
         width, height = window.winfo_width(), window.winfo_height()
         if WindowHandler._set_corner_region(hwnd, width, height, radius):
-            # Розмір, під який регіон реально накладено, — його звіряє
-            # _sync_corner_region, щоб не смикати Win32 на кожен <Configure>
-            # (вони йдуть і на переміщення вікна, де розмір не змінюється).
-            window._corner_region_size = (width, height)
+            # Стан, під який регіон реально накладено. Його звіряє
+            # ensure_corner_region, щоб не смикати Win32 на кожен <Configure>
+            # (вони йдуть і на переміщення вікна, де нічого не змінюється).
+            # РАДІУС у стані обов'язковий: при зміні DPI розмір вікна може
+            # лишитися той самий, а радіус дуги — ні, і перевірка лише за
+            # розміром пропустила б саме той випадок, який ламає кути.
+            window._corner_region = (width, height, radius)
         else:
             print("[round_corners] SetWindowRgn failed")
 
@@ -265,14 +302,17 @@ class WindowHandler:
         root.bind("<Configure>", WindowHandler._sync_corner_region, add="+")
 
     @staticmethod
-    def _sync_corner_region(event: tk.Event):
-        """Тримає округлий регіон у розмір вікна на БУДЬ-ЯКІЙ зміні геометрії.
+    def ensure_corner_region(root):
+        """Приводить округлий регіон у відповідність поточному розміру вікна І
+        поточному радіусу дуги, яку малює CTk. No-op, якщо вже збігається.
 
         Регіон — це жорсткий кліп фіксованого розміру, тож щойно вікно змінює
         розмір без нового SetWindowRgn, форма розходиться з вікном: більше вікно
         обрізається по старій межі (прямий зріз без кутів), менше — лишається з
         квадратними кутами, а поверх них видно фон канви CTk (у light це gray92,
-        помітно сіріший за паперовий фон) — ті самі «порожні кути».
+        помітно сіріший за паперовий фон) — ті самі «порожні кути». Так само
+        розходиться і РАДІУС: при зміні DPI CTk перемальовує дугу під новий
+        масштаб, і регіон зі старим радіусом дає в кожному куті дві дуги.
 
         Раніше регіон оновлювали лише три місця: побудова вікна, кінець ресайзу
         і відновлення з трея. Геометрію ж міняють і інші: `_reapply_saved_geometry`
@@ -280,18 +320,33 @@ class WindowHandler:
         при зміні DPI — головний сценарій цього застосунку (реконект RDP). Після
         них регіон лишався від попереднього розміру.
         """
-        root = event.widget
-        if not isinstance(root, ctk.CTk) or not root.overrideredirect():
+        if not root.overrideredirect():
             return
-        # Під час жесту регіон веде _apply_resize_frame — щокадру, разом із
-        # перемальовкою. Другий SetWindowRgn на ту саму подію лише додав би
+        # Під час ЖЕСТУ ресайзу регіон веде _apply_resize_frame — щокадру, разом
+        # із перемальовкою. Другий SetWindowRgn на ту саму подію лише додав би
         # роботи на кожен рух миші.
-        if getattr(root, "_resize_dir", None):
+        #
+        # Ознака жесту — _resize_scale (ставить start_resize, знімає stop_resize),
+        # а НЕ _resize_dir: той виставляє change_cursor на КОЖЕН <Motion> у зоні
+        # краю, тобто на просте наведення без кліку. Курсор, що пішов з вікна
+        # через край, лишав _resize_dir виставленим назавжди (нових Motion уже
+        # нема, скинути нікому) — і синхронізація регіону мовчки вимикалась до
+        # наступного кліку. Саме так регіон і переживав зміну DPI зі старим
+        # радіусом, даючи подвійну дугу в кутах.
+        if getattr(root, "_resize_scale", None):
             return
-        size = (root.winfo_width(), root.winfo_height())
-        if size == getattr(root, "_corner_region_size", None):
+        state = (root.winfo_width(), root.winfo_height(),
+                 WindowHandler._outline_radius_px(root))
+        if state == getattr(root, "_corner_region", None):
             return  # <Configure> сипле і на переміщення — там регіон не чіпаємо
-        WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
+        WindowHandler.round_corners(root)
+
+    @staticmethod
+    def _sync_corner_region(event: tk.Event):
+        """<Configure> на root → перевірити регіон (див. ensure_corner_region)."""
+        root = event.widget
+        if isinstance(root, ctk.CTk):
+            WindowHandler.ensure_corner_region(root)
 
     @staticmethod
     def _header_bottom(root):
@@ -597,10 +652,12 @@ class WindowHandler:
                 # оновлені), тож він завжди збігається з вікном і кутів не
                 # обрізає. bRedraw=False — тут не малюємо, це зробить наступний
                 # RedrawWindow (одна перемальовка на кадр, без подвійної).
-                scale = getattr(root, "_resize_scale", None) or 1.0
+                # Радіус — з того самого _outline_radius_px, що й поза жестом:
+                # інакше кути протягом ресайзу мали б інший радіус, ніж дуга,
+                # яку CTk малює тим самим кадром.
                 WindowHandler._set_corner_region(
                     hwnd, root.winfo_width(), root.winfo_height(),
-                    int(WindowHandler.CORNER_RADIUS * scale), redraw=False,
+                    WindowHandler._outline_radius_px(root), redraw=False,
                 )
 
                 RDW_INVALIDATE, RDW_ERASE, RDW_ALLCHILDREN, RDW_UPDATENOW = 0x1, 0x4, 0x80, 0x100
@@ -670,6 +727,8 @@ class WindowHandler:
         root.configure(cursor="")  # Повертаємо курсор до стандартного вигляду
 
         # Повертаємо округлення після завершення ресайзу (фінальний чистий
-        # регіон під точний кінцевий розмір; під час жесту воно вже було живе)
+        # регіон під точний кінцевий розмір; під час жесту воно вже було живе).
+        # Заразом це перший запис у _corner_region після жесту: під час нього
+        # регіон вела _apply_resize_frame, не оновлюючи стан.
         if root.overrideredirect():
-            WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
+            WindowHandler.round_corners(root)

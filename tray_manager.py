@@ -156,7 +156,7 @@ class TrayManager:
             # geometry, щоб winfo_* були актуальні.
             if root.overrideredirect():
                 root.update_idletasks()
-                WindowHandler.round_corners(root, WindowHandler.CORNER_RADIUS)
+                WindowHandler.round_corners(root)
 
         root.after(0, _apply)
 

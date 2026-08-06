@@ -184,6 +184,13 @@ class LogTrackerApp:
            затираючи прозорість із теми; перекрити це в `_set_scaling` не можна
            (alpha ставиться пізніше). Відновлюємо alpha теми тут — і лише коли
            він реально «поплив», щоб не мигати вікном щотіку.
+        3. **Форма кутів.** Win32-регіон мусить збігатися з розміром вікна і з
+           радіусом дуги, яку малює CTk. Основний шлях — <Configure> на root
+           (WindowHandler._sync_corner_region), але в полі регіон усе одно
+           переживав зміну DPI зі старим радіусом, даючи по дві дуги в кутах.
+           Тут це просто ще одна дешева звірка стану (порівняння трьох чисел,
+           SetWindowRgn лише коли реально розійшлося) — рівно та підстраховка,
+           заради якої цей тік і існує.
         """
         try:
             if self.is_window_open and self.root.winfo_exists():
@@ -195,6 +202,8 @@ class LogTrackerApp:
                     self.root.lift()
                     self.root.attributes('-topmost', True)
                     print(f"[on-screen guard] window was off-screen ({x},{y}) -> ({nx},{ny})")
+
+                WindowHandler.ensure_corner_region(self.root)
 
                 target_alpha = self.theme_manager.current_theme_data.get("window_alpha")
                 if target_alpha is not None:
