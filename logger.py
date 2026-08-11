@@ -551,6 +551,32 @@ class LogTrackerApp:
         відстань до кнопок, обрізаємо хвіст ІМЕНІ й ставимо '…' перед
         розширенням, щоб `.log` завжди було видно. Викликається при показі
         помилки та на зміні розміру вікна.
+
+        **Доступна ширина не має залежати від самої мітки.** Інакше виходить
+        храповик: обрізали текст → мітці треба менше місця → наступний
+        перерахунок бачить меншу «доступну» ширину → обрізає ще. Кожна подія
+        `<Configure>` (навіть та, що НЕ міняє ширину вікна — наприклад відкриття
+        панелі налаштувань, яка міняє лише висоту) відкушувала по кілька
+        символів, аж поки від імені лишалось `…`.
+
+        Обидві попередні мірки замикали цю петлю:
+
+        - `main_frame.grid_bbox(0, 0)` під час обробки `<Configure>` віддає ще
+          не перераховану, ЗАПИТАНУ розкладку — тобто ширину колонки за
+          натуральною шириною самої мітки (виміряно: 611 замість реальних
+          1116), а не фактичну;
+        - `chrome` рахувався як `file_label.winfo_reqwidth() - measure(текст)`,
+          але `reqwidth` у CTk-обгортки оновлюється лише наступним idle-циклом,
+          тож він порівнювався зі СВІЖИМ текстом: виміряно −392 і +432 замість
+          реальних ~30 px іконки.
+
+        Тому беремо тільки застосовану геометрію сусідів (`winfo_x` кнопок і
+        мітки) і ширину іконки з самого PhotoImage. Ці числа від тексту не
+        залежать, тож повторний виклик із тим самим вікном дає той самий
+        результат. Ціна — на СПРАВЖНЮ зміну ширини вони відстають на один
+        прохід розкладки, але наступна ж подія все виправляє, бо петлі більше
+        нема (під час ресайзу `_apply_resize_frame` і так робить `update()`
+        щокадру).
         """
         file_path = self._header_file_path or self.event_handler.last_error_file
         if not file_path:
@@ -567,22 +593,18 @@ class LogTrackerApp:
             font_spec = inner.cget("font") if inner is not None else self.file_label.cget("font")
             measurer = tkfont.Font(font=font_spec)
 
-            # Доступну ширину беремо з РЕАЛЬНОЇ комірки колонки заголовка
-            # (grid_bbox), а не з ширини вікна чи позиції кнопок. Колонка з
-            # weight=1 при нестачі місця ЗВУЖУЄТЬСЯ першою (кнопки лишаються),
-            # тож мітка обрізається саме своєю коміркою — від вікна/кнопок
-            # оцінка виходила завеликою і обрізання не спрацьовувало.
-            #   avail = ширина_комірки - padx(обидва боки) - chrome
-            # chrome = іконка + внутрішні відступи мітки (reqwidth поверх тексту).
-            mf = self.error_window.main_frame
-            cell = mf.grid_bbox(0, 0)  # (x, y, w, h) комірки заголовка
-            cell_w = cell[2] if cell and cell[2] > 0 else self.root.winfo_width()
+            # Доступну ширину рахуємо ЛИШЕ з уже застосованої геометрії СУСІДІВ:
+            #   avail = ліва межа кнопок - ліва межа мітки - її праве padx
+            #           - ширина іконки
+            # Жодне з цих чисел не залежить від тексту мітки — і саме це тут
+            # головне (див. коментар до методу про «храповик»). Обидва winfo_x
+            # лежать у координатах main_frame, тобто в одному просторі.
+            limit = self.error_window.burger_button.winfo_x()
+            start = self.file_label.winfo_x()
             info = self.file_label.grid_info()
             padx = info.get("padx", 0)
-            padx_total = (padx[0] + padx[1]) if isinstance(padx, (tuple, list)) else 2 * int(padx)
-            current_text = self.file_label.cget("text")
-            chrome = max(0, self.file_label.winfo_reqwidth() - measurer.measure(current_text))
-            avail = cell_w - padx_total - chrome - 4  # -4 невеликий запас
+            padx_right = padx[1] if isinstance(padx, (tuple, list)) else int(padx)
+            avail = limit - start - padx_right - self._header_icon_width() - 4
         except Exception:
             if self.file_label.cget("text") != full:
                 self.file_label.configure(text=full)
@@ -601,6 +623,21 @@ class LogTrackerApp:
 
         if self.file_label.cget("text") != text:
             self.file_label.configure(text=text)
+
+    def _header_icon_width(self):
+        """Ширина іконки в мітці заголовка у ФІЗИЧНИХ px (0 — якщо іконки нема).
+
+        Мітка малює `[іконка][текст]` (`compound="left"`), тож на текст лишається
+        її ширина мінус іконка. Питаємо ширину в самого Tk — у PhotoImage, який
+        CTkImage уже змасштабував під поточний DPI (виміряно 32 px при масштабі
+        2.0), а не виводимо з `reqwidth` мітки: `reqwidth` залежить від тексту, а
+        саме цю залежність тут і треба розірвати.
+        """
+        try:
+            photo = self.file_label._label.cget("image")
+            return int(self.root.tk.call("image", "width", photo)) if photo else 0
+        except Exception:
+            return 0
 
 
 if __name__ == "__main__":
