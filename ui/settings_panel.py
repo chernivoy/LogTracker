@@ -136,6 +136,8 @@ class SettingsPanel:
         self._labels = []
         self._entries = []
         self._buttons = []
+        # (звідки, куди) — якщо на відкритті кламп підняв вікно в екран
+        self._shifted = None
 
     # ---- публічний API ----
 
@@ -353,8 +355,14 @@ class SettingsPanel:
         # Вікно росте вниз, тож біля нижнього краю екрана могло б вилізти за
         # нього — той самий кламп, що й скрізь, де змінюється геометрія.
         scale = WindowHandler._window_scale(root)
-        x, y = rdp.clamp_to_visible(root.winfo_x(), root.winfo_y(),
+        was_x, was_y = root.winfo_x(), root.winfo_y()
+        x, y = rdp.clamp_to_visible(was_x, was_y,
                                     round(width * scale), round(height * scale))
+        # Зсув від клампа — це вимушене підняття вікна, щоб панель влізла в
+        # екран, а не переміщення, якого хотів користувач. Тож запам'ятовуємо і
+        # звідки, і куди посунули: на згортанні вікно має повернутись туди, де
+        # стояло, інакше кожне відкриття налаштувань підганяло б його вгору.
+        self._shifted = (was_x, was_y, x, y) if (x, y) != (was_x, was_y) else None
         root.geometry(f"{width}x{height}+{x}+{y}")
 
     def _collapse(self, extra):
@@ -362,13 +370,33 @@ class SettingsPanel:
         root._panel_extra_logical = 0
         root.minsize(300, WindowHandler.min_height_logical(root))
 
-        # Позицію не чіпаємо: вікно згортається знизу, верхній край лишається
-        # там, де стояв. Віднімаємо від ПОТОЧНОЇ висоти, а не повертаємо
-        # запам'ятану, — користувач міг ресайзити вікно з відкритою панеллю.
+        # Віднімаємо від ПОТОЧНОЇ висоти, а не повертаємо запам'ятану, —
+        # користувач міг ресайзити вікно з відкритою панеллю.
         width = self._logical(root.winfo_width())
         height = max(WindowHandler.min_height_logical(root),
                      self._logical(root.winfo_height()) - extra)
-        root.geometry(f"{width}x{height}")
+        root.geometry(f"{width}x{height}{self._restore_position()}")
+
+    def _restore_position(self):
+        """Хвіст `+x+y` для geometry(), якщо вікно треба повернути на місце.
+
+        Зазвичай позицію чіпати не треба: вікно згортається знизу, верхній край
+        лишається там, де стояв. Але якщо на відкритті кламп підняв вікно (панель
+        не влазила в екран), то після згортання воно лишилось би вище, ніж було,
+        і кожне відкриття налаштувань підганяло б його вгору.
+
+        Повертаємо тільки тоді, коли вікно й досі стоїть там, куди його посунув
+        кламп: якщо користувач тим часом сам перетягнув вікно, його позиція —
+        остання воля, і перебивати її не можна.
+        """
+        shifted, self._shifted = self._shifted, None
+        if not shifted:
+            return ""
+        was_x, was_y, moved_x, moved_y = shifted
+        root = self.root
+        if (root.winfo_x(), root.winfo_y()) != (moved_x, moved_y):
+            return ""
+        return f"+{was_x}+{was_y}"
 
     # ---- клавіатура і фокус ----
 

@@ -607,7 +607,21 @@ class WindowHandler:
         if root is None:
             return
 
-        if not hasattr(root, "_resize_dir") or not root._resize_dir:
+        # Ознака, що жест РЕАЛЬНО почався, — `_resize_scale`, а не `_resize_dir`:
+        # напрямок виставляє `change_cursor` на КОЖЕН `<Motion>` у зоні краю,
+        # тобто на просте наведення без кліку, а опорні точки (`_start_*`) кладе
+        # лише `start_resize`. Без цієї перевірки досить було провести мишею
+        # понад краєм — і будь-який наступний `<B1-Motion>` рахував нову
+        # геометрію від опорних точок ПОПЕРЕДНЬОГО жесту, тобто жбурляв вікно в
+        # чужий розмір і позицію.
+        #
+        # Ловилось це так: миша йде до кнопки Save панелі налаштувань низом
+        # вікна (там і кнопки, і зона краю), `start_resize` на самій кнопці
+        # виходить достроково, кнопка своєю ж командою ховає панель — і
+        # найменший порух із затиснутою кнопкою «ресайзив» вікно.
+        if not getattr(root, "_resize_scale", None):
+            return
+        if not getattr(root, "_resize_dir", None):
             return
         if not root.overrideredirect():
             return
@@ -778,9 +792,12 @@ class WindowHandler:
         if root is None:
             return
 
-        # Ресайзу не було (звичайний клік у не-крайовій зоні) — не пишемо ini
-        # на кожен клік і не перемальовуємо кути, лише скидаємо курсор.
-        if not getattr(root, "_resize_dir", None):
+        # Жесту не було — не пишемо ini на кожен клік і не перемальовуємо кути,
+        # лише скидаємо курсор. Ознака та сама, що й у do_resize: `_resize_scale`
+        # ставить ЛИШЕ start_resize, тоді як `_resize_dir` лишається виставленим
+        # від простого наведення на край (і на кліку по кнопці в тій зоні теж).
+        if not getattr(root, "_resize_scale", None):
+            root._resize_dir = None
             root.configure(cursor="")
             return
 
