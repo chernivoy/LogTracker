@@ -333,10 +333,23 @@ class WindowHandler:
     def start_move(event: tk.Event, root: ctk.CTk):
         """
         Зберігає початкову позицію курсора відносно вікна
-        для подальшого переміщення.
+        для подальшого переміщення і позначає жест як розпочатий.
         """
         root._start_move_x = event.x_root - root.winfo_x()
         root._start_move_y = event.y_root - root.winfo_y()
+        root._moving = True
+
+    @staticmethod
+    def stop_move(event: tk.Event):
+        """Кінець перетягування: знімає ознаку жесту (див. do_move).
+
+        Висить на `<ButtonRelease-1>` кореневого вікна, а не на віджетах
+        заголовка: відпустити кнопку можна де завгодно, зокрема над віджетом,
+        якого на початку жесту ще не існувало.
+        """
+        root = WindowHandler._event_root(event)
+        if root is not None:
+            root._moving = False
 
     @staticmethod
     def do_move(event: tk.Event, root: ctk.CTk):
@@ -344,6 +357,19 @@ class WindowHandler:
         Переміщує вікно відповідно до руху курсора.
         """
         if not root.overrideredirect():
+            return
+
+        # Рухаємо, ЛИШЕ якщо жест справді почався зі `start_move` на заголовку
+        # (те саме правило, що `_resize_scale` для ресайзу). `<B1-Motion>`
+        # приходить і без свого `<ButtonPress-1>`: коли віджет, на якому
+        # натиснули, знищено, неявний grab Tk розпадається і подальший рух із
+        # затиснутою кнопкою прилітає на віджет під курсором — тобто на
+        # заголовок/фон вікна. Саме так і буває на Save/Cancel панелі
+        # налаштувань: кнопка своєю ж командою ховає панель, вікно згортається,
+        # і під курсором опиняється main_frame. Тоді `_start_move_*` або не
+        # існує зовсім (AttributeError), або лишилось від ПОПЕРЕДНЬОГО
+        # перетягування — і вікно стрибало на сотні пікселів (виміряно 200).
+        if not getattr(root, "_moving", False):
             return
 
         # Якщо активний ресайз краю — не рухаємо вікно. Обробники move (на
@@ -380,6 +406,12 @@ class WindowHandler:
         # Прив'язуємо події ресайзу безпосередньо до кореневого вікна.
         for event_type, handler_func in resize_handlers:
             root.bind(event_type, handler_func)
+
+        # Кінець ПЕРЕТЯГУВАННЯ ловимо теж тут, на рівні вікна: сам жест
+        # починається на віджетах заголовка (ErrorWindow.bind_events), але
+        # відпустити кнопку можна де завгодно. add="+" — бо на цю ж послідовність
+        # щойно повішено stop_resize.
+        root.bind("<ButtonRelease-1>", WindowHandler.stop_move, add="+")
 
         # add="+" ОБОВ'ЯЗКОВИЙ: <Configure> на root вішає ще й LogTrackerApp
         # (дебаунс збереження геометрії). Прив'язка без add= стирає всі
