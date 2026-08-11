@@ -19,7 +19,6 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-from ui.settings_window import SettingsWindow
 from ui.ui_assets import (
     EXIT_ICON_PATH, SETTINGS_ICON_PATH, THEME_ICON_PATH,
     DARK_THEME_ICON_PATH, LIGHT_THEME_ICON_PATH, GRAPHITE_THEME_ICON_PATH
@@ -499,8 +498,11 @@ class ContextMenu:
         # тут же відділене саме те, що завершує роботу застосунку.
         return [
             _MenuItem("Theme", THEME_ICON_PATH, submenu=themes),
+            # Налаштування шляхів відкриваються ПАНЕЛЛЮ в самому вікні (окремого
+            # вікна більше нема), тож _activate спершу закриє меню, а вже потім
+            # панель забере фокус у своє перше поле.
             _MenuItem("Path settings", SETTINGS_ICON_PATH,
-                      command=lambda: SettingsWindow.open_settings_window(self.app)),
+                      command=self.app.open_path_settings),
             _MenuItem(separator=True),
             _MenuItem("Exit", EXIT_ICON_PATH, command=self.app.on_closing),
         ]

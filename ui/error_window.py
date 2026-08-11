@@ -4,6 +4,7 @@ import customtkinter as ctk
 
 from tray_manager import TrayManager
 from ui.context_menu import ContextMenu
+from ui.settings_panel import SettingsPanel
 from ui.toast import Toast
 from ui.ui_assets import APP_ICON_PATH, CLOSE_ICON_PATH, BURGER_MENU_ICON_PATH, APP_ICO_PATH
 from ui.window_handler import WindowHandler
@@ -29,6 +30,7 @@ class ErrorWindow:
         self.image_manager = image_manager
         self.context_menu = ContextMenu(self.root, self.app, self.image_manager)
         self.toast = None  # створюється в create_widgets, коли є контейнер
+        self.settings_panel = None  # те саме: йому потрібен main_frame
         self.widgets_to_update = {}
 
         self.setup_window()
@@ -113,8 +115,13 @@ class ErrorWindow:
         # НАЛАШТОВУЄМО GRID ДЛЯ main_frame:
         # row 0 (заголовок і кнопки) має weight 0
         # row 1 (фрейм з текстом) має weight 1, щоб розтягуватися по висоті
+        # row 2 (панель налаштування шляхів) — weight 0 і порожній, доки її не
+        #   відкриють: вікно на час показу росте рівно на її висоту, тож тиснути
+        #   поле помилки їй не треба. При нестачі місця grid забирає його саме в
+        #   рядка з weight, тобто панель лишається цілою, а поле стискається.
         self.main_frame.grid_rowconfigure(0, weight=0)
         self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_rowconfigure(2, weight=0)
 
         # Три колонки в main_frame:
         # Колонка 0 (заголовок) — weight=1, розтягується й ЗВУЖУЄТЬСЯ першою;
@@ -216,6 +223,14 @@ class ErrorWindow:
                            self.file_label, self.burger_button, self.error_frame,
                            bind_move=self._bind_move)
 
+        # Панель налаштування шляхів — ще один вміст ЦЬОГО вікна, а не окреме
+        # вікно: рядок під полем помилки, який заповнюється лише на час
+        # налаштування. Віджети будуються при відкритті, тут лише місце в grid
+        # і відступ від краю (той самий, що в error_frame — щоб контролі не
+        # налазили на дуги нижніх кутів і не ховали контур вікна).
+        self.settings_panel = SettingsPanel(self.app, self.root, self.main_frame,
+                                            row=2, inset=_CONTENT_INSET)
+
         # Зберігаємо віджети, які потрібно оновлювати, у словник
         self.widgets_to_update = {
             "main_frame": self.main_frame,
@@ -258,7 +273,10 @@ class ErrorWindow:
         except Exception:
             min_height_logical = 135 + _CONTENT_INSET
         self.root._min_height_logical = min_height_logical
-        self.root.minsize(300, min_height_logical)
+        # У самій minsize іде СУМА з висотою відкритої панелі налаштувань —
+        # інакше повторний виклик (logger.run робить його через after) зняв би
+        # запас під панель, і нижній край обрізав би її кнопки.
+        self.root.minsize(300, WindowHandler.min_height_logical(self.root))
 
     def bind_events(self):
         """Прив'язує події до віджетів: ресайз — на root (bind_resize_events),

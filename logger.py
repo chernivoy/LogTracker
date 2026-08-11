@@ -87,7 +87,6 @@ class LogTrackerApp:
         self.observer = None
         self.is_window_open = True
         self.tray_icon = None
-        self._settings_window = None  # відкрите вікно налаштувань (guard від дублювання)
         self._geometry_save_job = None
         self._header_file_path = None  # поточний файл у заголовку (для вписування імені)
 
@@ -251,7 +250,7 @@ class LogTrackerApp:
 
         Викликається з головного потоку Tk (кнопка Save), тож звертатися до
         обробника й черги тут безпечно — той самий потік, що й periodic_sync.
-        Шляхи вже провалідовані у SettingsWindow (джерело існує, призначення
+        Шляхи вже провалідовані в SettingsPanel (джерело існує, призначення
         непорожнє й не файл).
         """
         self.source_directory = source_directory
@@ -275,6 +274,15 @@ class LogTrackerApp:
         # Оновити вміст вікна під нові шляхи: найсвіжіша помилка з нової теки
         # або (якщо помилок ще нема) чисте поле замість старого вмісту/підказки.
         self._refresh_startup_view()
+
+    def open_path_settings(self):
+        """Показує панель налаштування шляхів унизу головного вікна.
+
+        Точка входу для бургер-меню. Окремого вікна налаштувань більше нема:
+        контролі з'являються в самому вікні, а воно на час показу стає вищим
+        рівно на їхню висоту (див. ui/settings_panel.py).
+        """
+        self.error_window.settings_panel.open()
 
     def _watch_destination(self):
         """(Пере)планує watchdog на поточну теку призначення, якщо вона придатна.
@@ -483,6 +491,11 @@ class LogTrackerApp:
         self.root.attributes('-alpha', current_theme["window_alpha"])
 
         ThemeManager.update_widgets_theme(self, self.widgets_to_update)
+        # Панель налаштування шляхів у widgets_to_update не входить: її віджети
+        # існують лише поки вона відкрита, а update_widgets_theme читає ключі
+        # напряму (відсутній віджет = KeyError). Тему їй міняє вона сама —
+        # no-op, коли панель закрита.
+        self.error_window.settings_panel.apply_theme()
         ConfigManager.save_config("Theme", "current", theme_name)
 
     def show_latest_known_error(self):

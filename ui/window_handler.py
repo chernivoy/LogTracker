@@ -52,6 +52,47 @@ class WindowHandler:
     # клин фону канви.
     CORNER_RADIUS = 15
 
+    # Віджети, у яких клік і протяг мають лишатися кліком і протягом, а не
+    # ставати ресайзом вікна: кнопки заголовка (згорнути/бургер), кнопки й поля
+    # вводу панелі налаштувань. Розпізнаємо за шляхом Tk-віджета — він містить
+    # ім'я класу CTk (в т.ч. для внутрішніх canvas/label/entry).
+    #
+    # Поля вводу тут критичні: панель займає низ вікна, а її поля відступають
+    # від краю лише на _CONTENT_INSET (6 логічних px), тобто цілком потрапляють
+    # у 20-піксельну смугу захоплення краю. Без цієї перевірки виділення тексту
+    # мишею біля лівого/правого краю ресайзило б вікно замість виділення.
+    _CLICKABLE_WIDGETS = ("ctkbutton", "ctkentry")
+
+    @staticmethod
+    def _is_clickable_widget(event: tk.Event):
+        widget_path = str(event.widget)
+        return any(name in widget_path for name in WindowHandler._CLICKABLE_WIDGETS)
+
+    @staticmethod
+    def _event_root(event: tk.Event):
+        """Вікно, у якому сталася подія, або None — якщо віджета вже нема.
+
+        `event.widget` не завжди віджет: Tkinter підставляє туди сирий
+        РЯДОК-шлях, коли Python-об'єкта за цим шляхом немає в реєстрі, тобто
+        коли віджет уже знищено. Це не екзотика, а звичайний наслідок того, що
+        всі кнопки миші прив'язані ще й на рівні ВІКНА: Tk виконує прив'язки по
+        bindtags по черзі (віджет → клас → вікно → all), і якщо віджетна
+        встигла знищити сам віджет, до віконної доходить мертвий шлях.
+
+        Саме так поводяться Save/Cancel панелі налаштувань: `CTkButton` кличе
+        команду на `<Button-1>`, команда ховає панель разом із кнопкою — і
+        `start_resize`, що йде наступним у ланцюгу, падав тут на
+        `.winfo_toplevel()`. Нічого страшного в події вже не лишилось (клік по
+        кнопці ресайзу все одно не починає), тож повертаємо None і виходимо.
+        """
+        widget = event.widget
+        if isinstance(widget, str):
+            return None
+        try:
+            return widget.winfo_toplevel()
+        except Exception:
+            return None
+
     @staticmethod
     def save_window_size(section, root):
         # Симетрично до load_window_size: зберігаємо ЛОГІЧНІ width/height
@@ -67,6 +108,14 @@ class WindowHandler:
         height = WindowHandler._to_logical(root, root.winfo_height())
         x = root.winfo_x()
         y = root.winfo_y()
+
+        # Поки внизу вікна відкрита панель налаштування шляхів, вікно тимчасово
+        # вище рівно на її висоту (ui/settings_panel.py). В ini має лежати
+        # ВЛАСНА висота користувача: інакше закриття панелі повернуло б розмір
+        # вікна, а збережений лишився б з нею — і наступний запуск відкрився б
+        # із зайвим порожнім місцем унизу. load_window_size додає приріст назад,
+        # якщо панель відкрита (відновлення з трея).
+        height = max(1, height - getattr(root, "_panel_extra_logical", 0))
 
         config = ConfigManager.load_config(CONFIG_FILE_WINDOW)
 
@@ -153,6 +202,12 @@ class WindowHandler:
         x = config.getint(section, 'x', fallback=100)
         y = config.getint(section, 'y', fallback=100)
 
+        # Симетрично до save_window_size: в ini лежить висота БЕЗ панелі
+        # налаштувань, тож якщо вона зараз відкрита — повертаємо приріст.
+        # Інакше відновлення з трея з відкритою панеллю підрізало б вікно на
+        # її висоту, і панель тиснула б поле помилки.
+        height += getattr(root, "_panel_extra_logical", 0)
+
         # Захист від зниклого вікна: clamp у фізичному просторі екрана, тож
         # логічні w/h переводимо в фізичну оцінку розміру через масштаб CTk.
         scale = WindowHandler._window_scale(root)
@@ -161,6 +216,26 @@ class WindowHandler:
         x, y = rdp.clamp_to_visible(x, y, phys_w, phys_h)
 
         return f'{width}x{height}+{x}+{y}'
+
+    @staticmethod
+    def min_height_logical(root):
+        """Мінімальна ЛОГІЧНА висота вікна на ЦЕЙ момент.
+
+        Складається з двох частин, які живуть окремо:
+
+        - `root._min_height_logical` — заголовок плюс запас під ~кілька рядків
+          тексту; міряє й виставляє `ErrorWindow.apply_dynamic_min_height`;
+        - `root._panel_extra_logical` — висота відкритої панелі налаштувань
+          (0, коли її нема); виставляє `ui/settings_panel.py`.
+
+        Складати їх мусить одне місце, бо число потрібне ТРЬОМ сторонам одразу:
+        `root.minsize(...)`, межі ручного ресайзу в `do_resize` і самій панелі
+        при згортанні вікна. Розійшлися б вони — і при ресайзі з півночі/заходу
+        OS клампив би розмір по одній межі, а x/y зсувалися б по іншій: вікно
+        «повзло» б (та сама пастка, що описана в do_resize).
+        """
+        return (getattr(root, "_min_height_logical", 100)
+                + getattr(root, "_panel_extra_logical", 0))
 
     @staticmethod
     def _outline_radius_px(root):
@@ -377,19 +452,19 @@ class WindowHandler:
         """
         Змінює вигляд курсора на краю вікна для вказівки на можливість ресайзу.
         """
-        root = event.widget.winfo_toplevel()
+        root = WindowHandler._event_root(event)
+        if root is None:
+            return
         # Якщо вікно має рамку (не overrideredirect), ОС сама керує курсором.
         if not root.overrideredirect():
             root.configure(cursor="")
             root._resize_dir = None
             return
 
-        # Кнопки згорнути/бургер — клік має лишатись кліком, не ресайзом і не
-        # переміщенням. Шлях Tk-віджета кнопки містить "ctkbutton" (в т.ч. для
-        # внутрішніх canvas/label). Перевіряємо ДО зони заголовка, бо кнопки
-        # теж у ній лежать.
-        widget_path = str(event.widget)
-        if "ctkbutton" in widget_path:
+        # Кнопки й поля вводу самі обробляють клік (див. _CLICKABLE_WIDGETS) —
+        # там ані ресайзу, ані переміщення. Перевіряємо ДО зони заголовка, бо
+        # кнопки згорнути/бургер лежать саме в ній.
+        if WindowHandler._is_clickable_widget(event):
             root.configure(cursor="")
             root._resize_dir = None
             return
@@ -452,13 +527,14 @@ class WindowHandler:
 
     @staticmethod
     def start_resize(event: tk.Event):
-        root = event.widget.winfo_toplevel()
+        root = WindowHandler._event_root(event)
+        if root is None:
+            return
 
-        # Клік по кнопці в куті — це клік, а не початок ресайзу чи переміщення.
-        # Перевіряємо ДО зони заголовка, бо кнопки теж у ній. Шлях віджета
-        # кнопки містить "ctkbutton" (в т.ч. для внутрішніх canvas/label).
-        widget_path = str(event.widget)
-        if "ctkbutton" in widget_path:
+        # Клік по кнопці чи в поле вводу — це клік, а не початок ресайзу або
+        # переміщення (див. _CLICKABLE_WIDGETS). Перевіряємо ДО зони заголовка,
+        # бо кнопки згорнути/бургер лежать саме в ній.
+        if WindowHandler._is_clickable_widget(event):
             root._resize_dir = None
             return
 
@@ -527,7 +603,9 @@ class WindowHandler:
         """
         Виконує зміну розміру вікна відповідно до руху курсора.
         """
-        root = event.widget.winfo_toplevel()
+        root = WindowHandler._event_root(event)
+        if root is None:
+            return
 
         if not hasattr(root, "_resize_dir") or not root._resize_dir:
             return
@@ -549,10 +627,10 @@ class WindowHandler:
         # застосовує до minsize той самий масштаб, тож OS-мінімум теж
         # (min_logical * scale). Якби межі не збігалися, при ресайзі з заходу/
         # півночі OS клампив би розмір, а x/y усе одно зсувалися б — вікно
-        # «повзло» б убік. Висота — динамічна (заголовок + запас під текст),
-        # її рахує ErrorWindow і кладе в root._min_height_logical.
+        # «повзло» б убік. Висота — динамічна (заголовок + запас під текст, а з
+        # відкритою панеллю налаштувань ще й вона), її дає min_height_logical.
         min_width = int(300 * scale)
-        min_height = int(getattr(root, "_min_height_logical", 100) * scale)
+        min_height = int(WindowHandler.min_height_logical(root) * scale)
 
         new_width_logical = root._start_width_logical
         new_height_logical = root._start_height_logical
@@ -696,7 +774,9 @@ class WindowHandler:
 
     @staticmethod
     def stop_resize(event: tk.Event):
-        root = event.widget.winfo_toplevel()
+        root = WindowHandler._event_root(event)
+        if root is None:
+            return
 
         # Ресайзу не було (звичайний клік у не-крайовій зоні) — не пишемо ini
         # на кожен клік і не перемальовуємо кути, лише скидаємо курсор.

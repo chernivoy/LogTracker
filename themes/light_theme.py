@@ -62,7 +62,7 @@ THEME_SETTINGS = {
     "context_menu_accent_color": "#4F46E5",
     "context_menu_muted_fg": "#8A8880",
     "context_menu_font": ("Inter", 13),
-    #Стиль для settings_window (модальне вікно Path settings)
+    #Стиль для settings_panel (смуга Path settings унизу вікна)
     # Фон = паперовий фон вікна, поля — чисті білі, кнопки — індиго-акцент.
     "settings_bg": "#F5F4F1",
     "settings_text_color": "#1C1C1E",
