@@ -2,11 +2,33 @@ import ctypes
 import os
 import shutil
 import subprocess
+from collections import namedtuple
 
 
 # Формати буфера обміну Windows (winuser.h): сам файл і текст у UTF-16.
 CF_UNICODETEXT = 13
 CF_HDROP = 15
+
+
+# Результат одного тіку синхронізації.
+#
+# copied — повні шляхи в теці призначення, які цей тік справді оновив.
+# Раніше тут був bool, і будь-яке копіювання запускало перечитування ВСІХ
+# файлів теки призначення (при 470 логах — 81,5 мс щосекунди), хоча нові
+# байти можуть бути лише в тому, що щойно скопійовано: файл без зміни
+# mtime не копіюється, а без копіювання його вміст у теці призначення не
+# міняється.
+#
+# present — усі файли теки призначення, які лишились після прибирання
+# осиротілих; звідси FileChangeHandler дізнається, чиї офсети ще актуальні.
+# None означає «синхронізація не відбулася» (шляхи не задані, джерело
+# зникло, виняток). Порожня множина і None тут РІЗНІ речі: сплутавши їх,
+# ми зняли б з обліку геть усе на першому ж тіку з недоступним джерелом, а
+# наступний тік «усиновив» би файли заново — і вікно вискочило б з трея зі
+# старою, вже показаною помилкою.
+SyncResult = namedtuple('SyncResult', 'copied present')
+
+_SYNC_NOT_RUN = SyncResult(frozenset(), None)
 
 
 class _DROPFILES(ctypes.Structure):
@@ -116,9 +138,55 @@ class FileHandler:
             return False
 
     @staticmethod
+    def _scan_log_dir(directory, file_extension, remove_stale_part=False):
+        """{ім'я: mtime} для логів теки — одним перелічуванням.
+
+        os.scandir віддає mtime з тих даних, які файлова система вже
+        повернула під час обходу теки, тож окремий stat на кожен файл не
+        потрібен. Раніше тут стояли os.listdir + os.path.getmtime, тобто
+        два системні виклики на файл: при 470 логах саме лише порівняння
+        часів коштувало 11,6 мс щосекунди.
+        """
+        result = {}
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                filename = entry.name
+
+                # Осиротілі .part від копіювань, обірваних крашем. os.replace у
+                # copy_file_without_waiting атомарний, тож у нормальному потоці
+                # .part не лишається — усе, що тут є, це слід аварійного виходу.
+                # Прибирати їх більше нікому: нижче все фільтрується за
+                # file_extension (.log), тож .part проскакував і копився вічно.
+                if remove_stale_part and filename.endswith('.part'):
+                    try:
+                        os.remove(entry.path)
+                        print(f"Removed stale temp file: {filename}")
+                    except OSError:
+                        pass
+                    continue
+
+                if not filename.endswith(file_extension):
+                    continue
+
+                # Файл міг зникнути між обходом теки і зверненням до нього
+                # (гонка з застосунком, що ротує логи). Пропускаємо саме
+                # проблемний файл, а не весь прохід — наступний тік повторить.
+                try:
+                    if entry.is_file():
+                        result[filename] = entry.stat().st_mtime
+                except OSError as e:
+                    print(f"Skip {filename}: {e}")
+                    continue
+
+        return result
+
+    @staticmethod
     def copy_files_from_source_dir(source_directory, dest_directory, managed_files=None,
                                    file_extension='.log'):
         """Синхронізує логи з джерела в теку призначення.
+
+        Повертає SyncResult (див. опис угорі файлу): що саме оновлено цим
+        тіком і що лишилось у теці призначення.
 
         managed_files — множина імен, які скопіював саме цей застосунок.
         Прибирання застарілих копій обмежене цією множиною: тека
@@ -130,74 +198,68 @@ class FileHandler:
         стежив за одним розширенням, а копіював інше.
         """
         # Перший запуск без налаштувань: порожнє/неіснуюче джерело — нема що
-        # копіювати. Без цього os.listdir(source) на порожньому шляху кидає
+        # копіювати. Без цього os.scandir(source) на порожньому шляху кидає
         # (Windows) або мовчки лістить робочу теку (POSIX), а порожнє
         # призначення обернуло б os.path.join на відносний шлях — копіювання
         # опинилося б у поточній робочій теці процесу.
         if not source_directory or not os.path.isdir(source_directory):
-            return False
+            return _SYNC_NOT_RUN
         if not dest_directory:
-            return False
+            return _SYNC_NOT_RUN
         try:
             FileHandler().create_directory_if_not_exists(dest_directory)
-            copied = False
-            for filename in os.listdir(source_directory):
-                if not filename.endswith(file_extension):
+
+            source_mtimes = FileHandler._scan_log_dir(source_directory, file_extension)
+            dest_mtimes = FileHandler._scan_log_dir(dest_directory, file_extension,
+                                                    remove_stale_part=True)
+
+            copied = set()
+            for filename, source_mtime in source_mtimes.items():
+                dest_mtime = dest_mtimes.get(filename)
+
+                # Копія зберігає mtime джерела, тож будь-яка РІЗНИЦЯ означає
+                # розсинхрон — і в той, і в інший бік. Порівняння через '>'
+                # лишало б застарілими копії, зроблені до введення переносу
+                # mtime: у них стоїть час копіювання, тобто завідомо новіший
+                # за джерело, і оновитись вони не могли б ніколи.
+                # Допуск 1 мс — на похибку представлення float.
+                if dest_mtime is not None and abs(source_mtime - dest_mtime) <= 0.001:
                     continue
+
                 source_file = os.path.join(source_directory, filename)
                 dest_file = os.path.join(dest_directory, filename)
-
-                # Обробку кожного файлу ізолюємо: os.path.getmtime нижче падає,
-                # якщо файл зник між listdir і зверненням (гонка з застосунком,
-                # що ротує логи). Раніше такий OSError ловив лише зовнішній
-                # except — і решта файлів у тіку не оброблялася зовсім.
-                # Тепер пропускаємо саме проблемний файл, наступний тік
-                # повторить.
                 try:
                     # Заблокований файл просто пропускаємо. Раніше тут стояв
                     # wait_for_file(), який блокував головний потік Tk до 2 с
                     # на файл — при 56 файлах тік, розрахований на секунду,
                     # міг розтягтися на хвилини. Наступний тік через секунду
                     # повторить спробу, чекати немає сенсу.
-                    if FileHandler.is_file_closed(source_file):
-                        # Копія зберігає mtime джерела, тож будь-яка
-                        # РІЗНИЦЯ означає розсинхрон — і в той, і в інший
-                        # бік. Порівняння через '>' лишало б застарілими
-                        # копії, зроблені до введення переносу mtime: у них
-                        # стоїть час копіювання, тобто завідомо новіший за
-                        # джерело, і оновитись вони не могли б ніколи.
-                        # Допуск 1 мс — на похибку представлення float.
-                        needs_copy = not os.path.exists(dest_file) or abs(
-                            os.path.getmtime(source_file) - os.path.getmtime(dest_file)
-                        ) > 0.001
-                        # copied відображає лише реальний успіх: раніше
-                        # прапорець ставився беззастережно, а помилку
-                        # копіювання проковтували — у лог ішло «File copied»
-                        # навіть коли файл не скопіювався.
-                        if needs_copy and FileHandler.copy_file_without_waiting(source_file, dest_file):
-                            copied = True
+                    #
+                    # Перевірка стоїть ПІСЛЯ порівняння mtime і не дарма:
+                    # is_file_closed відкриває файл, а відкривати треба лише
+                    # той, який зараз копіюємо. Раніше вона стояла першою, тож
+                    # щосекунди відкривалися геть усі файли джерела — при 470
+                    # логах це 57,7 мс на тік, тобто левова частка постійних
+                    # 9 % ядра, і зростало воно лінійно з кожним новим логом.
+                    if not FileHandler.is_file_closed(source_file):
+                        continue
 
-                            if managed_files is not None:
-                                managed_files.add(filename)
+                    # copied відображає лише реальний успіх: раніше
+                    # прапорець ставився беззастережно, а помилку
+                    # копіювання проковтували — у лог ішло «File copied»
+                    # навіть коли файл не скопіювався.
+                    if FileHandler.copy_file_without_waiting(source_file, dest_file):
+                        copied.add(dest_file)
+
+                        if managed_files is not None:
+                            managed_files.add(filename)
                 except OSError as e:
                     print(f"Skip source {filename}: {e}")
                     continue
 
-            for filename in os.listdir(dest_directory):
-                # Осиротілі .part від копіювань, обірваних крашем. os.replace у
-                # copy_file_without_waiting атомарний, тож у нормальному потоці
-                # .part не лишається — усе, що тут є, це слід аварійного виходу.
-                # Прибирати їх більше нікому: обхід нижче фільтрує за
-                # file_extension (.log), тож .part проскакував і копився вічно.
-                if filename.endswith('.part'):
-                    try:
-                        os.remove(os.path.join(dest_directory, filename))
-                        print(f"Removed stale temp file: {filename}")
-                    except OSError:
-                        pass
-                    continue
-                if not filename.endswith(file_extension):
-                    continue
+            present = {os.path.join(dest_directory, name) for name in dest_mtimes}
+
+            for filename in dest_mtimes.keys() - source_mtimes.keys():
                 dest_file = os.path.join(dest_directory, filename)
                 source_file = os.path.join(source_directory, filename)
 
@@ -205,6 +267,10 @@ class FileHandler:
                 # спіткнутися об файл, який зник під ногами, а зривати через це
                 # весь прохід синхронізації не можна.
                 try:
+                    # Знімок джерела зроблено кількома мілісекундами раніше, і
+                    # файл міг з'явитися вже після нього. Питаємо диск наживо,
+                    # щоб не видалити щойно створений лог. Кандидатів тут
+                    # одиниці (зазвичай нуль), тож зайвий stat нічого не варт.
                     if os.path.exists(source_file):
                         continue
 
@@ -214,23 +280,25 @@ class FileHandler:
                         continue
 
                     os.remove(dest_file)
+                    present.discard(dest_file)
                     if managed_files is not None:
                         managed_files.discard(filename)
                     print(
                         f'File {filename} removed from {dest_directory},  because it does not exist in {source_directory}')
-                    copied = True
                 except OSError as e:
                     print(f"Skip dest {filename}: {e}")
                     continue
+
             if copied:
                 print(f'Finished copying from {source_directory} to {dest_directory}.')
-            # Явний return: раніше при copied=False функція просто добігала
-            # до кінця і віддавала None. Працювало випадково — обидва
-            # значення хибні — але тип, що залежить від гілки, це пастка.
-            return copied
+            # Знімок теки призначення зроблено ДО копіювання, тож щойно
+            # створені копії до нього не потрапили — додаємо їх явно,
+            # інакше _forget_missing_files зняв би з обліку файл, який
+            # цей же тік і завів.
+            return SyncResult(frozenset(copied), frozenset(present) | frozenset(copied))
         except Exception as e:
             print(f" Error when copying file from {source_directory} to {dest_directory}: {e}")
-            return False
+            return _SYNC_NOT_RUN
 
     @staticmethod
     def _put_on_clipboard(clip_format, payload):
