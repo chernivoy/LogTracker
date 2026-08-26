@@ -138,14 +138,30 @@ class FileHandler:
             return False
 
     @staticmethod
-    def _scan_log_dir(directory, file_extension, remove_stale_part=False):
+    def _scan_log_dir(directory, file_extension, remove_stale_part=False, fresh=False):
         """{ім'я: mtime} для логів теки — одним перелічуванням.
 
-        os.scandir віддає mtime з тих даних, які файлова система вже
-        повернула під час обходу теки, тож окремий stat на кожен файл не
-        потрібен. Раніше тут стояли os.listdir + os.path.getmtime, тобто
-        два системні виклики на файл: при 470 логах саме лише порівняння
-        часів коштувало 11,6 мс щосекунди.
+        fresh=False бере mtime з даних, які файлова система вже повернула
+        під час обходу теки (`DirEntry.stat()`), тобто без жодного
+        системного виклику на файл. fresh=True питає кожен файл окремо
+        через os.stat().
+
+        **Для теки джерела fresh=True ОБОВ'ЯЗКОВИЙ — не «оптимізуй» його
+        назад.** На Windows os.scandir читає елементи каталогу
+        (FindFirstFileW), а NTFS не оновлює в них час і розмір, поки у
+        файлу відкритий дескриптор на запис. Стежений застосунок тримає
+        свій лог відкритим усю сесію, тож саме той файл, чиї помилки нам і
+        треба показувати, виглядав незміненим: копіювання не спрацьовувало,
+        перевірки помилок не було, вікно не спливало з трея. Виміряно в
+        полі: елемент каталогу відставав до 24 хвилин, а при відкритому
+        дескрипторі scandir віддавав size=0 на файлі з 24 байтами.
+
+        Тека призначення обходиться кешованими даними свідомо: копії пише
+        сам застосунок і закриває їх до os.replace, тож відкритих
+        дескрипторів там не буває (перевірено на 470 файлах — нуль
+        розбіжностей). До того ж ризик несиметричний: застарілий mtime
+        копії призвів би щонайбільше до зайвого копіювання, яке наступний
+        тік виправить, а застарілий mtime джерела ховає помилку назавжди.
         """
         result = {}
         with os.scandir(directory) as entries:
@@ -173,7 +189,8 @@ class FileHandler:
                 # проблемний файл, а не весь прохід — наступний тік повторить.
                 try:
                     if entry.is_file():
-                        result[filename] = entry.stat().st_mtime
+                        result[filename] = (os.stat(entry.path) if fresh
+                                            else entry.stat()).st_mtime
                 except OSError as e:
                     print(f"Skip {filename}: {e}")
                     continue
@@ -209,7 +226,10 @@ class FileHandler:
         try:
             FileHandler().create_directory_if_not_exists(dest_directory)
 
-            source_mtimes = FileHandler._scan_log_dir(source_directory, file_extension)
+            # fresh=True для джерела — інакше активний лог виглядає
+            # незміненим і його помилки не показуються (див. _scan_log_dir).
+            source_mtimes = FileHandler._scan_log_dir(source_directory, file_extension,
+                                                      fresh=True)
             dest_mtimes = FileHandler._scan_log_dir(dest_directory, file_extension,
                                                     remove_stale_part=True)
 
