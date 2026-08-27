@@ -20,15 +20,19 @@ pip install -r requirements.txt
 # Запуск
 python logger.py
 
-# Збірка через spec-файл (one-file) — ТІЛЬКИ модулем, не лаунчером
-.\venv\Scripts\python.exe -m PyInstaller --noconfirm --clean logger.spec   # → dist/logger.exe
+# Збірка через spec-файл (one-file) — з АКТИВОВАНИМ venv цього репо
+pyinstaller --noconfirm --clean logger.spec                                # → dist/logger.exe
+# Гарантовано правильне оточення, без залежності від PATH/активації:
+.\venv\Scripts\python.exe -m PyInstaller --noconfirm --clean logger.spec
 
 # Збірка через GUI (варіант із README, дав поточний output/logger/)
 pip install auto-py-to-exe
 auto-py-to-exe
 ```
 
-> **Збирати треба `python.exe -m PyInstaller`, а не `pyinstaller`.** Тека `venv` сюди **скопійована** зі старої копії проєкту, тож усі лаунчери в `venv\Scripts\*.exe` тримають зашитий shebang `#!C:\ChernivoyPersonaldata\log\venv\Scripts\python.exe` і запускають **чужий** інтерпретатор з чужими site-packages. Те саме дає активований у терміналі старий venv (`VIRTUAL_ENV`, PATH). Джерела при цьому беруться правильні (entry-скрипт і pathex вказують сюди), а от **усі бібліотеки в exe** — з чужого оточення: одного разу так заїхали `pywintypes312.dll`, `win32api.pyd`, `win32con`, яких застосунок не використовує (він навмисно на `ctypes`, без pywin32). `venv\Scripts\python.exe` shebang не читає й дає правильний `sys.prefix`. Перевірка в першому екрані логу збірки: рядок **`Python environment: C:\ADAICA_DEV_BD\log\venv`**; після збірки — `grep -c ChernivoyPersonaldata build\logger\Analysis-00.toc` має бути `0`.
+> **Збірка мовчки бере ЧУЖЕ оточення, якщо не стежити.** Тека `venv` сюди свого часу **скопійована** зі старої копії проєкту, і разом з нею приїхали лаунчери `venv\Scripts\*.exe` із зашитим shebang `#!C:\ChernivoyPersonaldata\log\venv\Scripts\python.exe` — тобто навіть локальний `pyinstaller.exe` запускав чужий інтерпретатор з чужими site-packages. Полагоджено 27.08.2026 через `python.exe -m pip install --force-reinstall --no-deps pyinstaller==6.10.0` (перегенерував лаунчер із правильним shebang), тож звичайний `pyinstaller` знову годиться — але **лише з активованим venv цього репо**: вибір робить PATH, і активований у терміналі сторонній venv (`VIRTUAL_ENV`) переможе мовчки. Скопіюєш `venv` ще раз — shebang зламається знову.
+>
+> Джерела при цьому беруться правильні (entry-скрипт і `pathex` вказують сюди), а от **усі бібліотеки в exe** — з чужого оточення: одного разу так заїхали `pywintypes312.dll`, `win32api.pyd`, `win32con`, яких застосунок не використовує (він навмисно на `ctypes`, без pywin32). Тому перевірка щоразу: у першому екрані логу збірки має стояти **`Python environment: C:\ADAICA_DEV_BD\log\venv`**, а після збірки `grep -c ChernivoyPersonaldata build\logger\Analysis-00.toc` має дати `0`.
 
 Python 3.12. `requirements.txt` збережений у UTF-16 — читати/редагувати з урахуванням кодування.
 
