@@ -284,6 +284,17 @@ class LogTrackerApp:
         """
         self.error_window.settings_panel.open()
 
+    def close_context_menu(self):
+        """Закриває бургер-меню, якщо воно відкрите (no-op, коли закрите).
+
+        Потрібне згортанню в трей: картки меню — окремі Toplevel, тож вони НЕ
+        зникають разом із головним вікном (див. TrayManager.minimize_to_tray).
+        Тримаємо це тут, а не в TrayManager, з тієї ж причини, що й
+        open_path_settings: доступ до нутрощів ErrorWindow лишається одним
+        методом застосунку, а не ланцюжком app.error_window.<віджет>.
+        """
+        self.error_window.context_menu.close()
+
     def _watch_destination(self):
         """(Пере)планує watchdog на поточну теку призначення, якщо вона придатна.
 

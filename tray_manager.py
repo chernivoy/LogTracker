@@ -119,6 +119,18 @@ class TrayManager:
 
         app.tray_icon = pystray.Icon("LogTracker", icon_image, "LogTracker for ADAICA", menu)
 
+        # Бургер-меню — ОКРЕМИЙ Toplevel, і root.withdraw() його НЕ ховає:
+        # withdraw діє лише на своє вікно, а попап не transient. Сам себе він
+        # теж не закриє: клік по кнопці «в трей» дає йому FocusOut, але
+        # рішення ContextMenu відкладає на 60 мс і звіряє з focus_displayof()
+        # (бо FocusOut приходить і від кліку по власному підменю) — а на той
+        # момент вікно вже withdraw, і Tk повертає фокус самому попапу як
+        # єдиному видимому вікну застосунку. Меню бачить фокус «у себе» й
+        # лишається відкритим: картка висить поверх усіх вікон, коли самого
+        # застосунку на екрані вже нема (виміряно: popup viewable=1 після
+        # withdraw, focus_displayof() — знову попап). Тож закриваємо явно.
+        app.close_context_menu()
+
         root.withdraw()
         app.tray_icon.run_detached()
 
