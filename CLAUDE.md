@@ -13,20 +13,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Проект без тестів, лінтерів і CI. Все запускається вручну з кореня репозиторію.
 
 ```powershell
-# Віртуальне середовище (у репо є і .venv, і venv — актуальне .venv)
-.\.venv\Scripts\Activate.ps1
+# Віртуальне середовище (у репо є і .venv, і venv — PyInstaller лише в venv)
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 # Запуск
 python logger.py
 
-# Збірка через spec-файл (one-file)
-pyinstaller logger.spec        # → dist/logger.exe (один самодостатній файл)
+# Збірка через spec-файл (one-file) — ТІЛЬКИ модулем, не лаунчером
+.\venv\Scripts\python.exe -m PyInstaller --noconfirm --clean logger.spec   # → dist/logger.exe
 
 # Збірка через GUI (варіант із README, дав поточний output/logger/)
 pip install auto-py-to-exe
 auto-py-to-exe
 ```
+
+> **Збирати треба `python.exe -m PyInstaller`, а не `pyinstaller`.** Тека `venv` сюди **скопійована** зі старої копії проєкту, тож усі лаунчери в `venv\Scripts\*.exe` тримають зашитий shebang `#!C:\ChernivoyPersonaldata\log\venv\Scripts\python.exe` і запускають **чужий** інтерпретатор з чужими site-packages. Те саме дає активований у терміналі старий venv (`VIRTUAL_ENV`, PATH). Джерела при цьому беруться правильні (entry-скрипт і pathex вказують сюди), а от **усі бібліотеки в exe** — з чужого оточення: одного разу так заїхали `pywintypes312.dll`, `win32api.pyd`, `win32con`, яких застосунок не використовує (він навмисно на `ctypes`, без pywin32). `venv\Scripts\python.exe` shebang не читає й дає правильний `sys.prefix`. Перевірка в першому екрані логу збірки: рядок **`Python environment: C:\ADAICA_DEV_BD\log\venv`**; після збірки — `grep -c ChernivoyPersonaldata build\logger\Analysis-00.toc` має бути `0`.
 
 Python 3.12. `requirements.txt` збережений у UTF-16 — читати/редагувати з урахуванням кодування.
 
